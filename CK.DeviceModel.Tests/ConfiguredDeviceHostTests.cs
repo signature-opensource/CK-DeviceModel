@@ -137,7 +137,7 @@ namespace CK.DeviceModel.Tests
 
             devicesHost.TryAdd("pcl1", pclConfig1).Should().BeTrue();
 
-            devicesHost.TryAdd("pcl1", pclConfig1);
+            devicesHost.TryAdd("pcl1", pclConfig1).Should().BeFalse();
 
             devicesHost.TryAdd("pcl2", pclConfig2).Should().BeTrue();
 
