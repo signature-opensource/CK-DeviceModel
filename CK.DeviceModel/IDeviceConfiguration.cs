@@ -16,5 +16,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <returns>A handle to the new configuration.</returns>
         public IDeviceConfiguration Clone();
+
+        //public T CreateDevice<T>() where T : Device;
     }
 }

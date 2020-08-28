@@ -23,15 +23,17 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         public int i;
     }
 
+    public struct YMCA
+    {
+        public int Y;
+        public int M;
+        public int C;
+        public int A;
+    }
+
     internal class TimeoutTestDevice : CppDevice
     {
-        struct YMCA
-        {
-            public int Y;
-            public int M;
-            public int C;
-            public int A;
-        }
+
 
         public TimeoutTestDevice(TimeoutTestDeviceConfiguration config, TestCppDeviceConfig nativeDeviceConfig) : base(config, nativeDeviceConfig)
         {
@@ -41,9 +43,21 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             {
                 YMCA? zone;
                 zone = e.MarshalToStruct<YMCA>();
-                zone.Should().BeNull();
+                zone.Should().BeNull();            
             });
 
+            AddEventProcessing(25, (e) =>
+            {
+                YMCA? zone;
+                zone = e.MarshalToStruct<YMCA>();
+                zone.Should().NotBeNull();
+                YMCA val = zone.Value;
+                val.Y.Should().Be(8);
+                val.M.Should().Be(8764);
+                val.C.Should().Be(-1837);
+                val.A.Should().Be(0);
+
+            });
             AddEventProcessing(58, (e) =>
             {
                 e.MarshalToStruct(storageForEvent58).Should().BeFalse();
@@ -129,7 +143,22 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             e.EventCode = 24;
 
             _dev.SendVirtualEventForTests(e);
-            
+
+
+            Event e2 = default;
+            e2.EventCode = 25;
+            e2.Field1.Int0 = 1;
+
+            YMCA test = default;
+            test.Y = 8;
+            test.M = 8764;
+            test.C = -1837;
+            test.A = 0;
+
+            e2.Field2.IntPtr = Marshal.AllocHGlobal(Marshal.SizeOf(test));
+            Marshal.StructureToPtr(test, e2.Field2.IntPtr, true);
+
+            _dev.SendVirtualEventForTests(e2);
         }
 
 

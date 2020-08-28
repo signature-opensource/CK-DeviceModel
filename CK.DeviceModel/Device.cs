@@ -119,7 +119,7 @@ namespace CK.DeviceModel
     };
 
 
-    public abstract class Device
+    public class Device
     {
         public string Name { get; private set; }
 
@@ -133,15 +133,13 @@ namespace CK.DeviceModel
         
         protected EventsProcessingCallback Callback { get; private set; }
 
-        protected Device(IDeviceConfiguration config)
+        private void Init()
         {
             Callback = ProcessEvent;
 
-            Name = config.Name;
-
             // 255 should be enough
             _eventHandlers = new ProcessChangedValue[255];
-            
+
             // ?
             string externId = ExternalIdentifier();
             if (externId != null)
@@ -150,12 +148,26 @@ namespace CK.DeviceModel
             _GUID = ExternalGUID();
         }
 
+        public Device()
+        {
+            Init();
+        }
+
+        internal Device(IDeviceConfiguration config)
+        {
+            Init();
+            ApplyConfiguration(config);
+        }
+
 
         /// <summary>
         /// Agent starting method. Should be redefined in derived classes, that should start the specific agent. 
         /// </summary>
         /// <returns>True if the agent has been successfully started, false otherwise.</returns>
-        public abstract bool Start(bool useThread = true);
+        public virtual bool Start(bool useThread = true)
+        {
+            return false;
+        }
 
 
 
@@ -163,14 +175,17 @@ namespace CK.DeviceModel
         /// Agent stopping method. Should be redefined in derived classes, that should stop the specific agent.
         /// </summary>
         /// <returns>True if the agent has successfully stopped, false otherwise.</returns>
-        public abstract bool Stop();
+        public virtual bool Stop()
+        {
+            return false;
+        }
 
 
         /// <summary>
         /// We know that this is within a MRSW-context lock, so we can safely configure.
         /// </summary>
         /// <param name="config">New configuration we want to apply to the device.</param>
-        internal void ApplyConfiguration(IDeviceConfiguration config)
+        internal virtual void ApplyConfiguration(IDeviceConfiguration config)
         {
             Name = config.Name;
         }
@@ -185,12 +200,21 @@ namespace CK.DeviceModel
 
         }
 
-        protected abstract long GetDeviceID();
+        protected virtual long GetDeviceID()
+        {
+            return 0;
+        }
 
         // Get serial number
-        public abstract string ExternalIdentifier();
+        public virtual string ExternalIdentifier()
+        {
+            return null;
+        }
 
-        public abstract long? ExternalGUID();
+        public virtual long? ExternalGUID()
+        {
+            return null;
+        }
 
         protected void ProcessEvent(Event e)
         {

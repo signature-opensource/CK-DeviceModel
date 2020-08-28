@@ -106,7 +106,7 @@ namespace CK.DeviceModel
         public static bool MarshalToStruct<ConcreteType>(this Event e, ConcreteType dest) where ConcreteType : struct
         {
             if (e.Field2.IntPtr is IntPtr ptr)
-                return MarshalToStruct(ptr, dest);      
+                return MarshalToStruct(ptr, ref dest);      
             return false;
         }
 
@@ -115,13 +115,13 @@ namespace CK.DeviceModel
         {
             ConcreteType marshalled = default;
 
-            if (!MarshalToStruct(ptr, marshalled))
+            if (!MarshalToStruct(ptr, ref marshalled))
                 return null;
 
             return marshalled;
         }
 
-        public static bool MarshalToStruct<ConcreteType>(this IntPtr ptr, ConcreteType dest) where ConcreteType : struct
+        public static bool MarshalToStruct<ConcreteType>(this IntPtr ptr, ref ConcreteType dest) where ConcreteType : struct
         {
             if (ptr == null)
                 return false;

@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Data.Common;
+using System.Linq;
 using System.Text;
 using System.Threading;
 
 namespace CK.DeviceModel
 {
-    public class ConfiguredDeviceHost<T> where T : Device
+    public class ConfiguredDeviceHost<T> where T : Device, new()
     {
         ImmutableDictionary<string, T> _devices;
         ReaderWriterLockSlim _cacheLock;
@@ -19,9 +20,24 @@ namespace CK.DeviceModel
             _cacheLock = new ReaderWriterLockSlim();
         }
 
-        public bool TryAddDevice(string deviceName, T device)
+        
+        private T CreateNewDevice(IDeviceConfiguration deviceConfig)
         {
-            if (deviceName == null || device == null)
+            if (deviceConfig.Name == null)
+                throw new ArgumentException("Device name should not be null in the device configuration.");
+            if (_devices.ContainsKey(deviceConfig.Name))
+                throw new ArgumentException("Device with this name already exists.");
+
+            T device = new T();
+
+            device.ApplyConfiguration(deviceConfig);
+
+            return device;
+        }
+
+        public bool TryAdd(string deviceName, IDeviceConfiguration deviceConfig)
+        {
+            if (deviceName == null || deviceConfig == null || deviceConfig.Name == null)
                 return false;
 
             if (_devices.ContainsKey(deviceName))
@@ -29,8 +45,13 @@ namespace CK.DeviceModel
                 Console.WriteLine("Already exists");
                 return false;
             }
-           
-            _devices = _devices.Add(deviceName, device);
+
+            if (_devices.Values.Any(x => x.Name == deviceConfig.Name))
+                throw new ArgumentException("Duplicate configuration name exception! Please make sure this configuration has a unique name.");
+
+            T deviceToAdd = CreateNewDevice(deviceConfig);
+
+            _devices = _devices.Add(deviceName, deviceToAdd);
             return true;
         }
 
