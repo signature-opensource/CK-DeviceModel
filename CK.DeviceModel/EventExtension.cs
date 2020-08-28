@@ -95,10 +95,11 @@ namespace CK.DeviceModel
         }
 
         // ----------------------------------------------------------------------------------------------------- HANDLING STRUCTS ---------------------------------------------------
-        public static IMappedMemoryZone MarshalToStruct<ConcreteType>(this Event e) where ConcreteType : IMappedMemoryZone
+        public static ConcreteType? MarshalToStruct<ConcreteType>(this Event e) where ConcreteType : struct, IMappedMemoryZone
         {
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToStruct<ConcreteType>(ptr);
+
             return null;
         }
 
@@ -110,7 +111,7 @@ namespace CK.DeviceModel
         }
 
 
-        public static IMappedMemoryZone MarshalToStruct<ConcreteType>(this IntPtr ptr) where ConcreteType : IMappedMemoryZone
+        public static ConcreteType? MarshalToStruct<ConcreteType>(this IntPtr ptr) where ConcreteType : struct, IMappedMemoryZone
         {
             ConcreteType marshalled = default;
 

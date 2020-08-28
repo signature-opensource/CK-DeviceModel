@@ -16,17 +16,21 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         }
     }
 
+    internal struct TestDeviceMemoryZone : IMappedMemoryZone
+   {
+
+    }
 
     internal class TimeoutTestDevice : CppDevice
     {
-        public TimeoutTestDevice(TimeoutTestDeviceConfiguration config) : base(config)
+        public TimeoutTestDevice(TimeoutTestDeviceConfiguration config, TestDeviceMemoryZone memory) : base(config, memory)
         {
-            IMappedMemoryZone storageForEvent58 = default;
+            TestDeviceMemoryZone storageForEvent58 = default;
 
             AddEventProcessing(24, (e) =>
             {
-                IMappedMemoryZone zone;
-                zone = e.MarshalToStruct<IMappedMemoryZone>();
+                TestDeviceMemoryZone? zone;
+                zone = e.MarshalToStruct<TestDeviceMemoryZone>();
             });
 
             AddEventProcessing(58, (e) =>
@@ -99,9 +103,11 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         public void ShouldSendEventCorrectly()
         {
             TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration();
+            TestDeviceMemoryZone memory = new TestDeviceMemoryZone();
+
             config.Name = "totoch";
 
-            _dev = new TimeoutTestDevice(config);
+            _dev = new TimeoutTestDevice(config, memory);
 
             _dev.Start(true);
 

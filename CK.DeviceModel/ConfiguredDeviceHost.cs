@@ -50,6 +50,7 @@ namespace CK.DeviceModel
             {
                 _cacheLock.ExitUpgradeableReadLock();
             }
+            return true;
         }
 
         public bool RenameDevice(string newDeviceName, string oldDeviceName)

@@ -7,7 +7,10 @@ using System.Text;
 
 namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
 {
+    public interface IMappedMemoryZone
+    {
 
+    }
 
     public interface ICppNativeDeviceConfig
     {
@@ -23,7 +26,7 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
         /// </summary>   
         private IntPtr _encapsulatedDevice;
 
-        protected CppDevice(ICppDeviceConfiguration config, ICppNativeDeviceConfig cppNativeDeviceConfig) : base(config)
+        protected CppDevice(ICppDeviceConfiguration config, IMappedMemoryZone cppNativeDeviceConfig) : base(config)
         {
             if (Marshal.SizeOf(config.GetType()) == 0)
                 throw new ArgumentException("Configuration cannot be strictly empty.");
