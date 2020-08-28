@@ -16,26 +16,37 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         }
     }
 
-    internal struct TestDeviceMemoryZone : IMappedMemoryZone
-   {
 
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct TestCppDeviceConfig : ICppNativeDeviceConfig
+    {
+        public int i;
     }
 
     internal class TimeoutTestDevice : CppDevice
     {
-        public TimeoutTestDevice(TimeoutTestDeviceConfiguration config, TestDeviceMemoryZone memory) : base(config, memory)
+        struct YMCA
         {
-            TestDeviceMemoryZone storageForEvent58 = default;
+            public int Y;
+            public int M;
+            public int C;
+            public int A;
+        }
+
+        public TimeoutTestDevice(TimeoutTestDeviceConfiguration config, TestCppDeviceConfig nativeDeviceConfig) : base(config, nativeDeviceConfig)
+        {
+            YMCA storageForEvent58 = default;
 
             AddEventProcessing(24, (e) =>
             {
-                TestDeviceMemoryZone? zone;
-                zone = e.MarshalToStruct<TestDeviceMemoryZone>();
+                YMCA? zone;
+                zone = e.MarshalToStruct<YMCA>();
+                zone.Should().BeNull();
             });
 
             AddEventProcessing(58, (e) =>
             {
-                e.MarshalToStruct(storageForEvent58);
+                e.MarshalToStruct(storageForEvent58).Should().BeFalse();
             });
         }
 
@@ -72,9 +83,11 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
 
         protected override bool RegisterEventsProcessingCallbackToCppNativeDevice(IntPtr ptrToEncapsulatedCppNativeDevice, IntPtr callbackPtr)
         {
-            throw new NotImplementedException();
+            return RegisterTimeoutAgentCallback(ptrToEncapsulatedCppNativeDevice, callbackPtr);
         }
 
+        [DllImport(MicrOpenCVDllPath)]
+        private extern static bool RegisterTimeoutAgentCallback(IntPtr timeoutAgent, IntPtr callbackPtr);
 
         [DllImport(MicrOpenCVDllPath)]
         private extern static IntPtr CreateTimeoutAgent(IntPtr config);
@@ -103,19 +116,20 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         public void ShouldSendEventCorrectly()
         {
             TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration();
-            TestDeviceMemoryZone memory = new TestDeviceMemoryZone();
+            TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig();
 
             config.Name = "totoch";
 
-            _dev = new TimeoutTestDevice(config, memory);
+            _dev = new TimeoutTestDevice(config, nativeConfig);
 
-            _dev.Start(true);
+            //_dev.Start(true);
 
 
             Event e = default;
             e.EventCode = 24;
 
             _dev.SendVirtualEventForTests(e);
+            
         }
 
 

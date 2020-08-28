@@ -7,10 +7,7 @@ using System.Text;
 
 namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
 {
-    public interface IMappedMemoryZone
-    {
 
-    }
 
     public interface ICppNativeDeviceConfig
     {
@@ -26,16 +23,21 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
         /// </summary>   
         private IntPtr _encapsulatedDevice;
 
-        protected CppDevice(ICppDeviceConfiguration config, IMappedMemoryZone cppNativeDeviceConfig) : base(config)
+        protected CppDevice(ICppDeviceConfiguration config, ICppNativeDeviceConfig cppDeviceConfig) : base(config)
         {
-            if (Marshal.SizeOf(config.GetType()) == 0)
-                throw new ArgumentException("Configuration cannot be strictly empty.");
+            if (cppDeviceConfig == null)
+                throw new ArgumentException("Cpp device config cannot be null.");
+            if (cppDeviceConfig.GetType() == typeof(ICppNativeDeviceConfig))
+                throw new ArgumentException("CppDeviceConfig should be a struct inheriting from ICppNativeDeviceConfig, not an ICppNativeDeviceConfig itself.");
+            if (Marshal.SizeOf(cppDeviceConfig.GetType()) == 0)
+                throw new ArgumentException("Memory zone cannot be strictly empty.");
 
-            IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(config.GetType()));
-            Marshal.StructureToPtr(config, ptr, true);
+            IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(cppDeviceConfig.GetType()));
+            Marshal.StructureToPtr(cppDeviceConfig, ptr, true);
             _encapsulatedDevice = CreateCppNativeDevice(ptr);
-            if (_encapsulatedDevice == null || _encapsulatedDevice.ToInt32() == 0)
-                throw new InvalidOperationException();
+            if (_encapsulatedDevice == null)
+                throw new InvalidOperationException("Encapsulated device shouldn't be null or have invalid adress: make sure CreateCppNativeDevice creates properly and returns a non-null value.");
+
             RegisterEventsProcessingCallbackToCppNativeDevice(Callback);
         }
 
@@ -58,7 +60,7 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
         {
             IntPtr ptr = Marshal.GetFunctionPointerForDelegate(callback);
 
-            if (_encapsulatedDevice == null || _encapsulatedDevice.ToInt32() == 0)
+            if (_encapsulatedDevice == null)
                 throw new NullReferenceException("EncapsulatedDevice is null or has not be properly allocated: are you sure you didn't mess up?");
 
             return RegisterEventsProcessingCallbackToCppNativeDevice(_encapsulatedDevice, ptr);

@@ -95,7 +95,7 @@ namespace CK.DeviceModel
         }
 
         // ----------------------------------------------------------------------------------------------------- HANDLING STRUCTS ---------------------------------------------------
-        public static ConcreteType? MarshalToStruct<ConcreteType>(this Event e) where ConcreteType : struct, IMappedMemoryZone
+        public static ConcreteType? MarshalToStruct<ConcreteType>(this Event e) where ConcreteType : struct
         {
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToStruct<ConcreteType>(ptr);
@@ -103,7 +103,7 @@ namespace CK.DeviceModel
             return null;
         }
 
-        public static bool MarshalToStruct<ConcreteType>(this Event e, ConcreteType dest) where ConcreteType : IMappedMemoryZone
+        public static bool MarshalToStruct<ConcreteType>(this Event e, ConcreteType dest) where ConcreteType : struct
         {
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToStruct(ptr, dest);      
@@ -111,7 +111,7 @@ namespace CK.DeviceModel
         }
 
 
-        public static ConcreteType? MarshalToStruct<ConcreteType>(this IntPtr ptr) where ConcreteType : struct, IMappedMemoryZone
+        public static ConcreteType? MarshalToStruct<ConcreteType>(this IntPtr ptr) where ConcreteType : struct
         {
             ConcreteType marshalled = default;
 
@@ -121,13 +121,10 @@ namespace CK.DeviceModel
             return marshalled;
         }
 
-        public static bool MarshalToStruct<ConcreteType>(this IntPtr ptr, ConcreteType dest) where ConcreteType : IMappedMemoryZone
+        public static bool MarshalToStruct<ConcreteType>(this IntPtr ptr, ConcreteType dest) where ConcreteType : struct
         {
-            if (!dest.GetType().IsSubclassOf(typeof(IMappedMemoryZone)))
-            {
-                throw new ArgumentException("ConcreteType should be a structure implementing IMappedMemoryZone, not an IMappedMemoryZone itself.");
-            }
-
+            if (ptr == null)
+                return false;
             try
             {
                 dest = Marshal.PtrToStructure<ConcreteType>(ptr);
