@@ -106,7 +106,10 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         [DllImport(MicrOpenCVDllPath)]
         private extern static IntPtr CreateTimeoutAgent(IntPtr config);
 
-
+        protected override void ApplyConfiguration(IDeviceConfiguration config)
+        {
+            
+        }
     }
 
     [TestFixture]

@@ -3,6 +3,8 @@ using FluentAssertions;
 using CK.DeviceModel.LanguageSpecificDevices.Cpp;
 using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CK.DeviceModel.Tests
 {
@@ -71,6 +73,12 @@ namespace CK.DeviceModel.Tests
             {
                 throw new NotImplementedException();
             }
+
+           
+            protected override void ApplyConfiguration(IDeviceConfiguration config)
+            {
+
+            }
         }
 
         public class PCLConfiguration : IDeviceConfiguration
@@ -86,7 +94,7 @@ namespace CK.DeviceModel.Tests
 
         public class PCL : Device
         {
-            public PCL(PCLConfiguration config) : base()
+            public PCL(PCLConfiguration config) : base(config)
             {
 
             }
@@ -111,12 +119,100 @@ namespace CK.DeviceModel.Tests
                 throw new NotImplementedException();
             }
 
+            protected override void ApplyConfiguration(IDeviceConfiguration config)
+            {
+
+            }
+
             protected override long GetDeviceID()
             {
                 throw new NotImplementedException();
             }
         }
 
+
+        public static void RunDecrement(object o)
+        {
+                int count = 99;
+            ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
+            PCLConfiguration config = new PCLConfiguration();
+
+                while (count >= 0)
+                {
+                    try
+                {
+                        config.Name = count.ToString();
+                        Action act = () => host.TryAdd(count.ToString(), config);
+                        act();
+                   //act.Should().NotBeNull();
+                    }
+                    catch (Exception e)
+                    {
+                       // e.Should().BeOfType(typeof(ArgumentException));
+                    }
+                    Thread.Sleep(2);
+                    count--;
+            }
+           // host.NumberOfDevices.Should().Be(100);
+
+        }
+        public static void RunIncrement(object o)
+        {
+            ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
+
+            int count = 0;
+            PCLConfiguration config = new PCLConfiguration();
+
+            while (count < 100)
+            {
+                try
+                {
+                    config.Name = count.ToString();
+                    Action act = () => host.TryAdd(count.ToString(), config);
+                    act();
+                   // act.Should().NotThrow();
+                }
+                catch (Exception e)
+                {
+                   // e.Should().BeOfType(typeof(ArgumentException));
+                }
+                Thread.Sleep(5);
+                count++;
+            }
+           // host.NumberOfDevices.Should().Be(100);
+        }
+
+        [Test]
+        public void ConfiguredDeviceInitShouldBeThreadSafe()
+        {
+
+
+            IConfiguredDeviceHostConfiguration hostConfig = new ConfiguredDeviceHostTestConfiguration();
+            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(hostConfig);
+
+            Action increase = () =>
+            {
+                RunIncrement(devicesHost);
+            };
+
+            Action decrease = () =>
+            {
+                RunDecrement(devicesHost);
+            };
+
+            Parallel.Invoke(increase, increase, decrease);
+
+            devicesHost.NumberOfDevices.Should().Be(100);
+            //Delegate del = ParameterizedThreadStart.CreateDelegate(devicesHost,);
+          
+            /*Thread t = new Thread(new ParameterizedThreadStart(RunIncrement));
+          Thread t2 = new Thread(new ParameterizedThreadStart(RunDecrement));
+            t.Start(devicesHost);
+            t2.Start(devicesHost);
+            t.Join();
+            t2.Join();*/
+
+        }
 
         [Test]
         public void ConfiguredDeviceHostShouldRejectDuplicateNames()
@@ -151,6 +247,9 @@ namespace CK.DeviceModel.Tests
 
             act2.Should().ThrowExactly<ArgumentException>();
 
+
         }
+
+
     }
 }

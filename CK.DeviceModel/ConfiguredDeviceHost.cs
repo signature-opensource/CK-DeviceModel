@@ -2,24 +2,29 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Data.Common;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 
 namespace CK.DeviceModel
 {
-    public class ConfiguredDeviceHost<T> where T : Device, new()
+    public class ConfiguredDeviceHost<T> where T : Device
     {
         ImmutableDictionary<string, T> _devices;
         ReaderWriterLockSlim _cacheLock;
+        SpinLock _sl;
 
         public ConfiguredDeviceHost(IConfiguredDeviceHostConfiguration config)
         {
             _devices = ImmutableDictionary.Create<string, T>();
             _cacheLock = new ReaderWriterLockSlim();
+            _sl = new SpinLock(true);
         }
 
+        public int NumberOfDevices => _devices.Count;
         
         private T CreateNewDevice(IDeviceConfiguration deviceConfig)
         {
@@ -28,10 +33,22 @@ namespace CK.DeviceModel
             if (_devices.ContainsKey(deviceConfig.Name))
                 throw new ArgumentException("Device with this name already exists.");
 
-            T device = new T();
+            string configClassName = deviceConfig.GetType().GetTypeInfo().FullName;
 
-            device.ApplyConfiguration(deviceConfig);
+            if (!configClassName.EndsWith("Configuration"))
+                throw new ArgumentException("deviceConfig's class name should be XXXXXConfiguration.");
+            
+            string deviceClassName = deviceConfig.GetType().AssemblyQualifiedName.Replace("Configuration,", ",");
 
+            Type deviceType = Type.GetType(deviceClassName);
+            if (deviceType == null)
+                throw new ArgumentException("Could not find matching device class.");
+
+            if (!(deviceType.IsSubclassOf(typeof(T)) || deviceType == typeof(T)))
+                throw new ArgumentException("Device to instantiate should either be of type T or a Subclass of T.");
+
+            T device = (T)Activator.CreateInstance(deviceType, new[] { deviceConfig } );
+      
             return device;
         }
 
@@ -51,7 +68,9 @@ namespace CK.DeviceModel
 
             T deviceToAdd = CreateNewDevice(deviceConfig);
 
-            _devices = _devices.Add(deviceName, deviceToAdd);
+            var h = _devices;
+            h = h.Add(deviceName, deviceToAdd);
+            Interlocked.Exchange(ref _devices, h);
             return true;
         }
 
@@ -101,17 +120,20 @@ namespace CK.DeviceModel
             return d;
         }
 
-        public bool ReconfigureDevice(T device, IDeviceConfiguration newConfig)
+        private bool ReconfigureDevice(T device, IDeviceConfiguration newConfig)
         {
             if (device == null || newConfig == null)
                 return false;
 
+            bool gotLock = false;
             _cacheLock.EnterUpgradeableReadLock();
             try
             {
+                _sl.Enter(ref gotLock);
                 _cacheLock.EnterWriteLock();
-                device.ApplyConfiguration(newConfig);
+                device.Reconfigure(newConfig);
                 _cacheLock.ExitWriteLock();
+                _sl.Exit();
             }
             finally
             {

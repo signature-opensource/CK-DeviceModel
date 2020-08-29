@@ -119,7 +119,7 @@ namespace CK.DeviceModel
     };
 
 
-    public class Device
+    public abstract class Device
     {
         public string Name { get; private set; }
 
@@ -133,9 +133,10 @@ namespace CK.DeviceModel
         
         protected EventsProcessingCallback Callback { get; private set; }
 
-        private void Init()
+        private void Init(IDeviceConfiguration config)
         {
             Callback = ProcessEvent;
+            Name = config.Name;
 
             // 255 should be enough
             _eventHandlers = new ProcessChangedValue[255];
@@ -148,14 +149,10 @@ namespace CK.DeviceModel
             _GUID = ExternalGUID();
         }
 
-        public Device()
+       
+        public Device(IDeviceConfiguration config)
         {
-            Init();
-        }
-
-        internal Device(IDeviceConfiguration config)
-        {
-            Init();
+            Init(config);
             ApplyConfiguration(config);
         }
 
@@ -180,15 +177,16 @@ namespace CK.DeviceModel
             return false;
         }
 
+        internal void Reconfigure(IDeviceConfiguration newConfig)
+        {
+            ApplyConfiguration(newConfig);
+        }
 
         /// <summary>
         /// We know that this is within a MRSW-context lock, so we can safely configure.
         /// </summary>
         /// <param name="config">New configuration we want to apply to the device.</param>
-        internal virtual void ApplyConfiguration(IDeviceConfiguration config)
-        {
-            Name = config.Name;
-        }
+        protected abstract void ApplyConfiguration(IDeviceConfiguration config);
 
         protected virtual void OnReconfiguring()
         {
