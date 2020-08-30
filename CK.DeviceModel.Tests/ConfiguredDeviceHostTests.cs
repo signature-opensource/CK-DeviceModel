@@ -85,6 +85,12 @@ namespace CK.DeviceModel.Tests
         {
             public string Name { get; set; }
 
+            public PCLConfiguration()
+            {
+
+            }
+
+
             public IDeviceConfiguration Clone()
             {
                 throw new NotImplementedException();
@@ -134,26 +140,24 @@ namespace CK.DeviceModel.Tests
         public static void RunDecrement(object o)
         {
                 int count = 99;
-            ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
-            PCLConfiguration config = new PCLConfiguration();
+                ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
+                PCLConfiguration config = new PCLConfiguration();
 
                 while (count >= 0)
                 {
                     try
                 {
                         config.Name = count.ToString();
-                        Action act = () => host.TryAdd(count.ToString(), config);
-                        act();
-                   //act.Should().NotBeNull();
+                        host.TryAdd(count.ToString(), config);
                     }
                     catch (Exception e)
                     {
-                       // e.Should().BeOfType(typeof(ArgumentException));
+                       e.Should().BeOfType(typeof(ArgumentException));
                     }
                     Thread.Sleep(2);
                     count--;
             }
-           // host.NumberOfDevices.Should().Be(100);
+           host.NumberOfDevices.Should().Be(100);
 
         }
         public static void RunIncrement(object o)
@@ -168,18 +172,16 @@ namespace CK.DeviceModel.Tests
                 try
                 {
                     config.Name = count.ToString();
-                    Action act = () => host.TryAdd(count.ToString(), config);
-                    act();
-                   // act.Should().NotThrow();
+                    host.TryAdd(count.ToString(), config);
                 }
                 catch (Exception e)
                 {
-                   // e.Should().BeOfType(typeof(ArgumentException));
+                   e.Should().BeOfType(typeof(ArgumentException));
                 }
                 Thread.Sleep(5);
                 count++;
             }
-           // host.NumberOfDevices.Should().Be(100);
+           host.NumberOfDevices.Should().Be(100);
         }
 
         [Test]
@@ -203,15 +205,6 @@ namespace CK.DeviceModel.Tests
             Parallel.Invoke(increase, increase, decrease);
 
             devicesHost.NumberOfDevices.Should().Be(100);
-            //Delegate del = ParameterizedThreadStart.CreateDelegate(devicesHost,);
-          
-            /*Thread t = new Thread(new ParameterizedThreadStart(RunIncrement));
-          Thread t2 = new Thread(new ParameterizedThreadStart(RunDecrement));
-            t.Start(devicesHost);
-            t2.Start(devicesHost);
-            t.Join();
-            t2.Join();*/
-
         }
 
         [Test]
