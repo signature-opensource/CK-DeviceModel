@@ -164,7 +164,7 @@ namespace CK.DeviceModel
             }
         }
 
-        public static T[] MarshalStructArray<T>(this Event e)
+        public static T[] MarshalStructArray<T>(this Event e) where T: struct
         {
             int numberOfElements = e.GetNumberOfChangedFields();
             if (numberOfElements <= 0)

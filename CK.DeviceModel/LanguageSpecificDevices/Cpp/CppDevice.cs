@@ -68,5 +68,11 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
 
         protected abstract bool RegisterEventsProcessingCallbackToCppNativeDevice(IntPtr ptrToEncapsulatedCppNativeDevice, IntPtr callbackPtr);
 
+        protected abstract bool StartCppDevice(IntPtr ptr, bool useThread = true);
+
+        public override bool Start(bool useThread)
+        {
+            return StartCppDevice(_encapsulatedDevice, useThread);
+        }
     }
 }

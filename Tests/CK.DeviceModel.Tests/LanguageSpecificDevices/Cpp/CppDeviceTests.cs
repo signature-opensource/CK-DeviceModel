@@ -76,9 +76,9 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         }
 
 
-        public override bool Start(bool useThread = true)
+        protected override bool StartCppDevice(IntPtr ptr, bool useThread = true)
         {
-            throw new NotImplementedException();
+            return StartTimeoutDevice(ptr, useThread);
         }
 
         public override bool Stop()
@@ -88,7 +88,7 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
 
         protected override IntPtr CreateCppNativeDevice(IntPtr configPtr)
         {
-            return CreateTimeoutAgent(configPtr);
+            return CreateTimeoutDevice(configPtr);
         }
 
         protected override long GetDeviceID()
@@ -98,14 +98,18 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
 
         protected override bool RegisterEventsProcessingCallbackToCppNativeDevice(IntPtr ptrToEncapsulatedCppNativeDevice, IntPtr callbackPtr)
         {
-            return RegisterTimeoutAgentCallback(ptrToEncapsulatedCppNativeDevice, callbackPtr);
+            return RegisterTimeoutDeviceCallback(ptrToEncapsulatedCppNativeDevice, callbackPtr);
         }
 
-        [DllImport(MicrOpenCVDllPath)]
-        private extern static bool RegisterTimeoutAgentCallback(IntPtr timeoutAgent, IntPtr callbackPtr);
 
         [DllImport(MicrOpenCVDllPath)]
-        private extern static IntPtr CreateTimeoutAgent(IntPtr config);
+        private extern static bool StartTimeoutDevice(IntPtr timeoutDevice, bool useThread);
+
+        [DllImport(MicrOpenCVDllPath)]
+        private extern static bool RegisterTimeoutDeviceCallback(IntPtr timeoutDevice, IntPtr callbackPtr);
+
+        [DllImport(MicrOpenCVDllPath)]
+        private extern static IntPtr CreateTimeoutDevice(IntPtr config);
 
 
         public override void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan)
@@ -117,6 +121,7 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         {
             throw new NotImplementedException();
         }
+
     }
 
     [TestFixture]
@@ -155,9 +160,16 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
 
 
         [Test]
-        public void EncapsulatedIntPtrShouldNotBeNull()
+        public void StartShouldWork()
         {
+            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration();
+            TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig();
 
+            config.Name = "totoch";
+
+            _dev = new TimeoutTestDevice(config, nativeConfig);
+
+            _dev.Start(true).Should().BeTrue();
         }
     }
 }

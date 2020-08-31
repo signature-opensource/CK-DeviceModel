@@ -85,6 +85,11 @@ namespace CK.DeviceModel.Tests
             {
                 throw new NotImplementedException();
             }
+
+            protected override bool StartCppDevice(IntPtr ptr, bool useThread = true)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         public class PCLConfiguration : IDeviceConfiguration

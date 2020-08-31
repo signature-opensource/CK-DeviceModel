@@ -2,6 +2,7 @@
 using FluentAssertions;
 using System.Collections.Generic;
 using System.Linq;
+using CK.DeviceModel.LanguageSpecificDevices.Cpp;
 
 namespace CK.DeviceModel.Tests
 {
@@ -69,6 +70,10 @@ namespace CK.DeviceModel.Tests
             for (int i = 0; i < 10; i++)
             {
                 listTest.Add(new YMCA(listTest.Last().Y / 2.0, listTest.Last().M + 23, listTest.Last().C - 2.9239, listTest.Last().A * 3.0));
+                listTest[i + 1].Y.Should().NotBe(0);
+                listTest[i + 1].M.Should().NotBe(0);
+                listTest[i + 1].C.Should().NotBe(0);
+                listTest[i + 1].A.Should().NotBe(0);
             }
 
             Event e = listTest.ToEvent(57);
