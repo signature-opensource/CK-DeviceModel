@@ -216,12 +216,11 @@ namespace CK.DeviceModel.Tests
         public void ReconfigureShouldBeThreadSafe()
         {
 
-            ActivityMonitor monitor = new ActivityMonitor();
             IConfiguredDeviceHostConfiguration hostConfig = new ConfiguredDeviceHostTestConfiguration();
-            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(monitor, hostConfig);
+            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(hostConfig);
 
             PCLConfiguration config = new PCLConfiguration();
-            config.Name = "PCL";
+            config.Name = "PCL_ClientXXX_Number_8789";
             devicesHost.TryAdd("pcl1", config).Should().BeTrue();
 
             ReconfigureProcess(devicesHost, config);
@@ -241,9 +240,8 @@ namespace CK.DeviceModel.Tests
         public void ConfiguredDeviceInitShouldBeThreadSafe()
         {
 
-            ActivityMonitor monitor = new ActivityMonitor();
             IConfiguredDeviceHostConfiguration hostConfig = new ConfiguredDeviceHostTestConfiguration();
-            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(monitor, hostConfig);
+            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(hostConfig);
             
             Action increase = () =>
             {
@@ -264,8 +262,7 @@ namespace CK.DeviceModel.Tests
         public void ConfiguredDeviceHostShouldRejectDuplicateNames()
         {
             IConfiguredDeviceHostConfiguration hostConfig = new ConfiguredDeviceHostTestConfiguration();
-            ActivityMonitor monitor = new ActivityMonitor();
-            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(monitor, hostConfig);
+            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(hostConfig);
 
             PCLConfiguration pclConfig1 = new PCLConfiguration();
             PCLConfiguration pclConfig2 = new PCLConfiguration();

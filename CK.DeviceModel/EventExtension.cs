@@ -1,6 +1,8 @@
-﻿using CK.DeviceModel.LanguageSpecificDevices.Cpp;
+﻿using CK.Core;
+using CK.DeviceModel.LanguageSpecificDevices.Cpp;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -143,6 +145,43 @@ namespace CK.DeviceModel
                 Console.WriteLine("Error" + e);
             }
             return false;
+        }
+
+        public static void DisposeStructureEvent(this Event e)
+        {
+            if (e.Field2.IntPtr != null)
+                Marshal.FreeHGlobal(e.Field2.IntPtr);
+        }
+
+        public static Event ToEvent<T>(this IReadOnlyCollection<T> structures, byte eventCode) where T : struct
+        {
+            Event e = default;
+            e.EventCode = eventCode;
+            e.Field1.Int0 = structures.Count;
+
+            e.Field2.IntPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(T)) * structures.Count);
+
+            IntPtr[] tmp = new IntPtr[structures.Count];
+            int i = 0;
+            foreach (T structure in structures)
+            {
+                IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(T)));
+                Marshal.StructureToPtr(structure, ptr, true);
+                tmp[i++] = ptr;
+            }
+            Marshal.Copy(tmp, 0, e.Field2.IntPtr, structures.Count);
+            return e;
+        }
+
+        public static Event ToEvent<T>(this T structure, byte eventCode) where T : struct
+        {
+            Event e = default;
+            e.EventCode = eventCode;
+
+            e.Field2.IntPtr = Marshal.AllocHGlobal(Marshal.SizeOf(structure));
+            Marshal.StructureToPtr(e, e.Field2.IntPtr, true);
+
+            return e;
         }
     }
     }

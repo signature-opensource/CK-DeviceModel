@@ -6,5 +6,6 @@ namespace CK.DeviceModel
 {
     public interface IConfiguredDeviceHostConfiguration
     {
+
     }
 }

@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CK.DeviceModel\CK.DeviceModel.csproj" />
+    <ProjectReference Include="..\..\CK.DeviceModel\CK.DeviceModel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

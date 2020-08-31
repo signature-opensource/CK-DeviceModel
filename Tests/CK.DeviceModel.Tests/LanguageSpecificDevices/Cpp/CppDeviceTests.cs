@@ -124,17 +124,6 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
     {
         TimeoutTestDevice _dev;
 
-        /*
-        [SetUp]
-        public void Setup()
-        {
-            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration();
-
-            _dev = new TimeoutTestDevice(config);
-
-            _dev.Start(true);
-
-        }*/
 
         [Test]
         public void ShouldSendEventCorrectly()
@@ -145,9 +134,6 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             config.Name = "totoch";
 
             _dev = new TimeoutTestDevice(config, nativeConfig);
-
-            //_dev.Start(true);
-
 
             Event e = default;
             e.EventCode = 24;
@@ -165,8 +151,6 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             test.C = -1837;
             test.A = 0;
 
-            e2.Field2.IntPtr = Marshal.AllocHGlobal(Marshal.SizeOf(test));
-            Marshal.StructureToPtr(test, e2.Field2.IntPtr, true);
 
             _dev.SendVirtualEventForTests(e2);
         }

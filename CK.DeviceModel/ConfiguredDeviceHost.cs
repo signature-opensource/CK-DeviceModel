@@ -17,19 +17,27 @@ namespace CK.DeviceModel
         ImmutableDictionary<string, T> _devices;
         ReaderWriterLockSlim _cacheLock;
         SpinLock _sl;
-        DeviceDispatcherSink<T> _deviceConfigDispatcher;
 
 
         object _addTransactionLock;
 
+        /*
 
         public ConfiguredDeviceHost(IActivityMonitor monitor, IConfiguredDeviceHostConfiguration config)
         {
+            DeviceDispatcherSink<T> _deviceConfigDispatcher;
             _devices = ImmutableDictionary.Create<string, T>();
             _cacheLock = new ReaderWriterLockSlim();
             _sl = new SpinLock(true);
             _deviceConfigDispatcher = new DeviceDispatcherSink<T>(monitor, TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2), null, null);
             _addTransactionLock = new object();
+        }*/
+
+        public ConfiguredDeviceHost(IConfiguredDeviceHostConfiguration config)
+        {
+            _devices = ImmutableDictionary.Create<string, T>();
+            _addTransactionLock = new object();
+            _cacheLock = new ReaderWriterLockSlim();
         }
 
         public int NumberOfDevices => _devices.Count;
@@ -60,7 +68,7 @@ namespace CK.DeviceModel
             return device;
         }
 
-        public bool TryAdd(string deviceUserSetName, IDeviceConfiguration deviceConfig, int maxNumberOfTries = int.MaxValue)
+        public bool TryAdd(string deviceUserSetName, IDeviceConfiguration deviceConfig)
         {
             lock (_addTransactionLock)
             {
@@ -78,10 +86,13 @@ namespace CK.DeviceModel
 
                 T deviceToAdd = CreateNewDevice(deviceConfig);
 
-                return TryAdd(deviceUserSetName, deviceToAdd, maxNumberOfTries);
-            }
+                _devices = _devices.Add(deviceUserSetName, deviceToAdd);
 
+                //return TryAdd(deviceUserSetName, deviceToAdd);
+            }
+            return true;
         }
+
 
         internal bool TryAdd(string deviceUserSetName, T device, int maxNumberOfTries)
         {
@@ -153,7 +164,7 @@ namespace CK.DeviceModel
             return d;
         }
 
-        private bool ReconfigureDevice(T device, IDeviceConfiguration newConfig, bool waitForApplication)
+        private bool ReconfigureDevice(T device, IDeviceConfiguration newConfig)
         {
             ActivityMonitor internalMonitor = new ActivityMonitor();
             if (device == null || newConfig == null)
@@ -176,12 +187,12 @@ namespace CK.DeviceModel
             return true;
         }
 
-        public bool ReconfigureDevice(string deviceName, IDeviceConfiguration newConfig, bool waitForApplication = true)
+        public bool ReconfigureDevice(string deviceName, IDeviceConfiguration newConfig)
         {
             T device = Find(deviceName);
             if (device == null)
                 return false;
-            return ReconfigureDevice(device, newConfig, waitForApplication);
+            return ReconfigureDevice(device, newConfig);
         }
     }
 }
