@@ -135,38 +135,15 @@ namespace CK.DeviceModel
 
         public delegate void EventsProcessingCallback(Event e);
 
-        public static object _confTrigger;
-
-        volatile int _stopFlag;
-
-        TimeSpan _timerDuration;
-
-        long _deltaTicks;
-
-        public TimeSpan TimerDuration
-        {
-            get => _timerDuration;
-            set
-            {
-                if (_timerDuration != value)
-                {
-                    _timerDuration = value;
-                    _deltaTicks = value.Ticks;
-                }
-            }
-        }
-
-
-
         protected EventsProcessingCallback Callback { get; private set; }
 
-        private void Init(IDeviceConfiguration config, TimeSpan timerDuration)
+        //object _configApplicationLock();
+
+        private void Init(IDeviceConfiguration config)
         {
             Callback = ProcessEvent;
             Name = config.Name;
 
-            _timerDuration = timerDuration;
-            _deltaTicks = timerDuration.Ticks;
 
             // 255 should be enough
             _eventHandlers = new ProcessChangedValue[255];
@@ -179,74 +156,23 @@ namespace CK.DeviceModel
             _GUID = ExternalGUID();
         }
 
-        private void DoConfigure(IActivityMonitor monitor, IDeviceConfiguration[] newConf)
-        {
-            Util.InterlockedSet(ref _newConf, t => t.Skip(newConf.Length).ToArray());
-            var c = newConf[newConf.Length - 1];
 
-            //if (c.TimerDuration.HasValue) 
-            //   TimerDuration = c.TimerDuration.Value;
-            List<IDeviceConfiguration> toKeep = new List<IDeviceConfiguration>();
-
-            try
-            {
-                ApplyConfiguration(monitor, c);
-                {
-                    // Existing _handlers[iHandler] accepted the new c.Handlers[iConf].
-                    /*c.Handlers.RemoveAt(iConf--);
-                    toKeep.Add(_handlers[iHandler]);
-                    _handlers.RemoveAt(iHandler);*/
-                }
-            }
-            catch (Exception ex)
-            {
-                //var h = _handlers[iHandler];
-                var msg = $"Handler {Name} crashed.";
-                ActivityMonitor.CriticalErrorCollector.Add(ex, msg);
-                //monitor.SendLine(LogLevel.Fatal, msg, ex);
-                // Since the handler can be compromised, we skip it from any subsequent
-                // attempt to reconfigure it and deactivate it.
-                //_handlers.RemoveAt(iHandler--);
-                //SafeActivateOrDeactivate(monitor, h, false);
-            }
-
-            // Deactivate and get rid of remaining handlers.
-            /*foreach (var h in _handlers)
-            {
-                SafeActivateOrDeactivate(monitor, h, false);
-            }
-            _handlers.Clear();
-            // Restores reconfigured handlers.
-            _handlers.AddRange(toKeep);
-            // Creates and activates new handlers.
-            foreach (var conf in c.Handlers)
-            {
-                try
-                {
-                    var h = GrandOutput.CreateHandler(conf);
-                    if (SafeActivateOrDeactivate(monitor, h, true))
-                    {
-                        _handlers.Add(h);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    var msg = $"While creating handler for {conf.GetType().FullName}.";
-                    ActivityMonitor.CriticalErrorCollector.Add(ex, msg);
-                    //monitor.SendLine(LogLevel.Fatal, msg, ex);
-                }
-            }*/
-            
-            lock (_confTrigger)
-                Monitor.PulseAll(_confTrigger);
-        }
-
-        public Device(IDeviceConfiguration config)
+        public Device ( IDeviceConfiguration config )
         {
             Init(config);
-            ApplyConfiguration(config);
         }
 
+        /// <summary>
+        /// Allows this device to do any required housekeeping.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="timerSpan">Indicative timer duration.</param>
+        public abstract void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan);
+
+        private void Process()
+        {
+
+        }
 
         /// <summary>
         /// Agent starting method. Should be redefined in derived classes, that should start the specific agent. 
@@ -272,6 +198,7 @@ namespace CK.DeviceModel
 
 
 
+        /*
         internal void Reconfigure(IDeviceConfiguration configuration, bool waitForApplication = false)
         {
             Util.InterlockedAdd(ref _newConf, configuration);
@@ -284,14 +211,29 @@ namespace CK.DeviceModel
                         Monitor.Wait(_confTrigger);
                 }
             }
-           // ApplyConfiguration(newConfig);
         }
+        */
 
+#if DEBUG
         /// <summary>
         /// We know that this is within a MRSW-context lock, so we can safely configure.
         /// </summary>
         /// <param name="config">New configuration we want to apply to the device.</param>
-        protected abstract void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config);
+        public abstract void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config);
+
+#endif
+
+#if RELEASE
+        internal abstract void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config);
+#endif
+
+        internal void EnsureApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration configuration, bool waitForApplication = false)
+        {
+            if (waitForApplication)
+            {
+
+            }
+        }
 
         protected virtual void OnReconfiguring()
         {

@@ -15,4 +15,10 @@
     <ProjectReference Include="..\CK.DeviceModel\CK.DeviceModel.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="CK.ActivityMonitor">
+      <HintPath>..\..\..\..\CK\CK-Core-Projects\CK-ActivityMonitor\CK.ActivityMonitor\bin\Debug\netstandard2.0\CK.ActivityMonitor.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

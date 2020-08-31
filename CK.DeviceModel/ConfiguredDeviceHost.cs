@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CK.Core;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
@@ -16,16 +17,23 @@ namespace CK.DeviceModel
         ImmutableDictionary<string, T> _devices;
         ReaderWriterLockSlim _cacheLock;
         SpinLock _sl;
+        DeviceDispatcherSink<T> _deviceConfigDispatcher;
 
-        public ConfiguredDeviceHost(IConfiguredDeviceHostConfiguration config)
+
+        object _addTransactionLock;
+
+
+        public ConfiguredDeviceHost(IActivityMonitor monitor, IConfiguredDeviceHostConfiguration config)
         {
             _devices = ImmutableDictionary.Create<string, T>();
             _cacheLock = new ReaderWriterLockSlim();
             _sl = new SpinLock(true);
+            _deviceConfigDispatcher = new DeviceDispatcherSink<T>(monitor, TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2), null, null);
+            _addTransactionLock = new object();
         }
 
         public int NumberOfDevices => _devices.Count;
-        
+
         private T CreateNewDevice(IDeviceConfiguration deviceConfig)
         {
             if (deviceConfig.Name == null)
@@ -52,26 +60,51 @@ namespace CK.DeviceModel
             return device;
         }
 
-        public bool TryAdd(string deviceName, IDeviceConfiguration deviceConfig)
+        public bool TryAdd(string deviceUserSetName, IDeviceConfiguration deviceConfig, int maxNumberOfTries = int.MaxValue)
         {
-            if (deviceName == null || deviceConfig == null || deviceConfig.Name == null)
-                return false;
-
-            if (_devices.ContainsKey(deviceName))
+            lock (_addTransactionLock)
             {
-                Console.WriteLine("Already exists");
-                return false;
+                if (deviceUserSetName == null || deviceConfig == null || deviceConfig.Name == null)
+                    return false;
+
+                if (_devices.ContainsKey(deviceUserSetName))
+                {
+                    Console.WriteLine("Already exists");
+                    return false;
+                }
+
+                if (_devices.Values.Any(x => x.Name == deviceConfig.Name))
+                    throw new ArgumentException("Duplicate configuration name exception! Please make sure this configuration has a unique name.");
+
+                T deviceToAdd = CreateNewDevice(deviceConfig);
+
+                return TryAdd(deviceUserSetName, deviceToAdd, maxNumberOfTries);
             }
 
-            if (_devices.Values.Any(x => x.Name == deviceConfig.Name))
-                throw new ArgumentException("Duplicate configuration name exception! Please make sure this configuration has a unique name.");
+        }
 
-            T deviceToAdd = CreateNewDevice(deviceConfig);
+        internal bool TryAdd(string deviceUserSetName, T device, int maxNumberOfTries)
+        {
+            var spin = new SpinWait();
+            int currentTry = -1;
+            ActivityMonitor internalMonitor = new ActivityMonitor();
+            while (++currentTry < maxNumberOfTries)
+            {
+                if (_devices.ContainsKey(deviceUserSetName)) return false;
+                if (_devices.ContainsValue(device)) return false;
+                if (_devices.Values.Any(x => x.Name == device.Name)) return false;
 
-            var h = _devices;
-            h = h.Add(deviceName, deviceToAdd);
-            Interlocked.Exchange(ref _devices, h);
-            return true;
+                var devices = _devices;
+                if (devices == null) return false;
+
+                // devices or _devices?
+                var newDevicesDic = _devices.Add(deviceUserSetName, device);
+                Interlocked.CompareExchange(ref _devices, newDevicesDic, devices);
+                if (_devices == newDevicesDic)
+                    break;
+                spin.SpinOnce();
+            }
+            return currentTry < maxNumberOfTries;
         }
 
         public bool RenameDevice(string newDeviceName, T device)
@@ -120,8 +153,9 @@ namespace CK.DeviceModel
             return d;
         }
 
-        private bool ReconfigureDevice(T device, IDeviceConfiguration newConfig)
+        private bool ReconfigureDevice(T device, IDeviceConfiguration newConfig, bool waitForApplication)
         {
+            ActivityMonitor internalMonitor = new ActivityMonitor();
             if (device == null || newConfig == null)
                 return false;
 
@@ -131,23 +165,23 @@ namespace CK.DeviceModel
             {
                 _sl.Enter(ref gotLock);
                 _cacheLock.EnterWriteLock();
-                device.Reconfigure(newConfig);
+                device.ApplyConfiguration(internalMonitor, newConfig);
                 _cacheLock.ExitWriteLock();
-                _sl.Exit();
             }
             finally
             {
                 _cacheLock.ExitUpgradeableReadLock();
+                if (gotLock) _sl.Exit();
             }
             return true;
         }
 
-        public bool ReconfigureDevice(string deviceName, IDeviceConfiguration newConfig)
+        public bool ReconfigureDevice(string deviceName, IDeviceConfiguration newConfig, bool waitForApplication = true)
         {
             T device = Find(deviceName);
             if (device == null)
                 return false;
-            return ReconfigureDevice(device, newConfig);
+            return ReconfigureDevice(device, newConfig, waitForApplication);
         }
     }
 }

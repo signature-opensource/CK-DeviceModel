@@ -1,4 +1,5 @@
-﻿using CK.DeviceModel.LanguageSpecificDevices.Cpp;
+﻿using CK.Core;
+using CK.DeviceModel.LanguageSpecificDevices.Cpp;
 using FluentAssertions;
 using NUnit.Framework;
 using System;
@@ -106,9 +107,15 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         [DllImport(MicrOpenCVDllPath)]
         private extern static IntPtr CreateTimeoutAgent(IntPtr config);
 
-        protected override void ApplyConfiguration(IDeviceConfiguration config)
+
+        public override void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan)
         {
-            
+            throw new NotImplementedException();
+        }
+
+        public override void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config)
+        {
+            throw new NotImplementedException();
         }
     }
 

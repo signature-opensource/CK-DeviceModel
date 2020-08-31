@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CK.ActivityMonitor" Version="13.3.0" />
+    <PackageReference Include="CK.Core" Version="13.2.0" />
     <PackageReference Include="System.Collections.Immutable" Version="1.7.1" />
   </ItemGroup>
 

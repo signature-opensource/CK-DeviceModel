@@ -23,8 +23,7 @@ namespace CK.DeviceModel.Tests
             Event e = default;
             e.Field1.Int0 = -1299931;
             float[] dest = new float[20];
-            e.MarshalToFloatArray(dest, 20);
-            dest.Should().BeNull();
+            e.MarshalToFloatArray(dest, 20).Should().BeFalse();
         }
     }
 }

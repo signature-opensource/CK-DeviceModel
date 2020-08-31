@@ -5,6 +5,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using CK.Core;
 
 namespace CK.DeviceModel.Tests
 {
@@ -75,9 +76,14 @@ namespace CK.DeviceModel.Tests
             }
 
            
-            protected override void ApplyConfiguration(IDeviceConfiguration config)
+            public override void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config)
             {
 
+            }
+
+            public override void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan)
+            {
+                throw new NotImplementedException();
             }
         }
 
@@ -85,12 +91,13 @@ namespace CK.DeviceModel.Tests
         {
             public string Name { get; set; }
 
+
             public PCLConfiguration()
             {
 
             }
 
-
+           
             public IDeviceConfiguration Clone()
             {
                 throw new NotImplementedException();
@@ -100,9 +107,15 @@ namespace CK.DeviceModel.Tests
 
         public class PCL : Device
         {
+            public int NumberOfTimesThisHasBeenConfiguration { get; set; } = 0;
+
             public PCL(PCLConfiguration config) : base(config)
             {
+            }
 
+            public override void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config)
+            {
+                NumberOfTimesThisHasBeenConfiguration++;
             }
 
             public override long? ExternalGUID()
@@ -115,6 +128,11 @@ namespace CK.DeviceModel.Tests
                 return null;
             }
 
+            public override void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan)
+            {
+                throw new NotImplementedException();
+            }
+
             public override bool Start(bool useThread = true)
             {
                 throw new NotImplementedException();
@@ -125,10 +143,6 @@ namespace CK.DeviceModel.Tests
                 throw new NotImplementedException();
             }
 
-            protected override void ApplyConfiguration(IDeviceConfiguration config)
-            {
-
-            }
 
             protected override long GetDeviceID()
             {
@@ -140,7 +154,7 @@ namespace CK.DeviceModel.Tests
         public static void RunDecrement(object o)
         {
                 int count = 99;
-                ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
+            ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
                 PCLConfiguration config = new PCLConfiguration();
 
                 while (count >= 0)
@@ -184,14 +198,53 @@ namespace CK.DeviceModel.Tests
            host.NumberOfDevices.Should().Be(100);
         }
 
+        public void ReconfigureProcess(ConfiguredDeviceHost<Device> devicesHost, PCLConfiguration configuration)
+        {
+            Device d;
+            for (int i = 0; i < 100; i++)
+            {
+                d = devicesHost.Find("pcl1");
+                d.Should().NotBeNull();
+                devicesHost.ReconfigureDevice("pcl1", configuration);
+                Thread.Sleep(5);
+            }
+
+            ((PCL)devicesHost.Find("pcl1")).NumberOfTimesThisHasBeenConfiguration.Should().BeGreaterOrEqualTo(100);
+        }
+
+        [Test]
+        public void ReconfigureShouldBeThreadSafe()
+        {
+
+            ActivityMonitor monitor = new ActivityMonitor();
+            IConfiguredDeviceHostConfiguration hostConfig = new ConfiguredDeviceHostTestConfiguration();
+            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(monitor, hostConfig);
+
+            PCLConfiguration config = new PCLConfiguration();
+            config.Name = "PCL";
+            devicesHost.TryAdd("pcl1", config).Should().BeTrue();
+
+            ReconfigureProcess(devicesHost, config);
+
+            Action ReconfigureAction = () =>
+            {
+                ReconfigureProcess(devicesHost, config);
+            };
+
+            Parallel.Invoke(ReconfigureAction, ReconfigureAction, ReconfigureAction, ReconfigureAction);
+
+            ((PCL)devicesHost["pcl1"]).NumberOfTimesThisHasBeenConfiguration.Should().Be(500);
+        }
+
+
         [Test]
         public void ConfiguredDeviceInitShouldBeThreadSafe()
         {
 
-
+            ActivityMonitor monitor = new ActivityMonitor();
             IConfiguredDeviceHostConfiguration hostConfig = new ConfiguredDeviceHostTestConfiguration();
-            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(hostConfig);
-
+            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(monitor, hostConfig);
+            
             Action increase = () =>
             {
                 RunIncrement(devicesHost);
@@ -211,8 +264,8 @@ namespace CK.DeviceModel.Tests
         public void ConfiguredDeviceHostShouldRejectDuplicateNames()
         {
             IConfiguredDeviceHostConfiguration hostConfig = new ConfiguredDeviceHostTestConfiguration();
-
-            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(hostConfig);
+            ActivityMonitor monitor = new ActivityMonitor();
+            ConfiguredDeviceHost<Device> devicesHost = new ConfiguredDeviceHost<Device>(monitor, hostConfig);
 
             PCLConfiguration pclConfig1 = new PCLConfiguration();
             PCLConfiguration pclConfig2 = new PCLConfiguration();

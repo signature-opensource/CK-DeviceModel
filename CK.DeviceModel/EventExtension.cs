@@ -18,6 +18,8 @@ namespace CK.DeviceModel
         // ------------------------------------------------------------------------------------------------ HANDLING FLOAT ARRAYS ----------------------------------------------------
         public static float[] MarshalToFloatArray(this Event e, int numberOfElements)
         {
+            if (e.Field1.Int0 <= 0)
+                return null;
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToFloatArray(ptr, numberOfElements);
             return null;
@@ -26,6 +28,8 @@ namespace CK.DeviceModel
 
         public static bool MarshalToFloatArray(this Event e, float[] dest, int numberOfElements)
         {
+            if (e.Field1.Int0 <= 0)
+                return false;
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToFloatArray(ptr, numberOfElements, dest);
             return false;
@@ -58,6 +62,8 @@ namespace CK.DeviceModel
         // ---------------------------------------------------------------------------------------- HANDLING DOUBLE ARRAYS -----------------------------------------------------------
         public static double[] MarshalToDoubleArray(this Event e, int numberOfElements)
         {
+            if (e.Field1.Int0 <= 0)
+                return null;
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToDoubleArray(ptr, numberOfElements);
             return null;
@@ -66,6 +72,8 @@ namespace CK.DeviceModel
 
         public static bool MarshalToDoubleArray(this Event e, int numberOfElements, double[] dest)
         {
+            if (e.Field1.Int0 <= 0)
+                return false;
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToDoubleArray(ptr, numberOfElements, dest);
             return false;
