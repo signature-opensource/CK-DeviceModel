@@ -179,8 +179,8 @@ namespace CK.DeviceModel
             e.EventCode = eventCode;
 
             e.Field2.IntPtr = Marshal.AllocHGlobal(Marshal.SizeOf(structure));
-            Marshal.StructureToPtr(e, e.Field2.IntPtr, true);
-
+            Marshal.StructureToPtr(structure, e.Field2.IntPtr, true);
+            
             return e;
         }
     }

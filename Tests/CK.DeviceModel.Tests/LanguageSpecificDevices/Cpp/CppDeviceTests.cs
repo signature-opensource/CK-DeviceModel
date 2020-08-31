@@ -141,9 +141,6 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             _dev.SendVirtualEventForTests(e);
 
 
-            Event e2 = default;
-            e2.EventCode = 25;
-            e2.Field1.Int0 = 1;
 
             YMCA test = default;
             test.Y = 8;
@@ -151,8 +148,9 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             test.C = -1837;
             test.A = 0;
 
+            Event ymcaEvent = test.ToEvent(25);
 
-            _dev.SendVirtualEventForTests(e2);
+            _dev.SendVirtualEventForTests(ymcaEvent);
         }
 
 
