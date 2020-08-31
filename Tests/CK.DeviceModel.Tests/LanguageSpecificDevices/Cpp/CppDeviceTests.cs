@@ -61,7 +61,7 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             });
             AddEventProcessing(58, (e) =>
             {
-                e.MarshalToStruct(storageForEvent58).Should().BeFalse();
+                e.MarshalToStruct(ref storageForEvent58).Should().BeFalse();
             });
         }
 

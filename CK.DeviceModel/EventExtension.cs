@@ -113,7 +113,7 @@ namespace CK.DeviceModel
             return null;
         }
 
-        public static bool MarshalToStruct<ConcreteType>(this Event e, ConcreteType dest) where ConcreteType : struct
+        public static bool MarshalToStruct<ConcreteType>(this Event e, ref ConcreteType dest) where ConcreteType : struct
         {
             if (e.Field2.IntPtr is IntPtr ptr)
                 return MarshalToStruct(ptr, ref dest);      
@@ -147,10 +147,47 @@ namespace CK.DeviceModel
             return false;
         }
 
-        public static void DisposeStructureEvent(this Event e)
+        public static void DisposeStructureEvent<T>(this Event e) where T : struct
         {
-            if (e.Field2.IntPtr != null)
-                Marshal.FreeHGlobal(e.Field2.IntPtr);
+            int numberOfStructs = e.GetNumberOfChangedFields();
+
+            if (numberOfStructs <= 0)
+                throw new ArgumentException("Cannot free unmanaged memory: there should be at least one element to free.");
+            if (e.Field2.IntPtr == null)
+                throw new ArgumentException("Cannot free unmanaged memory: pointer to unmanaged memory should not be null.");
+
+            Marshal.DestroyStructure<T>(e.Field2.IntPtr);
+            for (int i = 0; i < numberOfStructs; i++)
+            {
+                if (e.Field2.IntPtr != null)
+                    Marshal.FreeHGlobal(e.Field2.IntPtr);
+            }
+        }
+
+        public static T[] MarshalStructArray<T>(this Event e)
+        {
+            int numberOfElements = e.GetNumberOfChangedFields();
+            if (numberOfElements <= 0)
+                return null;
+
+            T[] res = new T[numberOfElements];
+
+            try
+            {
+                IntPtr[] dest = new IntPtr[numberOfElements];
+                Marshal.Copy(e.Field2.IntPtr, dest, 0, numberOfElements);
+                int i = 0;
+                foreach (IntPtr ptr in dest)
+                {
+                    res[i++] = Marshal.PtrToStructure<T>(ptr);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex);
+                return null;
+            }
+            return res;
         }
 
         public static Event ToEvent<T>(this IReadOnlyCollection<T> structures, byte eventCode) where T : struct
@@ -170,14 +207,20 @@ namespace CK.DeviceModel
                 tmp[i++] = ptr;
             }
             Marshal.Copy(tmp, 0, e.Field2.IntPtr, structures.Count);
+            /*
+            foreach (IntPtr t in tmp)
+            {
+                Marshal.FreeHGlobal(t);
+            }*/
+
             return e;
         }
 
         public static Event ToEvent<T>(this T structure, byte eventCode) where T : struct
         {
-            Event e = default;
+            Event e = new Event();
             e.EventCode = eventCode;
-
+            e.Field1.Int0 = 1;
             e.Field2.IntPtr = Marshal.AllocHGlobal(Marshal.SizeOf(structure));
             Marshal.StructureToPtr(structure, e.Field2.IntPtr, true);
             
