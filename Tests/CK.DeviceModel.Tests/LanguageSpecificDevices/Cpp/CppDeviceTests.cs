@@ -4,6 +4,7 @@ using FluentAssertions;
 using NUnit.Framework;
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
 {
@@ -21,7 +22,15 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TestCppDeviceConfig : ICppNativeDeviceConfig
     {
-        public int i;
+        public int TimeMs;
+
+        public int MaxCount;
+
+        public TestCppDeviceConfig(TimeSpan timer, int maxCount)
+        {
+            TimeMs = (int)Math.Floor(timer.TotalMilliseconds);
+            MaxCount = maxCount;
+        }
     }
 
     public struct YMCA
@@ -44,7 +53,7 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             {
                 YMCA? zone;
                 zone = e.MarshalToStruct<YMCA>();
-                zone.Should().BeNull();            
+                zone.Should().BeNull();
             });
 
             AddEventProcessing(25, (e) =>
@@ -62,6 +71,15 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
             AddEventProcessing(58, (e) =>
             {
                 e.MarshalToStruct(ref storageForEvent58).Should().BeFalse();
+            });
+
+            AddEventProcessing(66, (e) =>
+            {
+                float[] dest = new float[100];
+                e.MarshalToFloatArray(dest, 10).Should().BeTrue();
+                dest.Should().NotBeNull();
+                dest.Should().NotBeEmpty();
+                dest[0].Should().BeGreaterThan(0);
             });
         }
 
@@ -163,13 +181,15 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         public void StartShouldWork()
         {
             TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration();
-            TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig();
+            TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig(TimeSpan.FromMilliseconds(500), 10);
 
             config.Name = "totoch";
 
             _dev = new TimeoutTestDevice(config, nativeConfig);
 
             _dev.Start(true).Should().BeTrue();
+
+            Thread.Sleep(10000);
         }
     }
 }

@@ -72,6 +72,9 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
 
         public override bool Start(bool useThread)
         {
+            if (_encapsulatedDevice == null)
+                throw new InvalidOperationException("Cannot start before creating the agent.");
+
             return StartCppDevice(_encapsulatedDevice, useThread);
         }
     }
