@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
+namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 {
     [StructLayout(LayoutKind.Sequential)]
     public struct Event

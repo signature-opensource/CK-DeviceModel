@@ -2,10 +2,10 @@
 using FluentAssertions;
 using System.Collections.Generic;
 using System.Linq;
-using CK.DeviceModel.LanguageSpecificDevices.Cpp;
+using CK.DeviceModel.CppDeviceAdapter.Cpp;
 
-namespace CK.DeviceModel.Tests
-{
+namespace CK.DeviceModel.CppDeviceAdapter.Test
+{ 
     [TestFixture]
     public class EventExtensionTests
     {

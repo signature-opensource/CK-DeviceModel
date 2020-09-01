@@ -1,12 +1,11 @@
 ﻿using CK.Core;
-using CK.DeviceModel.LanguageSpecificDevices.Cpp;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
+namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 {
     public static class EventExtension
     {

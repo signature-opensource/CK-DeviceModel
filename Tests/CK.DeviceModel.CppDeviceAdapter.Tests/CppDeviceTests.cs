@@ -1,51 +1,13 @@
 ﻿using CK.Core;
-using CK.DeviceModel.LanguageSpecificDevices.Cpp;
+using CK.DeviceModel.CppDeviceAdapter.Cpp;
 using FluentAssertions;
 using NUnit.Framework;
 using System;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
+namespace CK.DeviceModel.CppDeviceAdapter.Tests
 {
-    internal class TimeoutTestDeviceConfiguration : ICppDeviceConfiguration
-    {
-        public string Name { get ; set ; }
-        public DeviceConfigurationStatus ConfigurationStatus { get; set; }
-
-        int _maxCount;
-
-        TimeSpan _cycleDuration;
-
-        public IDeviceConfiguration Clone()
-        {
-            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration(Name, _cycleDuration, _maxCount);
-            return config;
-        }
-
-        public TimeoutTestDeviceConfiguration(string name, TimeSpan cycleDuration, int maxCount)
-        {
-            Name = name;
-            _cycleDuration = TimeSpan.FromMilliseconds(cycleDuration.TotalMilliseconds);
-            _maxCount = maxCount;
-        }
-    }
-
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct TestCppDeviceConfig : ICppNativeDeviceConfig
-    {
-        public int TimeMs;
-
-        public int MaxCount;
-
-        public TestCppDeviceConfig(TimeSpan timer, int maxCount)
-        {
-            TimeMs = (int)Math.Floor(timer.TotalMilliseconds);
-            MaxCount = maxCount;
-        }
-    }
 
     public struct YMCA
     {
@@ -53,92 +15,6 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         public int M;
         public int C;
         public int A;
-    }
-
-    internal class TimeoutTestDevice : CppDevice<TimeoutTestDeviceConfiguration>
-    {
-
-
-        public TimeoutTestDevice(TimeoutTestDeviceConfiguration config, TestCppDeviceConfig nativeDeviceConfig) : base(config, nativeDeviceConfig)
-        {
-            YMCA storageForEvent58 = default;
-
-            AddEventProcessing(24, (e) =>
-            {
-                YMCA? zone;
-                zone = e.MarshalToStruct<YMCA>();
-                zone.Should().BeNull();
-            });
-
-            AddEventProcessing(25, (e) =>
-            {
-                YMCA? zone;
-                zone = e.MarshalToStruct<YMCA>();
-                zone.Should().NotBeNull();
-                YMCA val = zone.Value;
-                val.Y.Should().Be(8);
-                val.M.Should().Be(8764);
-                val.C.Should().Be(-1837);
-                val.A.Should().Be(0);
-
-            });
-            AddEventProcessing(58, (e) =>
-            {
-                e.MarshalToStruct(ref storageForEvent58).Should().BeFalse();
-            });
-
-            AddEventProcessing(66, (e) =>
-            {
-                float[] dest = new float[100];
-                e.MarshalToFloatArray(dest, 10).Should().BeTrue();
-                dest.Should().NotBeNull();
-                dest.Should().NotBeEmpty();
-                dest[0].Should().BeGreaterThan(0);
-            });
-        }
-
-
-        protected override bool StartCppDevice(IntPtr ptr, bool useThread = true)
-        {
-            return StartTimeoutDevice(ptr, useThread);
-        }
-
-        
-        protected override IntPtr CreateCppNativeDevice(IntPtr configPtr)
-        {
-            return CreateTimeoutDevice(configPtr);
-        }
-
-        protected override bool RegisterEventsProcessingCallbackToCppNativeDevice(IntPtr ptrToEncapsulatedCppNativeDevice, IntPtr callbackPtr)
-        {
-            return RegisterTimeoutDeviceCallback(ptrToEncapsulatedCppNativeDevice, callbackPtr);
-        }
-
-
-        [DllImport(MicrOpenCVDllPath)]
-        private extern static bool StartTimeoutDevice(IntPtr timeoutDevice, bool useThread);
-
-        [DllImport(MicrOpenCVDllPath)]
-        private extern static bool RegisterTimeoutDeviceCallback(IntPtr timeoutDevice, IntPtr callbackPtr);
-
-        [DllImport(MicrOpenCVDllPath)]
-        private extern static IntPtr CreateTimeoutDevice(IntPtr config);
-
-
-        protected override Task<ApplyConfigurationResult> DoApplyConfigurationAsync(IActivityMonitor monitor, TimeoutTestDeviceConfiguration config, bool? allowRestart)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override Task<bool> DoStartAsync(IActivityMonitor monitor)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override Task DoStopAsync(IActivityMonitor monitor, bool fromConfiguration)
-        {
-            throw new NotImplementedException();
-        }
     }
 
     [TestFixture]
@@ -150,17 +26,14 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
         [Test]
         public void ShouldSendEventCorrectly()
         {
-            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration("Timer0001XX", TimeSpan.FromMilliseconds(500), 10);
-            TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig();
+            TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig(TimeSpan.FromMilliseconds(500), 10);
+            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration("Timer0001XX", TimeSpan.FromMilliseconds(500), 10, nativeConfig);
+          
 
             config.Name = "totoch";
 
-            _dev = new TimeoutTestDevice(config, nativeConfig);
+            _dev = new TimeoutTestDevice(config);
 
-            Event e = default;
-            e.EventCode = 24;
-
-            _dev.SendVirtualEventForTests(e);
 
 
 
@@ -177,20 +50,41 @@ namespace CK.DeviceModel.Tests.LanguageSpecificDevices.Cpp
 
 
         [Test]
-        public void StartShouldWork()
+        public async Task AddCppDeviceShouldWork()
         {
-            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration("Timer0001XX", TimeSpan.FromMilliseconds(500), 10);
             TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig(TimeSpan.FromMilliseconds(500), 10);
+            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration("Timer0001XX", TimeSpan.FromMilliseconds(500), 10, nativeConfig);
 
             config.Name = "totoch";
-
-            _dev = new TimeoutTestDevice(config, nativeConfig);
-
             ActivityMonitor monitor = new ActivityMonitor();
 
-            _dev.StartAsync(monitor);
+            DeviceHostConfiguration<TimeoutTestDeviceConfiguration> hostConfig = new DeviceHostConfiguration<TimeoutTestDeviceConfiguration>();
+            hostConfig.Configurations.Add(config);
 
-            Thread.Sleep(10000);
+            ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration> host = new ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration>();
+            host.Count.Should().Be(0);
+            await host.ApplyConfigurationAsync(monitor, hostConfig);
+            host.Count.Should().Be(1);
+        }
+
+        [Test]
+        public async Task StartCppDeviceShouldWork()
+        {
+            TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig(TimeSpan.FromMilliseconds(500), 10);
+            TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration("Timer0001XX", TimeSpan.FromMilliseconds(500), 10, nativeConfig);
+
+            config.Name = "totoch";
+            ActivityMonitor monitor = new ActivityMonitor();
+
+            DeviceHostConfiguration<TimeoutTestDeviceConfiguration> hostConfig = new DeviceHostConfiguration<TimeoutTestDeviceConfiguration>();
+            hostConfig.Configurations.Add(config);
+
+            ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration> host = new ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration>();
+            host.Count.Should().Be(0);
+            await host.ApplyConfigurationAsync(monitor, hostConfig);
+            host.Count.Should().Be(1);
+
+            await host[config.Name].StartAsync(monitor);
         }
     }
 }

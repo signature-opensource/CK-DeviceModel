@@ -1,16 +1,19 @@
-﻿using System;
+﻿using CK.Core;
+using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
-namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
+namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 {
 
 
     public interface ICppNativeDeviceConfig
     {
+        ICppNativeDeviceConfig Clone();
 
     }
 
-    public abstract class CppDevice<TConfiguration> : Device<TConfiguration> where TConfiguration : ICppDeviceConfiguration
+    public abstract class CppDevice<TConfiguration> : Device<TConfiguration> where TConfiguration : ICppDeviceConfiguration  
     {
         public const string MicrOpenCVDllPath = "CK.SafeDetect.MicrOpenCV.dll";
 
@@ -20,7 +23,7 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
 
         public delegate void EventsProcessingCallback(Event e);
 
-        protected EventsProcessingCallback Callback { get; private set; }
+        protected EventsProcessingCallback Callback;
 
 
         /// <summary>
@@ -28,10 +31,10 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
         /// </summary>   
         private IntPtr _encapsulatedDevice;
 
-        protected CppDevice(TConfiguration config, ICppNativeDeviceConfig cppDeviceConfig) : base(config)
+        protected CppDevice(TConfiguration config) : base(config)
         {
-            if (cppDeviceConfig == null)
-                throw new ArgumentException("Cpp device config cannot be null.");
+           ICppNativeDeviceConfig cppDeviceConfig = config.NativeDeviceConfig;
+            if (cppDeviceConfig == null) throw new ArgumentException("Cpp device configuration cannot be null.");
             if (cppDeviceConfig.GetType() == typeof(ICppNativeDeviceConfig))
                 throw new ArgumentException("CppDeviceConfig should be a struct inheriting from ICppNativeDeviceConfig, not an ICppNativeDeviceConfig itself.");
             if (Marshal.SizeOf(cppDeviceConfig.GetType()) == 0)
@@ -40,10 +43,29 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
             IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(cppDeviceConfig.GetType()));
             Marshal.StructureToPtr(cppDeviceConfig, ptr, true);
             _encapsulatedDevice = CreateCppNativeDevice(ptr);
+            _eventHandlers = new ProcessChangedValue[255];
             if (_encapsulatedDevice == null)
                 throw new InvalidOperationException("Encapsulated device shouldn't be null or have invalid adress: make sure CreateCppNativeDevice creates properly and returns a non-null value.");
 
-            RegisterEventsProcessingCallbackToCppNativeDevice(Callback);
+        }
+
+        protected abstract Task<bool> StartCppDevice(IActivityMonitor monitor, IntPtr ptrToCppDevice);
+
+        protected abstract Task StopCppDevice(IActivityMonitor monitor, IntPtr ptrToCppDevice);
+
+        protected override sealed Task<bool> DoStartAsync(IActivityMonitor monitor)
+        {
+            if (Callback == null)
+            {
+                Callback = ProcessEvent;
+                RegisterEventsProcessingCallbackToCppNativeDevice(Callback);
+            }
+            return StartCppDevice(monitor, _encapsulatedDevice);
+        }
+
+        protected override sealed Task DoStopAsync(IActivityMonitor monitor, bool fromConfiguration)
+        {
+            return StopCppDevice(monitor, _encapsulatedDevice);
         }
 
         /// <summary>
@@ -63,7 +85,9 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
         /// <returns></returns>
         private bool RegisterEventsProcessingCallbackToCppNativeDevice(EventsProcessingCallback callback)
         {
-            IntPtr ptr = Marshal.GetFunctionPointerForDelegate(callback);
+            Delegate del = callback;
+
+            IntPtr ptr = Marshal.GetFunctionPointerForDelegate(del);
 
             if (_encapsulatedDevice == null)
                 throw new NullReferenceException("EncapsulatedDevice is null or has not be properly allocated: are you sure you didn't mess up?");
@@ -73,17 +97,9 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
 
         protected abstract bool RegisterEventsProcessingCallbackToCppNativeDevice(IntPtr ptrToEncapsulatedCppNativeDevice, IntPtr callbackPtr);
 
-        protected abstract bool StartCppDevice(IntPtr ptr, bool useThread = true);
 
-        /*
-        public override bool Start(bool useThread)
-        {
-            if (_encapsulatedDevice == null)
-                throw new InvalidOperationException("Cannot start before creating the agent.");
 
-            return StartCppDevice(_encapsulatedDevice, useThread);
-        }*/
-
+    
         protected void ProcessEvent(Event e)
         {
             // Getting the number of changed fields

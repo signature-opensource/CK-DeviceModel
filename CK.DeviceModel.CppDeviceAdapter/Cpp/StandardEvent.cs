@@ -1,4 +1,4 @@
-﻿namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
+﻿namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 {
     public enum StandardEvent
     {
