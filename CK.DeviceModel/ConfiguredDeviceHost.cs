@@ -16,16 +16,44 @@ using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
-    public class ConfiguredDeviceHost<T,TConfiguration> : IDeviceHost where T : Device<TConfiguration> where TConfiguration : IDeviceConfiguration
+    public class DeviceHostConfiguration<T> : IConfiguredDeviceHostConfiguration<T> where T : IDeviceConfiguration
+    {
+        public bool IsPartialConfiguration { get; set; }
+
+        public IList<T> Configurations { get; }
+
+
+        public IConfiguredDeviceHostConfiguration<T> Clone()
+        {
+            DeviceHostConfiguration<T> clonedConfig = new DeviceHostConfiguration<T>();
+
+            foreach (IDeviceConfiguration config in Configurations)
+            {
+                IDeviceConfiguration newConf = config.Clone();
+                clonedConfig.Configurations.Add((T)newConf);
+            }
+            return clonedConfig;
+        }
+
+        public DeviceHostConfiguration()
+        {
+            Configurations = new List<T>();
+        }
+    }
+
+
+
+    public class ConfiguredDeviceHost<T, TConfiguration> : IDeviceHost where T : Device<TConfiguration> where TConfiguration : IDeviceConfiguration
     {
         readonly SemaphoreSlim _lock;
         Dictionary<string, T> _devices;
 
         public ConfiguredDeviceHost()
         {
-            _lock = new SemaphoreSlim( 0, 1 );
-            _devices = new Dictionary<string, T>();
+            _lock = new SemaphoreSlim(1, 1);
+            _devices = new Dictionary<string, T>(); 
         }
+
 
         public int Count => _devices.Count;
 
@@ -198,8 +226,49 @@ namespace CK.DeviceModel
 
         protected virtual T? CreateDevice(IActivityMonitor monitor, IDeviceConfiguration config)
         {
-            /// ....
-            return null;
+            bool success = true;
+
+            if (config.Name == null)
+            {
+                success = false;
+                monitor.Error( new ArgumentException("Device name should not be null in the device configuration."));
+            }
+            if (_devices.ContainsKey(config.Name))
+            {
+                success = false;
+                monitor.Error(new ArgumentException("Device with this name already exists."));
+            }
+
+            string configClassName = config.GetType().GetTypeInfo().FullName;
+
+            if (!configClassName.EndsWith("Configuration"))
+            {
+                success = false;
+                monitor.Error(new ArgumentException($"config's class name should be {(nameof(T))}Configuration."));
+            }
+
+            string deviceClassName = config.GetType().AssemblyQualifiedName.Replace("Configuration,", ",");
+
+            Type deviceType = Type.GetType(deviceClassName);
+
+            if (deviceType == null)
+            {
+                success = false;
+                monitor.Error(new ArgumentException("Could not find matching device class."));
+            }
+
+            if (!(deviceType.IsSubclassOf(typeof(T)) || deviceType == typeof(T)))
+            {
+                success = false;
+                monitor.Error(new ArgumentException("Device to instantiate should either be of type T or a Subclass of T."));
+            }
+
+            T device = (T)Activator.CreateInstance(deviceType, new[] { config } );
+
+            if (!success)
+                return null;
+
+            return device;
         }
 
 
@@ -255,7 +324,7 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use: any error must be logged.</param>
         /// <param name="safe">The cloned configuration.</param>
         /// <returns>True on success, false on error (errors must be logged).</returns>
-        protected virtual bool CheckConfiguration(IActivityMonitor monitor, TConfiguration safe)
+        protected virtual bool CheckConfiguration(IActivityMonitor monitor, IConfiguredDeviceHostConfiguration<TConfiguration> safe)
         {
             return true;
         }
@@ -275,11 +344,11 @@ namespace CK.DeviceModel
                 {
                     if( start )
                     {
-                        ///....
+                        await device.DoStartAsync( monitor );
                     }
                     else
                     {
-                        ///...
+                        await device.DoStopAsync(monitor, true);
                     }
 
                 }
@@ -302,5 +371,5 @@ namespace CK.DeviceModel
         }
     }
 
-    }
+    
 }

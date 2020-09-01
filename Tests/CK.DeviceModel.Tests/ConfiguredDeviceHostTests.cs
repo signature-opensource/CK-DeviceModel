@@ -1,6 +1,5 @@
 ﻿using NUnit.Framework;
 using FluentAssertions;
-using CK.DeviceModel.LanguageSpecificDevices.Cpp;
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -13,153 +12,75 @@ namespace CK.DeviceModel.Tests
     public class ConfiguredDeviceHostTests
     {
 
-        public class TestCameraConfig : ICppDeviceConfiguration
+        public class CameraConfiguration : IDeviceConfiguration
         {
             public string Name { get; set; }
 
+            public DeviceConfigurationStatus ConfigurationStatus { get; set; }
+
+            public CameraConfiguration(string name, DeviceConfigurationStatus status = DeviceConfigurationStatus.RunnableStarted)
+            {
+                Name = name;
+                ConfigurationStatus = status;
+            }
+
             public IDeviceConfiguration Clone()
             {
-                throw new NotImplementedException();
+                CameraConfiguration config = new CameraConfiguration(Name, ConfigurationStatus);
+                return config;
             }
         }
 
-        public class TestCameraNativeConfig : ICppNativeDeviceConfig
+        public class Camera : Device<CameraConfiguration>
         {
 
-        }
-
-        public class ConfiguredDeviceHostTestConfiguration : IConfiguredDeviceHostConfiguration
-        {
-
-        }
-
-        public class TestCamera : CppDevice
-        {
-            public TestCamera(ICppDeviceConfiguration config, ICppNativeDeviceConfig cppNativeDeviceConfig) : base(config, cppNativeDeviceConfig)
+            public Camera(CameraConfiguration config) : base(config)
             {
 
             }
 
-            public override long? ExternalGUID()
+
+            protected override Task<ApplyConfigurationResult> DoApplyConfigurationAsync(IActivityMonitor monitor, CameraConfiguration config, bool? allowRestart)
             {
-                throw new NotImplementedException();
+                config.ConfigurationStatus = DeviceConfigurationStatus.Runnable;
+
+                return Task.FromResult(ApplyConfigurationResult.Success);
             }
 
-            public override string ExternalIdentifier()
+          
+
+            protected override Task<bool> DoStartAsync(IActivityMonitor monitor)
             {
-                throw new NotImplementedException();
+                return Task.FromResult(true);
             }
 
-            public override bool Start(bool useThread = true)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override bool Stop()
-            {
-                throw new NotImplementedException();
-            }
-
-            protected override IntPtr CreateCppNativeDevice(IntPtr configPtr)
-            {
-                throw new NotImplementedException();
-            }
-
-            protected override long GetDeviceID()
-            {
-                throw new NotImplementedException();
-            }
-
-            protected override bool RegisterEventsProcessingCallbackToCppNativeDevice(IntPtr ptrToEncapsulatedCppNativeDevice, IntPtr callbackPtr)
-            {
-                throw new NotImplementedException();
-            }
-
-           
-            public override void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config)
-            {
-
-            }
-
-            public override void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan)
-            {
-                throw new NotImplementedException();
-            }
-
-            protected override bool StartCppDevice(IntPtr ptr, bool useThread = true)
-            {
-                throw new NotImplementedException();
-            }
-        }
-
-        public class PCLConfiguration : IDeviceConfiguration
-        {
-            public string Name { get; set; }
-
-
-            public PCLConfiguration()
-            {
-
-            }
-
-           
-            public IDeviceConfiguration Clone()
-            {
-                throw new NotImplementedException();
-            }
-
-        }
-
-        public class PCL : Device
-        {
-            public int NumberOfTimesThisHasBeenConfiguration { get; set; } = 0;
-
-            public PCL(PCLConfiguration config) : base(config)
-            {
-            }
-
-            public override void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config)
-            {
-                NumberOfTimesThisHasBeenConfiguration++;
-            }
-
-            public override long? ExternalGUID()
+            protected override Task DoStopAsync(IActivityMonitor monitor, bool fromConfiguration)
             {
                 return null;
             }
-
-            public override string ExternalIdentifier()
-            {
-                return null;
-            }
-
-            public override void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override bool Start(bool useThread = true)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override bool Stop()
-            {
-                throw new NotImplementedException();
-            }
-
-
-            protected override long GetDeviceID()
-            {
-                throw new NotImplementedException();
-            }
         }
 
 
+        [Test]
+        public void DeviceHostShouldInitializeProperly()
+        {
+            CameraConfiguration config = new CameraConfiguration("CameraRGB_XVAJZH_98");
+            ConfiguredDeviceHost<Camera, CameraConfiguration> host = new ConfiguredDeviceHost<Camera, CameraConfiguration>();
+            ActivityMonitor monitor = new ActivityMonitor();
+
+            DeviceHostConfiguration<CameraConfiguration> hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
+            hostConfig.Configurations.Add(config);
+            host.Count.Should().Be(0);
+            host.ApplyConfigurationAsync(monitor, hostConfig).Wait();          
+            host.Count.Should().Be(1);
+        }
+
+        /*
+        
         public static void RunDecrement(object o)
         {
                 int count = 99;
-            ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
+                ConfiguredDeviceHost<Device> host = (ConfiguredDeviceHost<Device>)o;
                 PCLConfiguration config = new PCLConfiguration();
 
                 while (count >= 0)
@@ -296,7 +217,10 @@ namespace CK.DeviceModel.Tests
             act2.Should().ThrowExactly<ArgumentException>();
 
 
-        }
+        }*/
+
+
+
 
 
     }

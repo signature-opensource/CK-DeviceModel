@@ -87,10 +87,12 @@ namespace CK.DeviceModel
         {
         }
 
-        internal Task<bool> HostStartAsync(IActivityMonitor monitor)
+        internal async Task<bool> HostStartAsync(IActivityMonitor monitor)
         {
             Debug.Assert(_host != null);
-
+            // We are in the context of a call from the host, therefore we already have a lock (Semaphore lock). We can then safely call 
+            // the DoStart of the device.
+            return await DoStartAsync(monitor);
         }
 
         /// <summary>
@@ -115,12 +117,12 @@ namespace CK.DeviceModel
         /// Agent starting method.
         /// </summary>
         /// <returns>True if the agent has been successfully started, false otherwise.</returns>
-        protected abstract Task<bool> DoStartAsync(IActivityMonitor monitor);
+        internal protected abstract Task<bool> DoStartAsync(IActivityMonitor monitor);
 
-        internal Task<bool> HostStopAsync(IActivityMonitor monitor)
+        internal async Task<bool> HostStopAsync(IActivityMonitor monitor)
         {
             Debug.Assert(_host != null);
-
+            return await DoStartAsync( monitor );
         }
 
         /// <summary>
