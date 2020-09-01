@@ -3,304 +3,148 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using CK.Core;
 
 namespace CK.DeviceModel
 {
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct Event
+
+    public abstract class Device<TConfiguration> : IDevice where TConfiguration : IDeviceConfiguration
     {
-        // Conventional usage: stores the number of changed values
-        public EventVar Field1;
+        internal IDeviceHost? _host;
+        int _applyConfigurationCount;
 
-        // Conventional usage: stores either a value (if changed value is one) or a pointer (IntPtr) to an array of changed values
-        public EventVar Field2;
+        /// <summary>
+        /// Initializes a new device bound to a configuration.
+        /// </summary>
+        /// <param name="config">The configuration to use.</param>
+        protected Device( TConfiguration config )
+        {
+            Name = config.Name;
+        }
 
-        // Code of the event being sent.
-        public byte EventCode;
-    }
-
-
-    [StructLayout(LayoutKind.Explicit)]
-    public struct EventVar
-    {
-        [FieldOffset(0)]
-        public IntPtr IntPtr;
-
-        [FieldOffset(0)]
-        public byte Byte0;
-        [FieldOffset(1)]
-        public byte Byte1;
-        [FieldOffset(2)]
-        public byte Byte2;
-        [FieldOffset(3)]
-        public byte Byte3;
-        [FieldOffset(4)]
-        public byte Byte4;
-        [FieldOffset(5)]
-        public byte Byte5;
-        [FieldOffset(6)]
-        public byte Byte6;
-        [FieldOffset(7)]
-        public byte Byte7;
-
-        [FieldOffset(0)]
-        public sbyte SByte0;
-        [FieldOffset(1)]
-        public sbyte SByte1;
-        [FieldOffset(2)]
-        public sbyte SByte2;
-        [FieldOffset(3)]
-        public sbyte SByte3;
-        [FieldOffset(4)]
-        public sbyte SByte4;
-        [FieldOffset(5)]
-        public sbyte SByte5;
-        [FieldOffset(6)]
-        public sbyte SByte6;
-        [FieldOffset(7)]
-        public sbyte SByte7;
-
-        [FieldOffset(0)]
-        public double Double;
-
-        [FieldOffset(0)]
-        public long Long;
-
-        [FieldOffset(0)]
-        public ulong ULong;
-
-        [FieldOffset(0)]
-        public int Int0;
-        [FieldOffset(4)]
-        public int Int1;
-
-        [FieldOffset(0)]
-        public uint UInt0;
-        [FieldOffset(4)]
-        public uint UInt1;
-
-        [FieldOffset(0)]
-        public float Float0;
-        [FieldOffset(4)]
-        public float Float1;
-
-        [FieldOffset(0)]
-        public short Short0;
-        [FieldOffset(2)]
-        public short Short1;
-        [FieldOffset(4)]
-        public short Short2;
-        [FieldOffset(6)]
-        public short Short3;
-
-        [FieldOffset(0)]
-        public ushort UShort0;
-        [FieldOffset(2)]
-        public ushort UShort1;
-        [FieldOffset(4)]
-        public ushort UShort2;
-        [FieldOffset(6)]
-        public ushort UShort3;
-
-    }
-
-    public enum StandardEvent
-    {
-        error = 0,
-        W1 = 1,
-        W2 = 2,
-        W3 = 3,
-        W4 = 4,
-        started = 5,
-        stopped = 6,
-        isstarting = 7,
-        isstopping = 8,
-        isdestroyed = 9
-    };
-
-
-    public abstract class Device
-    {
+        /// <summary>
+        /// Gets the name. Necessarily not null or whitespace.
+        /// </summary>
         public string Name { get; private set; }
 
-        private ProcessChangedValue[] _eventHandlers;
+        /// <summary>
+        /// Gets the current <see cref="DeviceConfigurationStatus"/>.
+        /// </summary>
+        public DeviceConfigurationStatus ConfigurationStatus { get; private set; }
 
-        private long? _GUID;
-
-        public delegate void ProcessChangedValue(Event changedValue);
-
-        public delegate void EventsProcessingCallback(Event e);
-
-        protected EventsProcessingCallback Callback { get; private set; }
-
-        //object _configApplicationLock();
-
-        private void Init(IDeviceConfiguration config)
+        internal async Task<ApplyConfigurationResult> ApplyConfigurationAsync(IActivityMonitor monitor, TConfiguration config, bool? allowRestart)
         {
-            Callback = ProcessEvent;
-            Name = config.Name;
-
-
-            // 255 should be enough
-            _eventHandlers = new ProcessChangedValue[255];
-
-            // ?
-            string externId = ExternalIdentifier();
-            if (externId != null)
-                Name = externId;
-
-            _GUID = ExternalGUID();
-        }
-
-
-        public Device ( IDeviceConfiguration config )
-        {
-            Init(config);
+            if (config.Name != Name) return ApplyConfigurationResult.BadName;
+            var r = await DoApplyConfigurationAsync(monitor, config, allowRestart);
+            if( r == ApplyConfigurationResult.Success )
+            {
+                if( Interlocked.Increment( ref _applyConfigurationCount ) == 1 )
+                {
+                    if( config.ConfigurationStatus == DeviceConfigurationStatus.RunnableStarted || config.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning )
+                    {
+                        if (!await DoStartAsync(monitor)) r = ApplyConfigurationResult.StartByConfigurationFailed;
+                    }
+                }
+                else
+                {
+                    if (config.ConfigurationStatus == DeviceConfigurationStatus.Disabled)
+                    {
+                        await DoStopAsync(monitor, true);
+                    }
+                    else if (config.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning)
+                    {
+                        if (!await StartAsync(monitor)) r = ApplyConfigurationResult.StartByConfigurationFailed;
+                    }
+                }
+            }
+            return r;
         }
 
         /// <summary>
-        /// Allows this device to do any required housekeeping.
+        /// Applies a new configuration.
+        /// This can be called when this device is started or not, but <paramref name="allowRestart"/> should be set to true to allow a
+        /// Start/Stop of the device.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="timerSpan">Indicative timer duration.</param>
-        public abstract void OnTimer(IActivityMonitor monitor, TimeSpan timerSpan);
+        /// <param name="config">The configuration to apply.</param>
+        /// <param name="allowRestart">
+        /// Defines the behavior regarding potentially required Stop/Start:
+        /// <list type="bullet">
+        ///     <item>true - Always allow restart.</item>
+        ///     <item>false - Disallow any restart.</item>
+        ///     <item>null - Allow restart as long as it has no important side effects.</item>
+        /// </list>
+        /// The host's global <see cref="ConfiguredDeviceHost{T, TConfiguration}.ApplyConfigurationAsync(IActivityMonitor, IConfiguredDeviceHostConfiguration{TConfiguration}, bool)"/>
+        /// uses null here: a global reconfiguration SHOULD try to minimize side effects.
+        /// </param>
+        /// <returns>The result</returns>
+        protected abstract Task<ApplyConfigurationResult> DoApplyConfigurationAsync(IActivityMonitor monitor, TConfiguration config, bool? allowRestart);
 
-        private void Process()
+        internal protected virtual void Destroy( IActivityMonitor monitor )
         {
+        }
+
+        internal Task<bool> HostStartAsync(IActivityMonitor monitor)
+        {
+            Debug.Assert(_host != null);
 
         }
 
         /// <summary>
-        /// Agent starting method. Should be redefined in derived classes, that should start the specific agent. 
+        /// 
         /// </summary>
-        /// <returns>True if the agent has been successfully started, false otherwise.</returns>
-        public virtual bool Start(bool useThread = true)
+        /// <param name="monitor"></param>
+        /// <returns></returns>
+        public async Task<bool> StartAsync( IActivityMonitor monitor )
         {
-            return false;
+            var h = _host;
+            if( h == null )
+            {
+                monitor.Error("Starting a detached device is not possible.");
+                return false;
+            }
+            return await h.TryStartAsync(this, monitor);
         }
 
+
+
+        /// <summary>
+        /// Agent starting method.
+        /// </summary>
+        /// <returns>True if the agent has been successfully started, false otherwise.</returns>
+        protected abstract Task<bool> DoStartAsync(IActivityMonitor monitor);
+
+        internal Task<bool> HostStopAsync(IActivityMonitor monitor)
+        {
+            Debug.Assert(_host != null);
+
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="monitor"></param>
+        /// <returns></returns>
+        public async Task<bool> StopAsync( IActivityMonitor monitor )
+        {
+            var h = _host;
+            if( h == null )
+            {
+                monitor.Error("Starting a detached device is not possible.");
+                return false;
+            }
+            return await h.TryStopAsync(this, monitor);
+        }
 
 
         /// <summary>
         /// Agent stopping method. Should be redefined in derived classes, that should stop the specific agent.
         /// </summary>
         /// <returns>True if the agent has successfully stopped, false otherwise.</returns>
-        public virtual bool Stop()
-        {
-            return false;
-        }
-
-        private IDeviceConfiguration[] _newConf;
-
-
-
-        /*
-        internal void Reconfigure(IDeviceConfiguration configuration, bool waitForApplication = false)
-        {
-            Util.InterlockedAdd(ref _newConf, configuration);
-            if (waitForApplication)
-            {
-                lock (_confTrigger)
-                {
-                    IDeviceConfiguration[] newConf;
-                    while (_stopFlag == 0 && (newConf = _newConf) != null && newConf.Contains(configuration))
-                        Monitor.Wait(_confTrigger);
-                }
-            }
-        }
-        */
-
-#if DEBUG
-        /// <summary>
-        /// We know that this is within a MRSW-context lock, so we can safely configure.
-        /// </summary>
-        /// <param name="config">New configuration we want to apply to the device.</param>
-        public abstract void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config);
-
-#endif
-
-#if RELEASE
-        internal abstract void ApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration config);
-#endif
-
-        internal void EnsureApplyConfiguration(IActivityMonitor monitor, IDeviceConfiguration configuration, bool waitForApplication = false)
-        {
-            if (waitForApplication)
-            {
-
-            }
-        }
-
-        protected virtual void OnReconfiguring()
-        {
-
-        }
-
-        protected virtual void OnReconfigured()
-        {
-
-        }
-
-        protected virtual long GetDeviceID()
-        {
-            return 0;
-        }
-
-        // Get serial number
-        public virtual string ExternalIdentifier()
-        {
-            return null;
-        }
-
-        public virtual long? ExternalGUID()
-        {
-            return null;
-        }
-
-        protected void ProcessEvent(Event e)
-        {
-            // Getting the number of changed fields
-            byte eventID = (byte)(Enum.GetValues(typeof(StandardEvent)).Length + e.EventCode);
-            if (eventID < _eventHandlers.Length)
-                _eventHandlers[eventID](e);
-        }
-
-#if DEBUG
-        public void SendVirtualEventForTests(Event e)
-        {
-            ProcessEvent(e);
-        }
-#endif
-
-        protected bool AddStandardEventProcessing(StandardEvent e, ProcessChangedValue OnChange)
-        {
-            return AddStandardEventProcessing((byte)e, OnChange);
-        }
-
-        private bool AddStandardEventProcessing(byte eventID, ProcessChangedValue OnChange)
-        {
-            if (eventID > Enum.GetValues(typeof(StandardEvent)).Length)
-                return false;
-
-            _eventHandlers[eventID] = OnChange;
-
-            return true;
-        }
-
-        protected bool AddEventProcessing(byte eventId, ProcessChangedValue OnChange)
-        {
-            byte eventID = (byte)(Enum.GetValues(typeof(StandardEvent)).Length + eventId);
-            if (eventID < Enum.GetValues(typeof(StandardEvent)).Length)
-                return false;
-
-            _eventHandlers[eventID] = OnChange;
-
-            return true;
-        }
+        internal protected abstract Task DoStopAsync(IActivityMonitor monitor, bool fromConfiguration );
     }
 
 }

@@ -18,6 +18,15 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
     {
         public const string MicrOpenCVDllPath = "CK.SafeDetect.MicrOpenCV.dll";
 
+        private ProcessChangedValue[] _eventHandlers;
+
+        public delegate void ProcessChangedValue(Event changedValue);
+
+        public delegate void EventsProcessingCallback(Event e);
+
+        protected EventsProcessingCallback Callback { get; private set; }
+
+
         /// <summary>
         /// Maximum number of listeners that can subscribe to the current agent.
         /// </summary>   
@@ -76,6 +85,47 @@ namespace CK.DeviceModel.LanguageSpecificDevices.Cpp
                 throw new InvalidOperationException("Cannot start before creating the agent.");
 
             return StartCppDevice(_encapsulatedDevice, useThread);
+        }
+
+        protected void ProcessEvent(Event e)
+        {
+            // Getting the number of changed fields
+            byte eventID = (byte)(Enum.GetValues(typeof(StandardEvent)).Length + e.EventCode);
+            if (eventID < _eventHandlers.Length)
+                _eventHandlers[eventID](e);
+        }
+
+#if DEBUG
+        public void SendVirtualEventForTests(Event e)
+        {
+            ProcessEvent(e);
+        }
+#endif
+
+        protected bool AddStandardEventProcessing(StandardEvent e, ProcessChangedValue OnChange)
+        {
+            return AddStandardEventProcessing((byte)e, OnChange);
+        }
+
+        private bool AddStandardEventProcessing(byte eventID, ProcessChangedValue OnChange)
+        {
+            if (eventID > Enum.GetValues(typeof(StandardEvent)).Length)
+                return false;
+
+            _eventHandlers[eventID] = OnChange;
+
+            return true;
+        }
+
+        protected bool AddEventProcessing(byte eventId, ProcessChangedValue OnChange)
+        {
+            byte eventID = (byte)(Enum.GetValues(typeof(StandardEvent)).Length + eventId);
+            if (eventID < Enum.GetValues(typeof(StandardEvent)).Length)
+                return false;
+
+            _eventHandlers[eventID] = OnChange;
+
+            return true;
         }
     }
 }

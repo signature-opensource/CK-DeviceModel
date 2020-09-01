@@ -4,19 +4,24 @@ using System.Text;
 
 namespace CK.DeviceModel
 {
+
     public interface IDeviceConfiguration
     {
         /// <summary>
-        /// Name of the device.
+        /// Name of the device. This is a unique key for a device in its host.
         /// </summary>
-        public string Name { get; set; }
+        string Name { get; set; }
 
         /// <summary>
-        /// Clones the current configuration and returns a new deep copy of the current configuration
+        /// Gets or sets the <see cref="DeviceConfigurationStatus"/>.
         /// </summary>
-        /// <returns>A handle to the new configuration.</returns>
-        public IDeviceConfiguration Clone();
+        DeviceConfigurationStatus ConfigurationStatus { get; set; }
 
-        //public T CreateDevice<T>() where T : Device;
+        /// <summary>
+        /// Clones the current configuration and returns a new deep copy of the current configuration.
+        /// </summary>
+        /// <returns>A new, cloned, configuration of the device.</returns>
+        IDeviceConfiguration Clone();
+
     }
 }
