@@ -75,6 +75,44 @@ namespace CK.DeviceModel.Tests
             host.Count.Should().Be(1);
         }
 
+
+        [Test]
+        public void DeviceHostFindShouldReturnExactReference()
+        {
+            string cameraModel = "CameraRGB_XVAJZH_98";
+            CameraConfiguration config = new CameraConfiguration(cameraModel);
+            ConfiguredDeviceHost<Camera, CameraConfiguration> host = new ConfiguredDeviceHost<Camera, CameraConfiguration>();
+            ActivityMonitor monitor = new ActivityMonitor();
+
+            DeviceHostConfiguration<CameraConfiguration> hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
+            hostConfig.Configurations.Add(config);
+            host.Count.Should().Be(0);
+            host.ApplyConfigurationAsync(monitor, hostConfig).Wait();
+            host.Count.Should().Be(1);
+
+            host[cameraModel].Should().NotBeNull();
+            host[cameraModel].Name.Should().Be(cameraModel);
+            host[cameraModel + "WRONG"].Should().BeNull();
+
+
+            Camera cam = host[cameraModel];
+            Camera cam2 = host[cameraModel];
+            cam.Should().Be(cam2);
+        }
+
+        [Test]
+        public void DeviceNameAfterAddShouldHaveProperlyConfiguredName()
+        {
+            CameraConfiguration config = new CameraConfiguration("CameraRGB_XVAJZH_98");
+            ConfiguredDeviceHost<Camera, CameraConfiguration> host = new ConfiguredDeviceHost<Camera, CameraConfiguration>();
+            ActivityMonitor monitor = new ActivityMonitor();
+
+            DeviceHostConfiguration<CameraConfiguration> hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
+            hostConfig.Configurations.Add(config);
+            host.Count.Should().Be(0);
+            host.ApplyConfigurationAsync(monitor, hostConfig).Wait();
+            host.Count.Should().Be(1);
+        }
         /*
         
         public static void RunDecrement(object o)
