@@ -2,16 +2,27 @@
 
 namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 {
+    /// <summary>
+    /// Event structure sent by the C++.
+    /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct Event
     {
-        // Conventional usage: stores the number of changed values
+        /// <summary>
+        /// Conventional usage: stores the number of values we are processing.
+        /// </summary>
         public EventVar Field1;
 
-        // Conventional usage: stores either a value (if changed value is one) or a pointer (IntPtr) to an array of changed values
+        /// <summary>
+        /// Conventional usage: stores either a value (if changed value is one) 
+        /// or a pointer (IntPtr) to an array of values.
+        /// </summary>
         public EventVar Field2;
 
-        // Code of the event being sent.
+        /// <summary>
+        /// Code of the event being sent, to distinguish it from other events.
+        /// Should be uniaue in the context of the device.
+        /// </summary>
         public byte EventCode;
     }
 

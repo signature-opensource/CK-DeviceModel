@@ -6,13 +6,6 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 {
 
-
-    public interface ICppNativeDeviceConfig
-    {
-        ICppNativeDeviceConfig Clone();
-
-    }
-
     public abstract class CppDevice<TConfiguration> : Device<TConfiguration> where TConfiguration : ICppDeviceConfiguration  
     {
         public const string MicrOpenCVDllPath = "CK.SafeDetect.MicrOpenCV.dll";
