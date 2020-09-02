@@ -29,13 +29,7 @@ namespace CK.DeviceModel.CppDeviceAdapter.Tests
             TestCppDeviceConfig nativeConfig = new TestCppDeviceConfig(TimeSpan.FromMilliseconds(500), 10);
             TimeoutTestDeviceConfiguration config = new TimeoutTestDeviceConfiguration("Timer0001XX", TimeSpan.FromMilliseconds(500), 10, nativeConfig);
           
-
-            config.Name = "totoch";
-
             _dev = new TimeoutTestDevice(config);
-
-
-
 
             YMCA test = default;
             test.Y = 8;
