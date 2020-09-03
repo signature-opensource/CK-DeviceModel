@@ -20,7 +20,6 @@ namespace CodeCake
             Cake.Log.Verbosity = Verbosity.Diagnostic;
             StandardGlobalInfo globalInfo = CreateStandardGlobalInfo()
                                                 .AddDotnet()
-                                                .AddNPM()
                                                 .SetCIBuildTag();
             Task( "Check-Repository" )
                 .Does( () =>
@@ -33,7 +32,6 @@ namespace CodeCake
                 .Does( () =>
                 {
                     globalInfo.GetDotnetSolution().Clean();
-                    globalInfo.GetNPMSolution().Clean();
                 } );
 
 
@@ -43,7 +41,6 @@ namespace CodeCake
                 .Does( () =>
                 {
                     globalInfo.GetDotnetSolution().Build();
-                    globalInfo.GetNPMSolution().Build();
                 } );
 
             Task( "Unit-Testing" )
@@ -52,10 +49,7 @@ namespace CodeCake
                                      || Cake.ReadInteractiveOption( "RunUnitTests", "Run Unit Tests?", 'Y', 'N' ) == 'Y' )
                .Does( () =>
                {
-                   var testProjects = globalInfo.GetDotnetSolution().Projects.Where( p => p.Name.EndsWith( ".Tests" )
-                                                                                          && !p.Path.Segments.Contains( "Integration" ) );
-                   globalInfo.GetDotnetSolution().Test( testProjects );
-                   globalInfo.GetNPMSolution().Test();
+                   globalInfo.GetDotnetSolution().Test();
                } );
 
             Task( "Create-Packages" )
@@ -64,7 +58,6 @@ namespace CodeCake
                 .Does( () =>
                 {
                     globalInfo.GetDotnetSolution().Pack();
-                    globalInfo.GetNPMSolution().Pack();
                 } );
 
             Task( "Push-Packages" )

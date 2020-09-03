@@ -6,14 +6,25 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel", "CK.DeviceModel\CK.DeviceModel.csproj", "{8F530D25-198F-4645-A0BF-4CA9B3CF0F6B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{72DA97E4-D00C-4960-8D63-A41CFBF5835B}"
+	ProjectSection(SolutionItems) = preProject
+		Tests\TestHelper.config = Tests\TestHelper.config
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeCakeBuilder", "CodeCakeBuilder\CodeCakeBuilder.csproj", "{D17E97BF-A62C-481D-B622-6D6EC2F7F0A8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel.Tests", "Tests\CK.DeviceModel.Tests\CK.DeviceModel.Tests.csproj", "{722D5670-E000-4C3D-AED9-113028524CD3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CK.DeviceModel.CppDeviceAdapter", "CK.DeviceModel.CppDeviceAdapter\CK.DeviceModel.CppDeviceAdapter.csproj", "{57CE8050-99C1-4058-AFB0-7A22DA21CB59}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel.CppDeviceAdapter", "CK.DeviceModel.CppDeviceAdapter\CK.DeviceModel.CppDeviceAdapter.csproj", "{57CE8050-99C1-4058-AFB0-7A22DA21CB59}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CK.DeviceModel.CppDeviceAdapter.Tests", "Tests\CK.DeviceModel.CppDeviceAdapter.Tests\CK.DeviceModel.CppDeviceAdapter.Tests.csproj", "{8B55C9D3-3726-4C8B-9449-C172F1DC88CC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel.CppDeviceAdapter.Tests", "Tests\CK.DeviceModel.CppDeviceAdapter.Tests\CK.DeviceModel.CppDeviceAdapter.Tests.csproj", "{8B55C9D3-3726-4C8B-9449-C172F1DC88CC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{407D6A87-6955-4F6D-A642-0EFAF97CE3A5}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		RepositoryInfo.xml = RepositoryInfo.xml
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.PerfectEvent", "CK.PerfectEvent\CK.PerfectEvent.csproj", "{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +52,10 @@ Global
 		{8B55C9D3-3726-4C8B-9449-C172F1DC88CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B55C9D3-3726-4C8B-9449-C172F1DC88CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B55C9D3-3726-4C8B-9449-C172F1DC88CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

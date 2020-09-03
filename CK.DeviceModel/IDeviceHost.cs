@@ -1,4 +1,4 @@
-﻿using CK.Core;
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -6,10 +6,19 @@ using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
-    internal interface IDeviceHost
+    /// <summary>
+    /// Defines non-generic device host properties.
+    /// </summary>
+    public interface IDeviceHost
     {
-        Task<bool> TryStartAsync(IDevice d, IActivityMonitor monitor);
+        /// <summary>
+        /// Gets the host name that SHOULD identify this host instance unambiguously in a running context.
+        /// </summary>
+        string DeviceHostName { get; }
 
-        Task<bool> TryStopAsync(IDevice d, IActivityMonitor monitor);
+        /// <summary>
+        /// Gets the number of devices.
+        /// </summary>
+        int Count { get; }
     }
 }

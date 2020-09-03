@@ -55,7 +55,7 @@ namespace CK.DeviceModel.CppDeviceAdapter.Tests
             DeviceHostConfiguration<TimeoutTestDeviceConfiguration> hostConfig = new DeviceHostConfiguration<TimeoutTestDeviceConfiguration>();
             hostConfig.Configurations.Add(config);
 
-            ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration> host = new ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration>();
+            DeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration> host = new DeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration>();
             host.Count.Should().Be(0);
             await host.ApplyConfigurationAsync(monitor, hostConfig);
             host.Count.Should().Be(1);
@@ -73,7 +73,7 @@ namespace CK.DeviceModel.CppDeviceAdapter.Tests
             DeviceHostConfiguration<TimeoutTestDeviceConfiguration> hostConfig = new DeviceHostConfiguration<TimeoutTestDeviceConfiguration>();
             hostConfig.Configurations.Add(config);
 
-            ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration> host = new ConfiguredDeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration>();
+            DeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration> host = new DeviceHost<TimeoutTestDevice, TimeoutTestDeviceConfiguration>();
             host.Count.Should().Be(0);
             await host.ApplyConfigurationAsync(monitor, hostConfig);
             host.Count.Should().Be(1);
