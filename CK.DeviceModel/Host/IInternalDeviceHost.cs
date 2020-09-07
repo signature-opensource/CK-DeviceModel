@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Internal interface that define non-generic host behaviors.
+    /// Internal interface that define non-generic host behaviors: Devices
+    /// call these methods.
     /// </summary>
     internal interface IInternalDeviceHost : IDeviceHost
     {
