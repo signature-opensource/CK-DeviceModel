@@ -249,3 +249,5 @@ CodeCakeBuilder/MemoryKey.*.txt
 CodeCakeBuilder/UnitTestsDone.*.txt
 /Tests/CK.Observable.League.Tests/TestStores/
 /Tests/CK.Observable.Domain.Tests/TestTemp/
+
+$StObjGen/
