@@ -15,8 +15,4 @@
     <ProjectReference Include="..\CK.PerfectEvent\CK.PerfectEvent.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Impl\" />
-  </ItemGroup>
-
 </Project>

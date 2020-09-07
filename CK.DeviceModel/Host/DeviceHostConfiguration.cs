@@ -9,11 +9,11 @@ namespace CK.DeviceModel
 {
 
     /// <summary>
-    /// Default implementation of a DeviceHost configuration.
+    /// Default implementation of a host device configuration.
     /// This class can be specialized if needed.
     /// </summary>
     /// <typeparam name="TConfiguration"></typeparam>
-    public class DeviceHostConfiguration<TConfiguration> : IDeviceHostConfiguration where TConfiguration : IDeviceConfiguration
+    public class DeviceHostConfiguration<TConfiguration> : IDeviceHostConfiguration where TConfiguration : DeviceConfiguration
     {
         /// <summary>
         /// Initializes a new empty partial host configuration:
@@ -53,7 +53,7 @@ namespace CK.DeviceModel
         /// </summary>
         public IList<TConfiguration> Configurations { get; }
 
-        IReadOnlyList<IDeviceConfiguration> IDeviceHostConfiguration.Configurations => (IReadOnlyList<IDeviceConfiguration>)Configurations;
+        IReadOnlyList<DeviceConfiguration> IDeviceHostConfiguration.Configurations => (IReadOnlyList<DeviceConfiguration>)Configurations;
 
         /// <summary>
         /// Checks the validity of this configuration: all <see cref="IDeviceConfiguration.Name"/> must be non empy or white space, be

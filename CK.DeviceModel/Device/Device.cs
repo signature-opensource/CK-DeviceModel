@@ -13,51 +13,50 @@ namespace CK.DeviceModel
 
     /// <summary>
     /// Abstract base class for a device.
-    /// Its <typeparamref name="TConfiguration"/> MUST be an interface. Since this kind of constraint cannot be enforced by the C# generics,
-    /// the Device host constructor checks at runtime that TConfiguration is an interface (by throwing a TypeLoadException).
     /// </summary>
-    /// <typeparam name="TConfiguration">The type of the configuration: it MUST be an interface.</typeparam>
-    public abstract class Device<TConfiguration> : IDevice where TConfiguration : IDeviceConfiguration
+    /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
+    public abstract partial class Device<TConfiguration> : IDevice where TConfiguration : DeviceConfiguration
     {
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
         bool _isRunning;
 
-        //readonly SequentialEventHandlerSender<IPLCHostedService, ClosedEvent> _eSeqClosed = new SequentialEventHandlerSender<IPLCHostedService, ClosedEvent>();
-        //public event SequentialEventHandler<IPLCHostedService, ClosedEvent> Closed
-        //{
-        //    add => _eSeqClosed.Add( value );
-        //    remove => _eSeqClosed.Remove( value );
-        //}
+        readonly SequentialEventHandlerSender<IDevice, DeviceStateChangedEvent> _eSeqClosed = new SequentialEventHandlerSender<IDevice, DeviceStateChangedEvent>();
 
-        //readonly SequentialEventHandlerAsyncSender<IPLCHostedService, ClosedEvent> _eSeqClosedAsync = new SequentialEventHandlerAsyncSender<IPLCHostedService, ClosedEvent>();
-        //public event SequentialEventHandlerAsync<IPLCHostedService, ClosedEvent> ClosedAsync
-        //{
-        //    add => _eSeqClosedAsync.Add( value );
-        //    remove => _eSeqClosedAsync.Remove( value );
-        //}
+        readonly SequentialEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent> _eSeqClosedAsync = new SequentialEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent>();
 
-        //readonly ParallelEventHandlerAsyncSender<IPLCHostedService, ClosedEvent> _eParClosedAsync = new ParallelEventHandlerAsyncSender<IPLCHostedService, ClosedEvent>();
-        //public event ParallelEventHandlerAsync<IPLCHostedService, ClosedEvent> ClosedParallelAsync
-        //{
-        //    add => _eParClosedAsync.Add( value );
-        //    remove => _eParClosedAsync.Add( value );
-        //}
+        readonly ParallelEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent> _eParClosedAsync = new ParallelEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent>();
 
-        //public Task RaiseClosedAsync( IActivityMonitor m, ClosedEvent close )
-        //{
-        //    try
-        //    {
-        //        Task task = _eParClosedAsync.RaiseAsync( m, this, close );
-        //        _eSeqClosed.Raise( m, this, close );
-        //        return Task.WhenAll( task, _eSeqClosedAsync.RaiseAsync( m, this, close ) );
-        //    }
-        //    catch( Exception ex )
-        //    {
-        //        m.Error( ex );
-        //        return Task.CompletedTask;
-        //    }
-        //}
+        public event SequentialEventHandler<IDevice, DeviceStateChangedEvent> StateChanged
+        {
+            add => _eSeqClosed.Add( value );
+            remove => _eSeqClosed.Remove( value );
+        }
+        public event SequentialEventHandlerAsync<IDevice, DeviceStateChangedEvent> StateChangedAsync
+        {
+            add => _eSeqClosedAsync.Add( value );
+            remove => _eSeqClosedAsync.Remove( value );
+        }
+        public event ParallelEventHandlerAsync<IDevice, DeviceStateChangedEvent> StateChangedParallelAsync
+        {
+            add => _eParClosedAsync.Add( value );
+            remove => _eParClosedAsync.Add( value );
+        }
+
+        Task RaiseStateChangedAsync( IActivityMonitor monitor, DeviceStateChangedEvent e )
+        {
+            try
+            {
+                Task task = _eParClosedAsync.RaiseAsync( monitor, this, e );
+                _eSeqClosed.Raise( monitor, this, e );
+                return Task.WhenAll( task, _eSeqClosedAsync.RaiseAsync( monitor, this, e ) );
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While raising '{FullName}' {e}.", ex );
+                return Task.CompletedTask;
+            }
+        }
 
         /// <summary>
         /// Initializes a new device bound to a configuration.
@@ -112,111 +111,59 @@ namespace CK.DeviceModel
         /// </summary>
         public DeviceConfigurationStatus ConfigurationStatus => _configStatus;
 
-        /// <summary>
-        /// Defines the reason why a device stopped.
-        /// </summary>
-        internal protected enum StoppedReason
-        {
-            /// <summary>
-            /// Not applicable.
-            /// </summary>
-            None = 0,
-
-            /// <summary>
-            /// The device stopped because of a <see cref="DeviceConfigurationStatus.Disabled"/>.
-            /// </summary>
-            StoppedByDisabledConfiguration,
-
-            /// <summary>
-            /// The device stopped because of a call to the public <see cref="IDevice.StopAsync(Core.IActivityMonitor)"/>.
-            /// </summary>
-            StoppedCall,
-
-            /// <summary>
-            /// The device stopped because of a call to the protected <see cref="Device{TConfiguration}.AutoStopAsync(Core.IActivityMonitor, bool)"/>.
-            /// </summary>
-            AutoStoppedCall,
-
-            /// <summary>
-            /// The device stopped because of a call to the protected <see cref="Device{TConfiguration}.AutoStopAsync(Core.IActivityMonitor, bool)"/>
-            /// with ignoreAlwaysRunning parameter set to true.
-            /// </summary>
-            AutoStoppedForceCall,
-
-            /// <summary>
-            /// The device has stopped because it will be destroyed.
-            /// </summary>
-            StoppedBeforeDestroy
-        }
-
-
-        internal async Task<ReconfigurationResult> HostReconfigureAsync( IActivityMonitor monitor, TConfiguration config )
+        internal async Task<DeviceApplyConfigurationResult> HostReconfigureAsync( IActivityMonitor monitor, TConfiguration config )
         {
             Debug.Assert( config.Name == Name );
 
             if( _isRunning && config.ConfigurationStatus == DeviceConfigurationStatus.Disabled )
             {
                 _configStatus = DeviceConfigurationStatus.Disabled;
-                await HostStopAsync( monitor, StoppedReason.StoppedByDisabledConfiguration );
+                await HostStopAsync( monitor, DeviceStoppedReason.StoppedByDisabledConfiguration );
                 Debug.Assert( _isRunning == false, "DoStop DOES stop." );
             }
             else
             {
                 _configStatus = config.ConfigurationStatus;
             }
-            ReconfigurationResult r; 
+            DeviceReconfiguredResult r; 
             try
             {
-                r = (ReconfigurationResult)await DoReconfigureAsync( monitor, config );
+                r = await DoReconfigureAsync( monitor, config );
             }
             catch( Exception ex )
             {
                 monitor.Error( ex );
-                r = ReconfigurationResult.UpdateFailed;
+                r = DeviceReconfiguredResult.UpdateFailed;
             }
 
-            if( r == ReconfigurationResult.UpdateSucceeded
+            await RaiseStateChangedAsync( monitor, new DeviceStateChangedEvent( r ) );
+
+            DeviceApplyConfigurationResult applyResult = (DeviceApplyConfigurationResult)r;
+            if( (r == DeviceReconfiguredResult.UpdateSucceeded || r == DeviceReconfiguredResult.None)
                 && !_isRunning
                 && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
             {
-                if( !await HostStartAsync( monitor, true ) )
+                if( !await HostStartAsync( monitor, DeviceStartedReason.StartedByAlwaysRunningConfiguration ) )
                 {
-                    r = ReconfigurationResult.UpdateSucceededButStartFailed;
+                    applyResult = DeviceApplyConfigurationResult.UpdateSucceededButStartFailed;
                 }
             }
-            return r;
-        }
-
-        /// <summary>
-        /// Defines a subset of <see cref="ReconfigurationResult"/> valid for this <see cref="DoReconfigureAsync(IActivityMonitor, TConfiguration)"/>.
-        /// </summary>
-        protected enum DeviceReconfigurationResult
-        {
-            /// <summary>
-            /// The reconfiguration is successful.
-            /// </summary>
-            UpdateSucceeded = ReconfigurationResult.UpdateSucceeded,
-
-            /// <summary>
-            /// The reconfiguration failed.
-            /// </summary>
-            UpdateFailed = ReconfigurationResult.UpdateFailed,
-
-            /// <summary>
-            /// The updated configuration cannot be applied while the device is running.
-            /// </summary>
-            UpdateFailedRestartRequired = ReconfigurationResult.UpdateFailedRestartRequired
+            return applyResult;
         }
 
         /// <summary>
         /// Reconfigures this device. This can be called when this device is started (<see cref="IsRunning"/> can be true) and
-        /// if reconfiguration while running is not possible or supported, <see cref="DeviceReconfigurationResult.UpdateFailedRestartRequired"/>
-        /// should be returned. This method must not call any <see cref="StopAsync"/> or <see cref="StartAsync"/> methods.
+        /// if reconfiguration while running is not possible or supported, <see cref="DeviceReconfiguredResult.UpdateFailedRestartRequired"/>
+        /// should be returned.
+        /// <para>
+        /// It is perfectly valid for this method to return <see cref="DeviceReconfiguredResult.None"/> if nothing happened instead of
+        /// <see cref="DeviceReconfiguredResult.UpdateSucceeded"/>.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="config">The configuration to apply.</param>
         /// <returns>The reconfiguration result.</returns>
-        protected abstract Task<DeviceReconfigurationResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
+        protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
 
         /// <inheritdoc />
         public Task<bool> StartAsync( IActivityMonitor monitor )
@@ -246,7 +193,7 @@ namespace CK.DeviceModel
             return null;
         }
 
-        internal async Task<bool> HostStartAsync( IActivityMonitor monitor, bool fromConfiguration )
+        internal async Task<bool> HostStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
         {
             Debug.Assert( _host != null );
             var check = SyncStateStartCheck( monitor );
@@ -254,28 +201,26 @@ namespace CK.DeviceModel
             Debug.Assert( _isRunning == false );
             try
             {
-                if( await DoStartAsync( monitor, fromConfiguration ) )
+                if( await DoStartAsync( monitor, reason ) )
                 {
-                    return _isRunning = true;
+                    _isRunning = true;
                 }
             }
             catch( Exception ex )
             {
                 monitor.Error( $"While starting '{FullName}'.", ex );
             }
-            return false;
+            if( _isRunning ) await RaiseStateChangedAsync( monitor, new DeviceStateChangedEvent( reason ) );
+            return _isRunning;
         }
 
         /// <summary>
         /// Implements this device's Start behavior.
         /// False must be returned if anything prevents this device to start (this can throw).
         /// </summary>
-        /// <param name="fromConfiguration">
-        /// Whether the start is due to <see cref="DeviceConfigurationStatus.RunnableStarted"/>
-        /// or <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration's status.
-        /// </param>
+        /// <param name="reason">Reason of the start.</param>
         /// <returns>True if the device has been successfully started, false otherwise.</returns>
-        protected abstract Task<bool> DoStartAsync( IActivityMonitor monitor, bool fromConfiguration );
+        protected abstract Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason );
 
         /// <inheritdoc />
         public Task<bool> StopAsync( IActivityMonitor monitor )
@@ -306,17 +251,17 @@ namespace CK.DeviceModel
             return null;
         }
 
-        internal async Task<bool> HostStopAsync( IActivityMonitor monitor, StoppedReason reason )
+        internal async Task<bool> HostStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
         {
             Debug.Assert( _host != null && _isRunning );
             using( monitor.OpenInfo( $"Stopping {FullName} ({reason})" ) )
             {
-                if( reason == StoppedReason.StoppedByDisabledConfiguration || reason == StoppedReason.StoppedBeforeDestroy )
+                if( reason == DeviceStoppedReason.StoppedByDisabledConfiguration || reason == DeviceStoppedReason.StoppedBeforeDestroy )
                 {
                     _configStatus = DeviceConfigurationStatus.Disabled;
                 }
                 // AutoStoppedForceCall skips AlwaysRunning check.
-                if( reason != StoppedReason.AutoStoppedForceCall )
+                if( reason != DeviceStoppedReason.AutoStoppedForceCall )
                 {
                     var check = SyncStateStopCheck( monitor );
                     if( check.HasValue ) return check.Value;
@@ -335,6 +280,7 @@ namespace CK.DeviceModel
                     _isRunning = false;
                 }
             }
+            await RaiseStateChangedAsync( monitor, new DeviceStateChangedEvent( reason ) );
             return true;
         }
 
@@ -342,12 +288,12 @@ namespace CK.DeviceModel
         /// Implements this device's Stop behavior.
         /// This should always succeed: after having called this method (that may throw), this device is considered stopped.
         /// Note that this method is never called if this device must be <see cref="DeviceConfigurationStatus.AlwaysRunning"/>
-        /// (except with the <see cref="StoppedReason."/>) or it is already stopped.
+        /// (except with the <see cref="DeviceStoppedReason."/>) or it is already stopped.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reason">The reason to stop.</param>
         /// <returns>The awaitable.</returns>
-        protected abstract Task DoStopAsync( IActivityMonitor monitor, StoppedReason reason );
+        protected abstract Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason );
 
         /// <summary>
         /// Extension point to cleanup device's resources if required.

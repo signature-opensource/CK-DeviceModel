@@ -4,11 +4,12 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Describes the result of a device initial configuration or reconfiguration.
+    /// This is returned for each device in <see cref="DeviceHost{T, THostConfiguration, TConfiguration}.ConfigurationResult"/>.
     /// </summary>
-    public enum ReconfigurationResult
+    public enum DeviceApplyConfigurationResult
     {
         /// <summary>
-        /// Not applicable.
+        /// No configuration happened.
         /// </summary>
         None,
 
@@ -43,7 +44,7 @@ namespace CK.DeviceModel
         UpdateSucceeded,
 
         /// <summary>
-        /// Changing the configuration would require a Start/Stop but restarting is disallowed.
+        /// Changing the configuration requires the device to be stopped first.
         /// </summary>
         UpdateFailedRestartRequired,
 

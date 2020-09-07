@@ -13,47 +13,41 @@ namespace CK.DeviceModel.Tests
     public class DeviceHostTests
     {
 
-        public interface ICameraConfiguration : IDeviceConfiguration
+        public class CameraConfiguration : DeviceConfiguration
         {
-        }
-
-        public class CameraConfiguration : ICameraConfiguration
-        {
-            public string Name { get; set; }
-
-            public DeviceConfigurationStatus ConfigurationStatus { get; set; }
-
-            public CameraConfiguration( string name )
+            public CameraConfiguration()
             {
-                Name = name;
             }
 
-            public IDeviceConfiguration Clone() => new CameraConfiguration( Name ) { ConfigurationStatus = ConfigurationStatus };
+            public CameraConfiguration( CameraConfiguration o )
+                : base( o )
+            {
+            }
         }
 
-        public class Camera : Device<ICameraConfiguration>
+        public class Camera : Device<CameraConfiguration>
         {
             public static int TotalCount;
             public static int TotalRunning;
 
-            public Camera( IActivityMonitor monitor, ICameraConfiguration config )
+            public Camera( IActivityMonitor monitor, CameraConfiguration config )
                 : base( monitor, config )
             {
                 Interlocked.Increment( ref TotalCount );
             }
 
-            protected override Task<DeviceReconfigurationResult> DoReconfigureAsync( IActivityMonitor monitor, ICameraConfiguration config )
+            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
             {
-                return Task.FromResult( DeviceReconfigurationResult.UpdateSucceeded );
+                return Task.FromResult( DeviceReconfiguredResult.UpdateSucceeded );
             }
 
-            protected override Task<bool> DoStartAsync( IActivityMonitor monitor, bool fromConfiguration )
+            protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
             {
                 Interlocked.Increment( ref TotalRunning );
                 return Task.FromResult( true );
             }
 
-            protected override Task DoStopAsync( IActivityMonitor monitor, StoppedReason reason )
+            protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
             {
                 Interlocked.Decrement( ref TotalRunning );
                 return Task.CompletedTask;
@@ -66,7 +60,7 @@ namespace CK.DeviceModel.Tests
             }
         }
 
-        public class CameraHost : DeviceHost<Camera,DeviceHostConfiguration<ICameraConfiguration>,ICameraConfiguration,CameraHost>
+        public class CameraHost : DeviceHost<Camera,DeviceHostConfiguration<CameraConfiguration>,CameraConfiguration>
         {
         }
 
@@ -76,13 +70,13 @@ namespace CK.DeviceModel.Tests
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );
 
-            var config1 = new CameraConfiguration( "First" );
-            var config2 = new CameraConfiguration( "Another" ) { ConfigurationStatus = DeviceConfigurationStatus.Runnable };
-            var config3 = new CameraConfiguration( "YetAnother" ) { ConfigurationStatus = DeviceConfigurationStatus.RunnableStarted };
+            var config1 = new CameraConfiguration(){ Name = "First" };
+            var config2 = new CameraConfiguration{ Name = "Another", ConfigurationStatus = DeviceConfigurationStatus.Runnable };
+            var config3 = new CameraConfiguration{ Name = "YetAnother", ConfigurationStatus = DeviceConfigurationStatus.RunnableStarted };
 
             var host = new CameraHost();
 
-            var hostConfig = new DeviceHostConfiguration<ICameraConfiguration>();
+            var hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
             hostConfig.IsPartialConfiguration.Should().BeTrue( "By default a configuration is partial." );
             hostConfig.Configurations.Add( config1 );
 
@@ -146,40 +140,5 @@ namespace CK.DeviceModel.Tests
             Camera.TotalRunning.Should().Be( 0 );
 
         }
-
-        public class BuggyCamera : Device<CameraConfiguration>
-        {
-            public BuggyCamera( IActivityMonitor monitor, CameraConfiguration config )
-                : base( monitor, config )
-            {
-            }
-
-            protected override Task<DeviceReconfigurationResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
-            {
-                return Task.FromResult( DeviceReconfigurationResult.UpdateSucceeded );
-            }
-
-            protected override Task<bool> DoStartAsync( IActivityMonitor monitor, bool fromConfiguration )
-            {
-                return Task.FromResult( true );
-            }
-
-            protected override Task DoStopAsync( IActivityMonitor monitor, StoppedReason reason )
-            {
-                return Task.CompletedTask;
-            }
-        }
-
-        public class BuggyCameraHost : DeviceHost<BuggyCamera, DeviceHostConfiguration<CameraConfiguration>, CameraConfiguration, BuggyCameraHost>
-        {
-        }
-
-        [Test]
-        public void TConfiguration_must_be_an_interface()
-        {
-            Action c = () => new BuggyCameraHost();
-            c.Invoking( x => x() ).Should().Throw<TypeLoadException>();
-        }
-
     }
 }

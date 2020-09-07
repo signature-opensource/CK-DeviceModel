@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 {
@@ -21,7 +21,7 @@ namespace CK.DeviceModel.CppDeviceAdapter.Cpp
 
         /// <summary>
         /// Code of the event being sent, to distinguish it from other events.
-        /// Should be uniaue in the context of the device.
+        /// Should be unique in the context of the device.
         /// </summary>
         public byte EventCode;
     }

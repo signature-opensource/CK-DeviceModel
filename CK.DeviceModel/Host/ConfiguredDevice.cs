@@ -5,7 +5,7 @@ namespace CK.DeviceModel
     /// </summary>
     public readonly struct ConfiguredDevice<T, TConfiguration>
         where T : Device<TConfiguration>
-        where TConfiguration : IDeviceConfiguration
+        where TConfiguration : DeviceConfiguration
     {
         /// <summary>
         /// Gets the device.

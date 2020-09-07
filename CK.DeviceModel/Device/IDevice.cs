@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.PerfectEvent;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,7 +10,7 @@ namespace CK.DeviceModel
     /// <summary>
     /// Defines non-generic device properties and methods.
     /// </summary>
-    interface IDevice
+    public interface IDevice
     {
         /// <summary>
         /// Gets the name. Necessarily not null or whitespace.
@@ -51,6 +52,26 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false if this device cannot start.</returns>
         Task<bool> StartAsync( IActivityMonitor monitor );
+
+        /// <summary>
+        /// Raised whenever a reconfiguration, a start or a stop happens.
+        /// This is the synchronous form of the event. If asynchronous calls must be made, <see cref="StateChangedAsync"/>
+        /// or <see cref="StateChangedParallelAsync"/> must be used.
+        /// </summary>
+        event SequentialEventHandler<IDevice, DeviceStateChangedEvent> StateChanged;
+
+        /// <summary>
+        /// Raised whenever a reconfiguration, a start or a stop happens and enables asynchronous handling of this event.
+        /// The multiple registered delegates are called one after the others. If parallel asynchronous actions are
+        /// possible, <see cref="StateChangedParallelAsync"/> can be used.
+        /// </summary>
+        event SequentialEventHandlerAsync<IDevice, DeviceStateChangedEvent> StateChangedAsync;
+
+        /// <summary>
+        /// Raised whenever a reconfiguration, a start or a stop happens and enables asynchronous handling of this event.
+        /// All registered delegates are called in parallel. 
+        /// </summary>
+        event ParallelEventHandlerAsync<IDevice, DeviceStateChangedEvent> StateChangedParallelAsync;
 
     }
 
