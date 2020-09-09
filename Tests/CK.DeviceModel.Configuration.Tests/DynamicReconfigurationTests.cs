@@ -139,6 +139,12 @@ namespace CK.DeviceModel.Configuration.Tests
 
         class DynamicConfigurationProvider : ConfigurationProvider
         {
+            public void Remove( string path )
+            {
+                var keys = Data.Keys.Where( k => k == path || k.Length > path.Length && k.StartsWith( path ) && k[path.Length] == ConfigurationPath.KeyDelimiter[0] ).ToList();
+                foreach( var k in keys ) Data.Remove( k );
+            }
+
             public void RaiseChanged() => OnReload();
         }
 
@@ -199,7 +205,7 @@ namespace CK.DeviceModel.Configuration.Tests
         }
 
         [Test]
-        public async Task initial_configuration_can_start_devices()
+        public async Task initial_configuration_can_start_devices_and_then_they_live_their_lifes()
         {
             var config = DynamicConfiguration.Create();
             config.Provider.Set( "Device:CameraHost:Items:C1:Status", "RunnableStarted" );
@@ -250,9 +256,84 @@ namespace CK.DeviceModel.Configuration.Tests
                 l2.IsRunning.Should().BeFalse();
                 l2.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
 
+                c1.IsDestroyed.Should().BeFalse();
+                c2.IsDestroyed.Should().BeFalse();
+                l1.IsDestroyed.Should().BeFalse();
+                l2.IsDestroyed.Should().BeFalse();
+
                 await CameraHost.Instance.ClearAsync( TestHelper.Monitor );
                 await LightControllerHost.Instance.ClearAsync( TestHelper.Monitor );
 
+                c1.IsRunning.Should().BeFalse();
+                c2.IsRunning.Should().BeFalse();
+                l1.IsRunning.Should().BeFalse();
+                l2.IsRunning.Should().BeFalse();
+
+                c1.IsDestroyed.Should().BeTrue();
+                c2.IsDestroyed.Should().BeTrue();
+                l1.IsDestroyed.Should().BeTrue();
+                l2.IsDestroyed.Should().BeTrue();
+            } );
+        }
+
+        [Test]
+        public async Task configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service()
+        {
+            var config = DynamicConfiguration.Create();
+            config.Provider.Set( "Device:CameraHost:Items:C1:Status", "RunnableStarted" );
+            await RunHost( config, async services =>
+            {
+                Debug.Assert( CameraHost.Instance != null );
+                Debug.Assert( LightControllerHost.Instance != null );
+
+                Camera.TotalCount.Should().Be( 1 );
+                Camera.TotalRunning.Should().Be( 1 );
+                LightController.TotalCount.Should().Be( 0 );
+                LightController.TotalRunning.Should().Be( 0 );
+
+                var c1 = CameraHost.Instance.Find( "C1" );
+                Debug.Assert( c1 != null );
+                c1.IsRunning.Should().BeTrue();
+
+                config.Provider.Set( "Device:CameraHost:Items:C1:Status", "Disabled" );
+                config.Provider.RaiseChanged();
+                await Task.Delay( 50 );
+
+                c1.IsRunning.Should().BeFalse();
+
+                config.Provider.Set( "Device:CameraHost:Items:C1:Status", "AlwaysRunning" );
+                config.Provider.Set( "Device:CameraHost:Items:C2:Status", "Disabled" );
+                config.Provider.RaiseChanged();
+                await Task.Delay( 50 );
+
+                var c2 = CameraHost.Instance.Find( "C2" );
+                Debug.Assert( c2 != null );
+
+                c1.IsRunning.Should().BeTrue();
+                c2.IsRunning.Should().BeFalse();
+
+                // C1 configuration is "removed", but IsPartialConfiguration is true by default:
+                // the device is not concerned by a missing configuration.
+                config.Provider.Remove( "Device:CameraHost:Items:C1" );
+                config.Provider.Set( "Device:CameraHost:Items:C2:Status", "AlwaysRunning" );
+                config.Provider.RaiseChanged();
+                await Task.Delay( 50 );
+
+                c1.IsRunning.Should().BeTrue();
+                c2.IsRunning.Should().BeTrue();
+
+                // Setting IsPartialConfiguration to false: the C1 device doesn't exist anymore!
+                config.Provider.Set( "Device:CameraHost:IsPartialConfiguration", "false" );
+                config.Provider.RaiseChanged();
+                await Task.Delay( 50 );
+
+                c1.IsDestroyed.Should().BeTrue( "C1 is dead." );
+                c2.IsRunning.Should().BeTrue();
+
+                await CameraHost.Instance.ClearAsync( TestHelper.Monitor );
+
+                c1.IsDestroyed.Should().BeTrue();
+                c2.IsDestroyed.Should().BeTrue();
             } );
         }
 

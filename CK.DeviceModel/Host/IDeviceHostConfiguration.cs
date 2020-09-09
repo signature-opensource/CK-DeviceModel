@@ -12,6 +12,7 @@ namespace CK.DeviceModel
     {
         /// <summary>
         /// Gets whether this is a partial configuration.
+        /// Defaults to true.
         /// </summary>
         bool IsPartialConfiguration { get; }
 

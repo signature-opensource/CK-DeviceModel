@@ -63,7 +63,7 @@ namespace CK.DeviceModel
         /// Concrete device must expose a constructor with the exact same signature: initial configuration is handled by
         /// this constructor, warnings or errors must be logged and exception can be thrown if anything goes wrong. 
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use for the initialization phase.</param>
         /// <param name="config">The initial configuration to use.</param>
         protected Device( IActivityMonitor monitor, TConfiguration config )
         {
@@ -99,10 +99,20 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets whether this device has been started.
-        /// From the implementation methods (<see cref="DoReconfigureAsync"/>, <see cref="DoStartAsync"/>,
-        /// <see cref="DoStopAsync"/> and <see cref="DoDestroyAsync"/>) this property value is stable and can be trusted.
+        /// From the implementation methods this property value is stable and can be trusted:
+        /// <list type="bullet">
+        ///     <item><see cref="DoReconfigureAsync"/>: true or false (this is the only method where it can be true or false).</item>
+        ///     <item><see cref="DoStartAsync"/>: false.</item>
+        ///     <item><see cref="DoStopAsync"/>: true.</item>
+        ///     <item><see cref="DoDestroyAsync"/>: false (since it nas been necessarily stopped before destroyed).</item>
+        /// </list>
         /// </summary>
         public bool IsRunning => _isRunning;
+
+        /// <summary>
+        /// Gets whether this device has been destroyed.
+        /// </summary>
+        public bool IsDestroyed => _host == null;
 
         /// <summary>
         /// Gets the current configuration status of this device.
@@ -324,7 +334,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// This method can be called at any time to stop this device, optionally ignoring the <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.
         /// Note that the <see cref="ConfigurationStatus"/> is left unchanged: the state of the system is what it should be: a device
-        /// that has been configure to be always running is actually stopped.
+        /// that has been configured to be always running is actually stopped.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="ignoreAlwaysRunning">True to stop even if <see cref="ConfigurationStatus"/> states that this device must always run.</param>

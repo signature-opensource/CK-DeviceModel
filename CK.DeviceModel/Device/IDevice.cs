@@ -31,6 +31,13 @@ namespace CK.DeviceModel
         bool IsRunning { get; }
 
         /// <summary>
+        /// Gets whether this device has been destroyed.
+        /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
+        /// based on this "instant" status should be avoided.
+        /// </summary>
+        bool IsDestroyed { get; }
+
+        /// <summary>
         /// Gets the current configuration status of this device.
         /// Just like <see cref="IsRunning"/>, since a device lives in multi-threaded/concurrent contexts,
         /// any sensible decision based on this "instant" status should be avoided.

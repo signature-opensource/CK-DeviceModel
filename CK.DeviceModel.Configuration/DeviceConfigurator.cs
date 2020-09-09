@@ -83,7 +83,7 @@ namespace CK.DeviceModel
             Debug.Assert( _changeMonitor != null );
             using( _changeMonitor.OpenInfo( "Building configuration objects for Devices." ) )
             {
-                NoConfigurationsSectionWrapper noConfigSection = new NoConfigurationsSectionWrapper();
+                NoItemsSectionWrapper noItemsSection = new NoItemsSectionWrapper();
                 try
                 {
                     int idxResult = 0;
@@ -123,8 +123,8 @@ namespace CK.DeviceModel
                                         {
                                             _changeMonitor.Debug( $"Using default constructor and configuration binding." );
                                             config = (IDeviceHostConfiguration)ctor.Invoke( Array.Empty<object>() );
-                                            noConfigSection.InnerSection = c;
-                                            noConfigSection.Bind( config );
+                                            noItemsSection.InnerSection = c;
+                                            noItemsSection.Bind( config );
                                         }
                                         else
                                         {
@@ -134,7 +134,7 @@ namespace CK.DeviceModel
                                         var items = c.GetSection( nameof( IDeviceHostConfiguration.Items ) );
                                         if( !items.Exists() )
                                         {
-                                            _changeMonitor.Warn( $"No 'Items' section fond" );
+                                            _changeMonitor.Warn( $"No 'Items' section found." );
                                         }
                                         else
                                         {
@@ -171,7 +171,7 @@ namespace CK.DeviceModel
             }
         }
 
-        class NoConfigurationsSectionWrapper : IConfigurationSection
+        class NoItemsSectionWrapper : IConfigurationSection
         {
             class Empty : IConfigurationSection
             {
@@ -221,7 +221,7 @@ namespace CK.DeviceModel
 
             public IEnumerable<IConfigurationSection> GetChildren()
             {
-                return InnerSection.GetChildren().Where( c => c.Path.EndsWith( SkippedLeaf ) );
+                return InnerSection.GetChildren().Where( c => !c.Path.EndsWith( SkippedLeaf ) );
             }
 
             public IChangeToken GetReloadToken() => InnerSection.GetReloadToken();
