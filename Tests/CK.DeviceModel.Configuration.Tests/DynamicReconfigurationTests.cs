@@ -354,14 +354,22 @@ namespace CK.DeviceModel.Configuration.Tests
                                         {
                                             // All this is done automatically by CKSetup.
                                             services.AddSingleton<LightControllerHost>();
-                                                services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, LightControllerHost>( sp => sp.GetRequiredService<LightControllerHost>() ) );
-                                                services.AddSingleton<CameraHost>();
-                                                services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, CameraHost>( sp => sp.GetRequiredService<CameraHost>() ) );
-                                                services.AddHostedService<DeviceConfigurator>();
+                                            services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, LightControllerHost>( sp => sp.GetRequiredService<LightControllerHost>() ) );
+                                            services.AddSingleton<CameraHost>();
+                                            services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, CameraHost>( sp => sp.GetRequiredService<CameraHost>() ) );
+                                            services.AddHostedService<DeviceConfigurator>();
                                         } )
                                         .Build() )
                 {
                     await host.StartAsync();
+
+                    // Checks that the TryAddEnumerable dos not instantiate its own singleton: this is why we use the (rather nasty)
+                    // registration with the factory lambda above.
+                    var allHosts = host.Services.GetServices<IDeviceHost>().ToList();
+                    allHosts.Count.Should().Be( 2 );
+                    var hosts = new IDeviceHost[] { host.Services.GetRequiredService<CameraHost>(), host.Services.GetRequiredService<LightControllerHost>() };
+                    allHosts.Should().BeEquivalentTo( hosts, o => o.WithoutStrictOrdering() );
+
                     CameraHost.Instance.Should().NotBeNull();
                     LightControllerHost.Instance.Should().NotBeNull();
 
