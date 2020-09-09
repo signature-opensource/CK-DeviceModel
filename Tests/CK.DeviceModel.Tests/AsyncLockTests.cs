@@ -64,6 +64,11 @@ namespace CK.DeviceModel.Tests
             if( thirdAsync ) await l.EnterAsync( m );
             else l.Enter( m );
 
+            using( await l.LockAsync( m ) )
+            {
+                l.IsEnteredBy( m ).Should().BeTrue();
+            }
+
             l.IsEnteredBy( m ).Should().BeTrue();
 
             l.Leave( m );
@@ -74,6 +79,17 @@ namespace CK.DeviceModel.Tests
 
             l.Leave( m );
             l.IsEnteredBy( m ).Should().BeFalse();
+
+            using( await l.LockAsync( m ) )
+            {
+                l.IsEnteredBy( m ).Should().BeTrue();
+            }
+
+            using( l.Lock( m ) )
+            {
+                l.IsEnteredBy( m ).Should().BeTrue();
+            }
+
         }
 
     }

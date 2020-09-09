@@ -25,7 +25,7 @@ namespace CK.DeviceModel
         protected DeviceConfiguration( DeviceConfiguration source )
         {
             Name = source.Name;
-            ConfigurationStatus = source.ConfigurationStatus;
+            Status = source.Status;
         }
 
         /// <summary>
@@ -37,7 +37,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets or sets the <see cref="DeviceConfigurationStatus"/>.
         /// </summary>
-        public DeviceConfigurationStatus ConfigurationStatus { get; set; }
+        public DeviceConfigurationStatus Status { get; set; }
 
     }
 }

@@ -22,7 +22,7 @@ namespace CK.DeviceModel
         public DeviceHostConfiguration()
         {
             IsPartialConfiguration = true;
-            Configurations = new List<TConfiguration>();
+            Items = new List<TConfiguration>();
         }
 
         /// <summary>
@@ -33,15 +33,15 @@ namespace CK.DeviceModel
         public DeviceHostConfiguration( DeviceHostConfiguration<TConfiguration> source )
         {
             IsPartialConfiguration = source.IsPartialConfiguration;
-            Configurations = source.Configurations.Select( c => (TConfiguration)c.Clone() ).ToList();
+            Items = source.Items.Select( c => (TConfiguration)c.Clone() ).ToList();
         }
 
         /// <summary>
-        /// Gets or sets whether this is a partial configuration: <see cref="Configurations"/> will be applied 
+        /// Gets or sets whether this is a partial configuration: <see cref="Items"/> will be applied 
         /// but existing devices without configurations are let as-is.
         /// Defaults to true.
         /// <para>
-        /// When set to false, this configuration destroys all devices for which no configuration exists in the <see cref="Configurations"/>.
+        /// When set to false, this configuration destroys all devices for which no configuration exists in the <see cref="Items"/>.
         /// </para>
         /// </summary>
         public bool IsPartialConfiguration { get; set; }
@@ -51,9 +51,11 @@ namespace CK.DeviceModel
         /// <see cref="IDeviceConfiguration.Name"/> must be unique: this will be checked when this 
         /// configuration will be applied.
         /// </summary>
-        public IList<TConfiguration> Configurations { get; }
+        public IList<TConfiguration> Items { get; }
 
-        IReadOnlyList<DeviceConfiguration> IDeviceHostConfiguration.Configurations => (IReadOnlyList<DeviceConfiguration>)Configurations;
+        IReadOnlyList<DeviceConfiguration> IDeviceHostConfiguration.Items => (IReadOnlyList<DeviceConfiguration>)Items;
+
+        void IDeviceHostConfiguration.Add( DeviceConfiguration c ) => Items.Add( (TConfiguration)c );
 
         /// <summary>
         /// Checks the validity of this configuration: all <see cref="IDeviceConfiguration.Name"/> must be non empy or white space, be
@@ -67,7 +69,7 @@ namespace CK.DeviceModel
             var dedup = new HashSet<string>();
             bool success = true;
             int idx = 0;
-            foreach( var c in Configurations )
+            foreach( var c in Items )
             {
                 ++idx;
                 var name = c.Name;

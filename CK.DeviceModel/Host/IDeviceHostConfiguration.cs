@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
@@ -15,8 +16,15 @@ namespace CK.DeviceModel
         bool IsPartialConfiguration { get; }
 
         /// <summary>
-        /// Gets the configurations.
+        /// Gets the devices' configuration.
         /// </summary>
-        IReadOnlyList<DeviceConfiguration> Configurations { get; }
+        IReadOnlyList<DeviceConfiguration> Items { get; }
+
+        /// <summary>
+        /// Adds the device configuration to the <see cref="Items"/> list.
+        /// Note that the configuration's type must be the actual one otherwise a <see cref="InvalidCastException"/> will be thrown.
+        /// </summary>
+        /// <param name="c">The device configuration.</param>
+        void Add( DeviceConfiguration c );
     }
 }

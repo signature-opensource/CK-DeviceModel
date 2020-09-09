@@ -52,9 +52,57 @@ namespace CK.Core
         public string Name => _name;
 
         /// <summary>
+        /// Helper to support using statement.
+        /// <see cref="Enter(IActivityMonitor)"/> this lock and returns a <see cref="IDisposable"/> that will <see cref="Leave(IActivityMonitor)"/> this lock.
+        /// </summary>
+        /// <param name="monitor">The monitor that identifies the activity.</param>
+        /// <returns>The disposable to release the lock.</returns>
+        public IDisposable Lock( IActivityMonitor monitor )
+        {
+            Enter( monitor );
+            return new Releaser( this, monitor );
+        }
+
+        /// <summary>
+        /// Helper to support using statement.
+        /// <see cref="EnterAsync(IActivityMonitor)(IActivityMonitor)"/> this lock and returns an awaitable <see cref="IDisposable"/> that
+        /// will <see cref="Leave(IActivityMonitor)"/> this lock.
+        /// <para>
+        /// This returns a ValueTask (that is not IDisposable): forgetting the await in the <c>using( await _lock.LockAsync() )</c> is not possible
+        /// since this deosn't compile.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor that identifies the activity.</param>
+        /// <returns>The disposable to release the lock.</returns>
+        public ValueTask<IDisposable> LockAsync( IActivityMonitor monitor ) => new ValueTask<IDisposable>( DoLockAsync( monitor ) );
+
+        async Task<IDisposable> DoLockAsync( IActivityMonitor monitor )
+        {
+            await EnterAsync( monitor );
+            return new Releaser( this, monitor );
+        }
+
+        class Releaser : IDisposable
+        {
+            readonly AsyncLock _lock;
+            readonly IActivityMonitor _monitor;
+
+            public Releaser( AsyncLock l, IActivityMonitor m )
+            {
+                _lock = l;
+                _monitor = m;
+            }
+
+            public void Dispose()
+            {
+                _lock.Leave( _monitor );
+            }
+        }
+
+        /// <summary>
         /// Gets whether this lock is currently enter by the <paramref name="monitor"/>.
         /// </summary>
-        /// <param name="monitor">The monitor.</param>
+        /// <param name="monitor">The monitor that identifies the activity.</param>
         /// <returns>True if the monitor has entered this lock.</returns>
         /// <exception cref="ArgumentNullException">The monitor is null.</exception>
         public bool IsEnteredBy( IActivityMonitor monitor )
@@ -66,7 +114,7 @@ namespace CK.Core
         /// <summary>
         /// Asynchronously waits to enter this <see cref="AsyncLock"/>.
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="monitor">The monitor that identifies the activity.</param>
         /// <returns>A task that will complete when the lock has been entered.</returns>
         /// <exception cref="ArgumentNullException">The monitor is null.</exception>
         /// <exception cref="LockRecursionException">Recursion detected and <see cref="LockRecursionPolicy.NoRecursion"/> has been configured.</exception>
@@ -76,7 +124,7 @@ namespace CK.Core
         /// Asynchronously waits to enter this <see cref="AsyncLock"/>, using a 32-bit signed integer to measure the time interval,
         /// while observing a <see cref="CancellationToken"/>.
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="monitor">The monitor that identifies the activity.</param>
         /// <param name="millisecondsTimeout">
         /// The number of milliseconds to wait, or <see cref="Timeout.Infinite"/>(-1) to wait indefinitely.
         /// </param>
@@ -97,7 +145,7 @@ namespace CK.Core
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( _current == monitor.Output )
             {
-                if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException();
+                if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException( Name );
                 ++_recCount;
                 return true;
             }
@@ -114,7 +162,7 @@ namespace CK.Core
         /// <summary>
         /// Blocks the current thread until it can enter the <see cref="AsyncLock"/>.
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="monitor">The monitor that identifies the activity.</param>
         /// <exception cref="ArgumentNullException">The monitor is null.</exception>
         /// <exception cref="System.ObjectDisposedException">The current instance has already been
         /// disposed.</exception>
@@ -125,7 +173,7 @@ namespace CK.Core
         /// Blocks the current thread until it can enter this <see cref="AsyncLock"/>, using a 32-bit signed integer to measure the time interval,
         /// while observing a <see cref="System.Threading.CancellationToken"/>.
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="monitor">The monitor that identifies the activity.</param>
         /// <param name="millisecondsTimeout">The number of milliseconds to wait, or <see cref="Timeout.Infinite"/>(-1) to
         /// wait indefinitely.</param>
         /// <param name="cancellationToken">The <see cref="System.Threading.CancellationToken"/> to observe.</param>
@@ -142,7 +190,7 @@ namespace CK.Core
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( _current == monitor.Output )
             {
-                if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException();
+                if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException( Name );
                 ++_recCount;
                 monitor.Trace( $"Incremented AsyncLock '{_name}' recursion count ({_recCount})." );
                 return true;

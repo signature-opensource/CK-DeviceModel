@@ -68,7 +68,7 @@ namespace CK.DeviceModel
         protected Device( IActivityMonitor monitor, TConfiguration config )
         {
             Name = config.Name;
-            _configStatus = config.ConfigurationStatus;
+            _configStatus = config.Status;
             FullName = null!;
         }
 
@@ -115,7 +115,7 @@ namespace CK.DeviceModel
         {
             Debug.Assert( config.Name == Name );
 
-            if( _isRunning && config.ConfigurationStatus == DeviceConfigurationStatus.Disabled )
+            if( _isRunning && config.Status == DeviceConfigurationStatus.Disabled )
             {
                 _configStatus = DeviceConfigurationStatus.Disabled;
                 await HostStopAsync( monitor, DeviceStoppedReason.StoppedByDisabledConfiguration );
@@ -123,7 +123,7 @@ namespace CK.DeviceModel
             }
             else
             {
-                _configStatus = config.ConfigurationStatus;
+                _configStatus = config.Status;
             }
             DeviceReconfiguredResult r; 
             try
@@ -245,7 +245,7 @@ namespace CK.DeviceModel
         {
             if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
             {
-                monitor.Error( $"Cannot stop device '{FullName}' because ConfigurationStatus is AlwaysRunning." );
+                monitor.Error( $"Cannot stop device '{FullName}' because Status is AlwaysRunning." );
                 return false;
             }
             return null;

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
 using static CK.Testing.MonitorTestHelper;
+using System.Diagnostics;
 
 namespace CK.DeviceModel.Tests
 {
@@ -71,36 +72,37 @@ namespace CK.DeviceModel.Tests
             Camera.TotalRunning.Should().Be( 0 );
 
             var config1 = new CameraConfiguration(){ Name = "First" };
-            var config2 = new CameraConfiguration{ Name = "Another", ConfigurationStatus = DeviceConfigurationStatus.Runnable };
-            var config3 = new CameraConfiguration{ Name = "YetAnother", ConfigurationStatus = DeviceConfigurationStatus.RunnableStarted };
+            var config2 = new CameraConfiguration{ Name = "Another", Status = DeviceConfigurationStatus.Runnable };
+            var config3 = new CameraConfiguration{ Name = "YetAnother", Status = DeviceConfigurationStatus.RunnableStarted };
 
             var host = new CameraHost();
 
             var hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
             hostConfig.IsPartialConfiguration.Should().BeTrue( "By default a configuration is partial." );
-            hostConfig.Configurations.Add( config1 );
+            hostConfig.Items.Add( config1 );
 
             host.Count.Should().Be( 0 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 1 );
             Camera.TotalCount.Should().Be( 1 );
 
-            hostConfig.Configurations.Add( config2 );
+            hostConfig.Items.Add( config2 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 2 );
             Camera.TotalCount.Should().Be( 2 );
             Camera.TotalRunning.Should().Be( 0 );
 
-            hostConfig.Configurations.Add( config3 );
+            hostConfig.Items.Add( config3 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 3 );
             Camera.TotalCount.Should().Be( 3 );
             Camera.TotalRunning.Should().Be( 1 );
 
-            Camera c1 = host.Find( "First" );
-            Camera c2 = host.Find( "Another" );
-            Camera c3 = host.Find( "YetAnother" );
+            Camera? c1 = host.Find( "First" );
+            Camera? c2 = host.Find( "Another" );
+            Camera? c3 = host.Find( "YetAnother" );
             host.Find( "Not here" ).Should().BeNull();
+            Debug.Assert( c1 != null && c2 != null && c3 != null );
 
             c1.Name.Should().Be( "First" );
             c1.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
@@ -113,12 +115,12 @@ namespace CK.DeviceModel.Tests
             (await c3.StopAsync( TestHelper.Monitor )).Should().BeTrue();
             Camera.TotalRunning.Should().Be( 0 );
 
-            hostConfig.Configurations.Remove( config3 );
-            hostConfig.Configurations.Remove( config1 );
+            hostConfig.Items.Remove( config3 );
+            hostConfig.Items.Remove( config1 );
 
-            config1.ConfigurationStatus = DeviceConfigurationStatus.AlwaysRunning;
-            config2.ConfigurationStatus = DeviceConfigurationStatus.AlwaysRunning;
-            config3.ConfigurationStatus = DeviceConfigurationStatus.AlwaysRunning;
+            config1.Status = DeviceConfigurationStatus.AlwaysRunning;
+            config2.Status = DeviceConfigurationStatus.AlwaysRunning;
+            config3.Status = DeviceConfigurationStatus.AlwaysRunning;
 
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 3 );

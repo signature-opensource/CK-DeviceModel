@@ -2,29 +2,20 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Data.Common;
 using System.Diagnostics;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Security;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
-
     /// <summary>
     /// Base class for <see cref="IDeviceHost"/> implementation.
     /// </summary>
     /// <typeparam name="T">The Device type.</typeparam>
     /// <typeparam name="THostConfiguration">The configuration type for this host.</typeparam>
     /// <typeparam name="TConfiguration">The Device's configuration type.</typeparam>
+    [CKTypeDefiner]
     public abstract class DeviceHost<T, THostConfiguration, TConfiguration> : IDeviceHost, IInternalDeviceHost
         where T : Device<TConfiguration>
         where THostConfiguration : DeviceHostConfiguration<TConfiguration>
@@ -67,6 +58,9 @@ namespace CK.DeviceModel
         /// </summary>
         public int Count => _devices.Count;
 
+        Type IDeviceHost.GetDeviceHostConfigurationType() => typeof( THostConfiguration );
+        Type IDeviceHost.GetDeviceConfigurationType() => typeof( TConfiguration );
+
         /// <summary>
         /// Gets a device by its name.
         /// </summary>
@@ -98,6 +92,10 @@ namespace CK.DeviceModel
         {
             readonly IReadOnlyCollection<string>? _unconfiguredDeviceNames;
 
+            /// <summary>
+            /// Error constructor: only the initial configuration is provided.
+            /// </summary>
+            /// <param name="initialConfiguration">The configuration.</param>
             internal ConfigurationResult( THostConfiguration initialConfiguration )
             {
                 Success = false;
@@ -131,7 +129,7 @@ namespace CK.DeviceModel
             public THostConfiguration HostConfiguration { get; }
 
             /// <summary>
-            /// Gets the detailed results for each <see cref="IDeviceHostConfiguration.Configurations"/>.
+            /// Gets the detailed results for each <see cref="IDeviceHostConfiguration.Items"/>.
             /// This is null if <see cref="InvalidHostConfiguration"/> is true.
             /// </summary>
             public IReadOnlyList<DeviceApplyConfigurationResult>? Results { get; }
@@ -141,6 +139,13 @@ namespace CK.DeviceModel
             /// or have been destroyed if IsPartialConfiguration is false.
             /// </summary>
             public IReadOnlyCollection<string> UnconfiguredDeviceNames => _unconfiguredDeviceNames ?? Array.Empty<string>();
+        }
+
+
+        async Task<bool> IDeviceHost.ApplyConfigurationAsync( IActivityMonitor monitor, IDeviceHostConfiguration configuration, bool allowEmptyConfiguration )
+        {
+            var r = await ApplyConfigurationAsync( monitor, (THostConfiguration)configuration, allowEmptyConfiguration ).ConfigureAwait( false );
+            return r.Success;
         }
 
         /// <summary>
@@ -157,7 +162,7 @@ namespace CK.DeviceModel
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );
 
             bool success = true;
-            using( monitor.OpenInfo( $"Reconfiguring '{DeviceHostName}'. Applying {safeConfig.Configurations.Count} device configurations." ) )
+            using( monitor.OpenInfo( $"Reconfiguring '{DeviceHostName}'. Applying {safeConfig.Items.Count} device configurations." ) )
             {
                 await _lock.EnterAsync( monitor );
                 try
@@ -182,10 +187,10 @@ namespace CK.DeviceModel
                     }
 
                     // Applying configurations by reconfiguring existing and creating new devices.
-                    DeviceApplyConfigurationResult[] results = new DeviceApplyConfigurationResult[safeConfig.Configurations.Count];
+                    DeviceApplyConfigurationResult[] results = new DeviceApplyConfigurationResult[safeConfig.Items.Count];
                     var currentDeviceNames = new HashSet<string>( newDevices.Keys );
                     int configIdx = 0;
-                    foreach( var c in safeConfig.Configurations )
+                    foreach( var c in safeConfig.Items )
                     {
                         DeviceApplyConfigurationResult r;
                         if( !newDevices.TryGetValue( c.Name, out var configured ) )
@@ -203,10 +208,10 @@ namespace CK.DeviceModel
                                 r = DeviceApplyConfigurationResult.CreateSucceeded;
                                 d.HostSetHost( this );
                                 newDevices.Add( c.Name, new ConfiguredDevice<T, TConfiguration>( d, c ) );
-                                if( c.ConfigurationStatus == DeviceConfigurationStatus.RunnableStarted || c.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning )
+                                if( c.Status == DeviceConfigurationStatus.RunnableStarted || c.Status == DeviceConfigurationStatus.AlwaysRunning )
                                 {
-                                    monitor.Trace( $"Starting device since ConfigurationStatus = {c.ConfigurationStatus}." );
-                                    if( !await d.HostStartAsync( monitor, c.ConfigurationStatus == DeviceConfigurationStatus.RunnableStarted
+                                    monitor.Trace( $"Starting device since Status = {c.Status}." );
+                                    if( !await d.HostStartAsync( monitor, c.Status == DeviceConfigurationStatus.RunnableStarted
                                                                             ? DeviceStartedReason.StartedByRunnableStartedConfiguration
                                                                             : DeviceStartedReason.StartedByAlwaysRunningConfiguration ) )
                                     {
@@ -225,7 +230,7 @@ namespace CK.DeviceModel
                             using( monitor.OpenTrace( $"Reconfiguring device '{c.Name}'." ) )
                             {
                                 currentDeviceNames.Remove( c.Name );
-                                r = await configured.Device.HostReconfigureAsync( monitor, c );
+                                r = await configured.Device.HostReconfigureAsync( monitor, c ).ConfigureAwait( false );
                             }
                             success &= r == DeviceApplyConfigurationResult.UpdateSucceeded;
                         }
@@ -234,7 +239,7 @@ namespace CK.DeviceModel
                     // Now handling device destruction if configuration is a full one.
                     if( configuration.IsPartialConfiguration )
                     {
-                        monitor.Debug( $"Applying partial configuration: ignored {currentDeviceNames.Count} devices: {currentDeviceNames.Concatenate()}." );
+                        monitor.Debug( $"Configuration is partial: ignored {currentDeviceNames.Count} devices: {currentDeviceNames.Concatenate()}." );
                     }
                     else
                     {
@@ -244,7 +249,7 @@ namespace CK.DeviceModel
                             {
                                 var e = newDevices[noMore];
                                 newDevices.Remove( noMore );
-                                await DestroyDevice( monitor, e );
+                                await DestroyDevice( monitor, e ).ConfigureAwait( false );
                             }
                         }
                     }
@@ -258,11 +263,7 @@ namespace CK.DeviceModel
             }
         }
 
-        /// <summary>
-        /// Clears this host by stopping and destroying all existing devices.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The awaitable.</returns>
+        /// <inheritdoc />
         public async Task ClearAsync( IActivityMonitor monitor )
         {
             await _lock.EnterAsync( monitor );
@@ -285,26 +286,29 @@ namespace CK.DeviceModel
 
         async Task DestroyDevice( IActivityMonitor monitor, ConfiguredDevice<T,TConfiguration> e )
         {
-            if( e.Device.IsRunning )
+            using( monitor.OpenInfo( $"Destroying device '{e.Device.FullName}'." ) )
             {
-                await e.Device.HostStopAsync( monitor, DeviceStoppedReason.StoppedBeforeDestroy );
-                Debug.Assert( !e.Device.IsRunning );
-            }
-            try
-            {
-                await e.Device.HostDestroyAsync( monitor );
-            }
-            catch( Exception ex )
-            {
-                monitor.Warn( $"'{e.Device.FullName}'.OnDestroyAsync error. This is ignored.", ex );
-            }
-            try
-            {
-                await OnDeviceDestroyedAsync( monitor, e.Device, e.Configuration );
-            }
-            catch( Exception ex )
-            {
-                monitor.Warn( $"'{e.Device.FullName}'.OnDeviceDestroyedAsync error. This is ignored.", ex );
+                if( e.Device.IsRunning )
+                {
+                    await e.Device.HostStopAsync( monitor, DeviceStoppedReason.StoppedBeforeDestroy );
+                    Debug.Assert( !e.Device.IsRunning );
+                }
+                try
+                {
+                    await e.Device.HostDestroyAsync( monitor );
+                }
+                catch( Exception ex )
+                {
+                    monitor.Warn( $"'{e.Device.FullName}'.OnDestroyAsync error. This is ignored.", ex );
+                }
+                try
+                {
+                    await OnDeviceDestroyedAsync( monitor, e.Device, e.Configuration );
+                }
+                catch( Exception ex )
+                {
+                    monitor.Warn( $"'{e.Device.FullName}'.OnDeviceDestroyedAsync error. This is ignored.", ex );
+                }
             }
         }
 
@@ -486,6 +490,7 @@ namespace CK.DeviceModel
             }
             return success;
         }
+
     }
 
 
