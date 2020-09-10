@@ -60,6 +60,7 @@ namespace CK.DeviceModel
                 var toApply = await _applyChannel.Reader.ReadAsync( tRun );
                 await ApplyOnceAsync( monitor, toApply, tRun );
             }
+            monitor.MonitorEnd();
         }
 
         async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply, CancellationToken cancellationToken )
