@@ -92,5 +92,52 @@ namespace CK.DeviceModel.Tests
 
         }
 
+        [TestCase( 3000, 3000 )]
+        [TestCase( 35000, 25000 )]
+        public async Task simple_stress_test( int syncIncLoop, int asyncDecLoop )
+        {
+            IActivityMonitor m1 = new ActivityMonitor( applyAutoConfigurations: false );
+            IActivityMonitor m2 = new ActivityMonitor( applyAutoConfigurations: false );
+
+            AsyncLock guard = new AsyncLock( LockRecursionPolicy.SupportsRecursion, "G" );
+
+            int nByM1 = 0;
+            int nByM2 = 0;
+
+            Action job = () =>
+            {
+                Thread.Sleep( 10 );
+                for( int i = 0; i < syncIncLoop; i++ )
+                {
+                    guard.Enter( m2 );
+                    nByM2++;
+                    guard.Leave( m2 );
+
+                    guard.Enter( m1 );
+                    nByM1++;
+                    guard.Leave( m1 );
+                }
+            };
+
+            Func<Task> asyncJob = async () =>
+            {
+                Thread.Sleep( 10 );
+                for( int i = 0; i < asyncDecLoop; i++ )
+                {
+                    await guard.EnterAsync( m2 );
+                    nByM2++;
+                    guard.Leave( m2 );
+
+                    await guard.EnterAsync( m1 );
+                    nByM1--;
+                    guard.Leave( m1 );
+                }
+            };
+
+            await Task.WhenAll( Task.Run( job ), Task.Run( job ), Task.Run( asyncJob ), Task.Run( asyncJob ) );
+
+            nByM1.Should().Be( syncIncLoop * 2 - asyncDecLoop * 2 );
+            nByM2.Should().Be( syncIncLoop * 2 + asyncDecLoop * 2 );
+        }
     }
 }

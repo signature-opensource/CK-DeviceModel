@@ -7,7 +7,6 @@ using System.Text;
 
 namespace CK.DeviceModel
 {
-
     /// <summary>
     /// Default implementation of a host device configuration.
     /// This class can be specialized if needed.
