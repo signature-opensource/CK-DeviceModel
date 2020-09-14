@@ -96,48 +96,79 @@ namespace CK.DeviceModel.Tests
         [TestCase( 35000, 25000 )]
         public async Task simple_stress_test( int syncIncLoop, int asyncDecLoop )
         {
-            IActivityMonitor m1 = new ActivityMonitor( applyAutoConfigurations: false );
-            IActivityMonitor m2 = new ActivityMonitor( applyAutoConfigurations: false );
+            AsyncLock guard = new AsyncLock( LockRecursionPolicy.NoRecursion, "G" );
 
-            AsyncLock guard = new AsyncLock( LockRecursionPolicy.SupportsRecursion, "G" );
+            int nByJob = 0;
+            int nByJobAsync = 0;
 
-            int nByM1 = 0;
-            int nByM2 = 0;
-
-            Action job = () =>
+            Action<IActivityMonitor> job = m =>
             {
                 Thread.Sleep( 10 );
                 for( int i = 0; i < syncIncLoop; i++ )
                 {
-                    guard.Enter( m2 );
-                    nByM2++;
-                    guard.Leave( m2 );
-
-                    guard.Enter( m1 );
-                    nByM1++;
-                    guard.Leave( m1 );
+                    guard.Enter( m );
+                    nByJob++;
+                    guard.Leave( m );
                 }
             };
 
-            Func<Task> asyncJob = async () =>
+            Func<IActivityMonitor,Task> asyncJob = async m =>
             {
                 Thread.Sleep( 10 );
                 for( int i = 0; i < asyncDecLoop; i++ )
                 {
-                    await guard.EnterAsync( m2 );
-                    nByM2++;
-                    guard.Leave( m2 );
-
-                    await guard.EnterAsync( m1 );
-                    nByM1--;
-                    guard.Leave( m1 );
+                    await guard.EnterAsync( m );
+                    nByJob--;
+                    nByJobAsync++;
+                    guard.Leave( m );
                 }
             };
 
-            await Task.WhenAll( Task.Run( job ), Task.Run( job ), Task.Run( asyncJob ), Task.Run( asyncJob ) );
+            IActivityMonitor m1 = new ActivityMonitor( applyAutoConfigurations: false );
+            IActivityMonitor m2 = new ActivityMonitor( applyAutoConfigurations: false );
+            IActivityMonitor m3 = new ActivityMonitor( applyAutoConfigurations: false );
+            IActivityMonitor m4 = new ActivityMonitor( applyAutoConfigurations: false );
 
-            nByM1.Should().Be( syncIncLoop * 2 - asyncDecLoop * 2 );
-            nByM2.Should().Be( syncIncLoop * 2 + asyncDecLoop * 2 );
+            await Task.WhenAll( Task.Run( () => job( m1 ) ), Task.Run( () => job( m2 ) ), Task.Run( () => asyncJob( m3 ) ), Task.Run( () => asyncJob( m4 ) ) );
+
+            nByJob.Should().Be( syncIncLoop * 2 - asyncDecLoop * 2 );
+            nByJobAsync.Should().Be( asyncDecLoop * 2 );
         }
+
+
+        [Test]
+        public async Task our_AsyncLock_can_detect_reentrancy_and_throw_LockRecursionException()
+        {
+            var m = TestHelper.Monitor;
+
+            var l = new AsyncLock( LockRecursionPolicy.NoRecursion );
+
+            l.IsEnteredBy( m ).Should().BeFalse();
+
+            using( await l.LockAsync( m ) )
+            {
+                l.IsEnteredBy( m ).Should().BeTrue();
+                l.Invoking( x => x.Lock( m ) ).Should().Throw<LockRecursionException>();
+            }
+
+            l.IsEnteredBy( m ).Should().BeFalse();
+
+            using( l.Lock( m ) )
+            {
+                l.IsEnteredBy( m ).Should().BeTrue();
+                l.Awaiting( x => x.LockAsync( m ) ).Should().Throw<LockRecursionException>();
+            }
+
+            l.IsEnteredBy( m ).Should().BeFalse();
+
+            using( l.Lock( m ) )
+            {
+                l.IsEnteredBy( m ).Should().BeTrue();
+                l.Invoking( x => x.Lock( m ) ).Should().Throw<LockRecursionException>();
+            }
+
+            l.IsEnteredBy( m ).Should().BeFalse();
+        }
+
     }
 }

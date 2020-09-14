@@ -17,12 +17,6 @@ namespace CK.Core
     {
         readonly SemaphoreSlim _semaphore;
         readonly LockRecursionPolicy _policy;
-        // This lock is named _stupid because of my own stupidity:
-        // my intuition is that lock is useless however the simple stress test
-        // demonstrates that this is required...
-        // Of course, with this, it's quite obvious that it works... But I still think
-        // that locking like this  is somehow overkill...
-        readonly object _stupidLock;
         IActivityMonitorOutput? _current;
         int _recCount;
         readonly string _name;
@@ -37,7 +31,6 @@ namespace CK.Core
             _semaphore = new SemaphoreSlim( 1, 1 );
             _policy = recursionPolicy;
             _name = name;
-            _stupidLock = new object();
         }
 
         /// <summary>
@@ -51,7 +44,6 @@ namespace CK.Core
             _semaphore = new SemaphoreSlim( 1, 1 );
             _policy = recursionPolicy;
             _name = filePath + '@' + lineNmber.ToString( CultureInfo.InvariantCulture );
-            _stupidLock = new object();
         }
 
         /// <summary>
@@ -151,24 +143,18 @@ namespace CK.Core
         public async Task<bool> EnterAsync( IActivityMonitor monitor, int millisecondsTimeout, CancellationToken cancellationToken )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            lock( _stupidLock )
+            if( _current == monitor.Output )
             {
-                if( _current == monitor.Output )
-                {
-                    if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException( Name );
-                    ++_recCount;
-                    return true;
-                }
+                if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException( Name );
+                ++_recCount;
+                return true;
             }
             if( await _semaphore.WaitAsync( millisecondsTimeout, cancellationToken ).ConfigureAwait( false ) )
             {
-                lock( _stupidLock )
-                {
-                    Debug.Assert( _recCount == 0 );
-                    monitor.Trace( $"Entered AsyncLock '{_name}' (async)." );
-                    _current = monitor.Output;
-                    return true;
-                }
+                Debug.Assert( _recCount == 0 );
+                monitor.Trace( $"Entered AsyncLock '{_name}' (async)." );
+                _current = monitor.Output;
+                return true;
             }
             return false;
         }
@@ -202,25 +188,19 @@ namespace CK.Core
         public bool Enter( IActivityMonitor monitor, int millisecondsTimeout, CancellationToken cancellationToken )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            lock( _stupidLock )
+            if( _current == monitor.Output )
             {
-                if( _current == monitor.Output )
-                {
-                    if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException( Name );
-                    ++_recCount;
-                    monitor.Trace( $"Incremented AsyncLock '{_name}' recursion count ({_recCount})." );
-                    return true;
-                }
+                if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException( Name );
+                ++_recCount;
+                monitor.Trace( $"Incremented AsyncLock '{_name}' recursion count ({_recCount})." );
+                return true;
             }
             if( _semaphore.Wait( millisecondsTimeout, cancellationToken ) )
             {
-                lock( _stupidLock )
-                {
-                    Debug.Assert( _recCount == 0 );
-                    monitor.Trace( $"Synchronously entered AsyncLock '{_name}'." );
-                    _current = monitor.Output;
-                    return true;
-                }
+                Debug.Assert( _recCount == 0 );
+                monitor.Trace( $"Synchronously entered AsyncLock '{_name}'." );
+                _current = monitor.Output;
+                return true;
             }
             return false;
         }
@@ -231,25 +211,22 @@ namespace CK.Core
         /// <param name="monitor">The monitor that currently holds this lock.</param>
         public void Leave( IActivityMonitor monitor )
         {
-            lock( _stupidLock )
+            if( _current != monitor.Output )
             {
-                if( _current != monitor.Output )
-                {
-                    monitor.Fatal( $"Attempt to Release AsyncLock '{_name}' that has {(_current == null ? "never been acquired" : $"been aquired by another monitor")}." );
-                    throw new SynchronizationLockException();
-                }
-                Debug.Assert( _recCount >= 0 );
-                if( _recCount == 0 )
-                {
-                    monitor.Trace( $"Released AsyncLock '{_name}'." );
-                    _current = null;
-                    _semaphore.Release();
-                }
-                else
-                {
-                    monitor.Trace( $"Decremented AsyncLock '{_name}' recursion count ({_recCount})." );
-                    --_recCount;
-                }
+                monitor.Fatal( $"Attempt to Release AsyncLock '{_name}' that has {(_current == null ? "never been acquired" : $"been aquired by another monitor")}." );
+                throw new SynchronizationLockException();
+            }
+            Debug.Assert( _recCount >= 0 );
+            if( _recCount == 0 )
+            {
+                monitor.Trace( $"Released AsyncLock '{_name}'." );
+                _current = null;
+                _semaphore.Release();
+            }
+            else
+            {
+                monitor.Trace( $"Decremented AsyncLock '{_name}' recursion count ({_recCount})." );
+                --_recCount;
             }
         }
 
