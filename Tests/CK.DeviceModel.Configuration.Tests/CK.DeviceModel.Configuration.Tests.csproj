@@ -14,16 +14,10 @@
     <PackageReference Include="NUnit" Version="3.12.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.17.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.7.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\CK.DeviceModel\CK.DeviceModel.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="CK.ActivityMonitor">
-      <HintPath>..\..\..\..\CK\CK-Core-Projects\CK-ActivityMonitor\CK.ActivityMonitor\bin\Debug\netstandard2.0\CK.ActivityMonitor.dll</HintPath>
-    </Reference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="3.1.7" />
+    
+    <ProjectReference Include="..\..\CK.DeviceModel.Configuration\CK.DeviceModel.Configuration.csproj" />
   </ItemGroup>
 
 </Project>

@@ -83,9 +83,9 @@ namespace CK.DeviceModel.CppDeviceAdapter.Tests
             //return Task.FromResult(Stop)
         }
 
-        protected override Task<ApplyConfigurationResult> DoApplyConfigurationAsync(IActivityMonitor monitor, TimeoutTestDeviceConfiguration config, bool? allowRestart)
+        protected override Task<ReconfigurationResult> DoApplyConfigurationAsync(IActivityMonitor monitor, TimeoutTestDeviceConfiguration config, bool? allowRestart)
         {
-            return Task.FromResult(ApplyConfigurationResult.Success);
+            return Task.FromResult(ReconfigurationResult.UpdateSucceeded);
         }
     }
 }
