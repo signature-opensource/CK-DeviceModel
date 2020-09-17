@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.PerfectEvent;
 using CK.Text;
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace CK.DeviceModel
         where TConfiguration : DeviceConfiguration
     {
         readonly AsyncLock _lock;
+        readonly PerfectEventSender<IDeviceHost, EventArgs> _devicesChanged;
 
         // This is the whole state of this Host. It is updated atomically (by setting a
         // new dictionary instance).
@@ -35,6 +37,7 @@ namespace CK.DeviceModel
         {
             if( String.IsNullOrWhiteSpace( deviceHostName ) ) throw new ArgumentException( nameof( deviceHostName ) );
             _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
+            _devicesChanged = new PerfectEventSender<IDeviceHost, EventArgs>();
             _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, deviceHostName );
         }
 
@@ -44,6 +47,7 @@ namespace CK.DeviceModel
         protected DeviceHost()
         {
             _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
+            _devicesChanged = new PerfectEventSender<IDeviceHost, EventArgs>();
             _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
         }
 
@@ -76,7 +80,8 @@ namespace CK.DeviceModel
         public T? Find( string deviceName ) => _devices.GetValueOrDefault( deviceName ).Device;
 
         /// <summary>
-        /// Gets a device and its configuration by its name.
+        /// Gets a device and its applied configuration by its name.
+        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device and its configuration or null if not found.</returns>
@@ -84,6 +89,14 @@ namespace CK.DeviceModel
         {
             return _devices.TryGetValue( deviceName, out var e ) ? e : (ConfiguredDevice<T, TConfiguration>?)null;
         }
+
+        /// <summary>
+        /// Gets a <see cref="PerfectEvent{TSender, TArg}"/> that is raised whenever the device list has changed
+        /// or any device's configuration has changed (<see cref="Device{TConfiguration}.DoReconfigureAsync(IActivityMonitor, TConfiguration)"/> returned
+        /// another result than <see cref="DeviceReconfiguredResult.None"/>).
+        /// This event is not raised when devices are started or stopped.
+        /// </summary>
+        public PerfectEvent<IDeviceHost, EventArgs> DevicesChanged => _devicesChanged.PerfectEvent;
 
         /// <summary>
         /// Captures the result of <see cref="ApplyConfigurationAsync"/>.
@@ -114,7 +127,7 @@ namespace CK.DeviceModel
 
             /// <summary>
             /// Gets whether the configuration of the host succeeded.
-            /// </summary>
+            /// </summary>           
             public bool Success { get; }
 
             /// <summary>
@@ -164,6 +177,10 @@ namespace CK.DeviceModel
             bool success = true;
             using( monitor.OpenInfo( $"Reconfiguring '{DeviceHostName}'. Applying {safeConfig.Items.Count} device configurations." ) )
             {
+                // We track the changes: if nothing changed, we don't raise the Changed event.
+                // Note that the Changed event is raised outside of the lock.
+                bool somethingChanged = false;
+
                 await _lock.EnterAsync( monitor );
                 try
                 {
@@ -186,6 +203,7 @@ namespace CK.DeviceModel
                         return new ConfigurationResult( configuration );
                     }
 
+
                     // Applying configurations by reconfiguring existing and creating new devices.
                     DeviceApplyConfigurationResult[] results = new DeviceApplyConfigurationResult[safeConfig.Items.Count];
                     var currentDeviceNames = new HashSet<string>( newDevices.Keys );
@@ -203,24 +221,28 @@ namespace CK.DeviceModel
                                 {
                                     r = DeviceApplyConfigurationResult.CreateFailed;
                                     success = false;
-                                    continue;
                                 }
-                                r = DeviceApplyConfigurationResult.CreateSucceeded;
-                                d.HostSetHost( this );
-                                newDevices.Add( c.Name, new ConfiguredDevice<T, TConfiguration>( d, c ) );
-                                if( c.Status == DeviceConfigurationStatus.RunnableStarted || c.Status == DeviceConfigurationStatus.AlwaysRunning )
+                                else
                                 {
-                                    monitor.Trace( $"Starting device since Status = {c.Status}." );
-                                    if( !await d.HostStartAsync( monitor, c.Status == DeviceConfigurationStatus.RunnableStarted
-                                                                            ? DeviceStartedReason.StartedByRunnableStartedConfiguration
-                                                                            : DeviceStartedReason.StartedByAlwaysRunningConfiguration ) )
+                                    r = DeviceApplyConfigurationResult.CreateSucceeded;
+                                    d.HostSetHost( this );
+                                    newDevices.Add( c.Name, new ConfiguredDevice<T, TConfiguration>( d, c ) );
+                                    // A new device has been added to the newDevices.
+                                    somethingChanged = true;
+                                    if( c.Status == DeviceConfigurationStatus.RunnableStarted || c.Status == DeviceConfigurationStatus.AlwaysRunning )
                                     {
-                                        r = DeviceApplyConfigurationResult.CreateSucceededButStartFailed;
-                                        success = false;
-                                    }
-                                    else
-                                    {
-                                        r = DeviceApplyConfigurationResult.CreateAndStartSucceeded;
+                                        monitor.Trace( $"Starting device because Status is {c.Status}." );
+                                        if( !await d.HostStartAsync( monitor, c.Status == DeviceConfigurationStatus.RunnableStarted
+                                                                                ? DeviceStartedReason.StartedByRunnableStartedConfiguration
+                                                                                : DeviceStartedReason.StartedByAlwaysRunningConfiguration ) )
+                                        {
+                                            r = DeviceApplyConfigurationResult.CreateSucceededButStartFailed;
+                                            success = false;
+                                        }
+                                        else
+                                        {
+                                            r = DeviceApplyConfigurationResult.CreateAndStartSucceeded;
+                                        }
                                     }
                                 }
                             }
@@ -231,8 +253,12 @@ namespace CK.DeviceModel
                             {
                                 currentDeviceNames.Remove( c.Name );
                                 r = await configured.Device.HostReconfigureAsync( monitor, c ).ConfigureAwait( false );
+                                if( r == DeviceApplyConfigurationResult.None ) monitor.CloseGroup( "No change." );
+                                else somethingChanged = true;
+                                // Always updates the configuration.
+                                newDevices[c.Name] = new ConfiguredDevice<T, TConfiguration>( configured.Device, c );
                             }
-                            success &= r == DeviceApplyConfigurationResult.UpdateSucceeded;
+                            success &= (r == DeviceApplyConfigurationResult.UpdateSucceeded || r == DeviceApplyConfigurationResult.None);
                         }
                         results[configIdx++] = r;
                     }
@@ -250,15 +276,22 @@ namespace CK.DeviceModel
                                 var e = newDevices[noMore];
                                 newDevices.Remove( noMore );
                                 await DestroyDevice( monitor, e ).ConfigureAwait( false );
+                                somethingChanged = true;
                             }
                         }
                     }
+                    // We always keep the "newDevices" with their updated configurations: even when a device returned DeviceReconfiguredResult.None,
+                    // the configurations are up to date.
                     _devices = newDevices;
                     return new ConfigurationResult( success, configuration, results, currentDeviceNames );
                 }
                 finally
                 {
                     _lock.Leave( monitor );
+                    if( somethingChanged )
+                    {
+                        await _devicesChanged.SafeRaiseAsync( monitor, this, EventArgs.Empty );
+                    }
                 }
             }
         }
@@ -455,6 +488,7 @@ namespace CK.DeviceModel
             // Nothing can throw here: avoid useless try/catch.
             if( _devices.TryGetValue( d.Name, out var e ) )
             {
+                bool raiseChanged = false;
                 switch( a )
                 {
                     case DeviceAction.Start: success = e.Device.IsRunning || await e.Device.HostStartAsync( monitor, DeviceStartedReason.StartedCall ); break;
@@ -466,13 +500,18 @@ namespace CK.DeviceModel
                             var newDevices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
                             await DestroyDevice( monitor, e );
                             newDevices.Remove( d.Name );
-                            success = true;
+                            success = raiseChanged = true;
                             _devices = newDevices;
                             break;
                         }
                     default: throw new NotImplementedException();
                 }
                 _lock.Leave( monitor );
+                if( raiseChanged )
+                {
+                    await _devicesChanged.SafeRaiseAsync( monitor, this, EventArgs.Empty );
+                }
+
             }
             else
             {

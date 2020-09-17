@@ -10,8 +10,11 @@ namespace CK.PerfectEvent
 
     /// <summary>
     /// A perfect event sender offers synchronous, asynchronous and parallel asynchronous event support.
+    /// You can use the <see cref="Sync"/>, <see cref="Async"/> or <see cref="ParallelAsync"/> properties
+    /// or directly add or remove one of the 3 handler types, either by using the Add/Remove method overloads
+    /// or, more directly, <c>+=</c> and <c>-=</c> standard event operators.
     /// <para>
-    /// Instances of this class should be kept private: only the sender should be able to call <see cref="RaiseAsync(IActivityMonitor, TSender, TArg)"/>
+    /// Instances of this class should be kept private: only the sender object should be able to call <see cref="RaiseAsync(IActivityMonitor, TSender, TArg)"/>
     /// or <see cref="SafeRaiseAsync(IActivityMonitor, TSender, TArg, string?, int)"/>.
     /// What should be exposed is the <see cref="PerfectEvent"/> property that restricts the API to event registration.
     /// </para>

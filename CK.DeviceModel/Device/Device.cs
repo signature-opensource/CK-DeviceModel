@@ -20,43 +20,10 @@ namespace CK.DeviceModel
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
         bool _isRunning;
+        readonly PerfectEventSender<IDevice, DeviceStateChangedEvent> _stateChanged;
 
-        readonly SequentialEventHandlerSender<IDevice, DeviceStateChangedEvent> _eSeqClosed = new SequentialEventHandlerSender<IDevice, DeviceStateChangedEvent>();
-
-        readonly SequentialEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent> _eSeqClosedAsync = new SequentialEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent>();
-
-        readonly ParallelEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent> _eParClosedAsync = new ParallelEventHandlerAsyncSender<IDevice, DeviceStateChangedEvent>();
-
-        public event SequentialEventHandler<IDevice, DeviceStateChangedEvent> StateChanged
-        {
-            add => _eSeqClosed.Add( value );
-            remove => _eSeqClosed.Remove( value );
-        }
-        public event SequentialEventHandlerAsync<IDevice, DeviceStateChangedEvent> StateChangedAsync
-        {
-            add => _eSeqClosedAsync.Add( value );
-            remove => _eSeqClosedAsync.Remove( value );
-        }
-        public event ParallelEventHandlerAsync<IDevice, DeviceStateChangedEvent> StateChangedParallelAsync
-        {
-            add => _eParClosedAsync.Add( value );
-            remove => _eParClosedAsync.Add( value );
-        }
-
-        Task RaiseStateChangedAsync( IActivityMonitor monitor, DeviceStateChangedEvent e )
-        {
-            try
-            {
-                Task task = _eParClosedAsync.RaiseAsync( monitor, this, e );
-                _eSeqClosed.Raise( monitor, this, e );
-                return Task.WhenAll( task, _eSeqClosedAsync.RaiseAsync( monitor, this, e ) );
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( $"While raising '{FullName}' {e}.", ex );
-                return Task.CompletedTask;
-            }
-        }
+        /// <inheritdoc />
+        public PerfectEvent<IDevice, DeviceStateChangedEvent> StateChanged => _stateChanged.PerfectEvent;
 
         /// <summary>
         /// Initializes a new device bound to a configuration.
@@ -67,6 +34,7 @@ namespace CK.DeviceModel
         /// <param name="config">The initial configuration to use.</param>
         protected Device( IActivityMonitor monitor, TConfiguration config )
         {
+            _stateChanged = new PerfectEventSender<IDevice, DeviceStateChangedEvent>();
             Name = config.Name;
             _configStatus = config.Status;
             FullName = null!;
@@ -146,7 +114,10 @@ namespace CK.DeviceModel
                 r = DeviceReconfiguredResult.UpdateFailed;
             }
 
-            await RaiseStateChangedAsync( monitor, new DeviceStateChangedEvent( r ) );
+            if( r != DeviceReconfiguredResult.None )
+            {
+                await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStateChangedEvent( r ) );
+            }
 
             DeviceApplyConfigurationResult applyResult = (DeviceApplyConfigurationResult)r;
             if( (r == DeviceReconfiguredResult.UpdateSucceeded || r == DeviceReconfiguredResult.None)
@@ -220,7 +191,7 @@ namespace CK.DeviceModel
             {
                 monitor.Error( $"While starting '{FullName}'.", ex );
             }
-            if( _isRunning ) await RaiseStateChangedAsync( monitor, new DeviceStateChangedEvent( reason ) );
+            if( _isRunning ) await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStateChangedEvent( reason ) );
             return _isRunning;
         }
 
@@ -290,7 +261,7 @@ namespace CK.DeviceModel
                     _isRunning = false;
                 }
             }
-            await RaiseStateChangedAsync( monitor, new DeviceStateChangedEvent( reason ) );
+            await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStateChangedEvent( reason ) );
             return true;
         }
 

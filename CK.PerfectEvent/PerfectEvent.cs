@@ -4,6 +4,9 @@ namespace CK.PerfectEvent
 {
     /// <summary>
     /// Registration facade for <see cref="PerfectEventSender{TSender, TArg}"/>.
+    /// You can use the <see cref="Sync"/>, <see cref="Async"/> or <see cref="ParallelAsync"/> properties
+    /// or directly add or remove one of the 3 handler types, either by using the Add/Remove method overloads
+    /// or, more directly, <c>+=</c> and <c>-=</c> standard event operators.
     /// </summary>
     /// <typeparam name="TSender">The type of the event sender.</typeparam>
     /// <typeparam name="TArg">The type of the event argument.</typeparam>
