@@ -59,6 +59,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Checks the validity of this configuration: all <see cref="IDeviceConfiguration.Name"/> must be non empy or white space, be
         /// unique among the different configurations, and optionally, at least one configuration must exist.
+        /// This calls <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> for each configuration.
         /// </summary>
         /// <param name="monitor">The monitor that will be used to emit warnings or errors.</param>
         /// <param name="allowEmptyConfiguration">False to consider an empty configuration as an error.</param>
@@ -71,10 +72,9 @@ namespace CK.DeviceModel
             foreach( var c in Items )
             {
                 ++idx;
-                var name = c.Name;
-                if( String.IsNullOrWhiteSpace( name ) )
+                if( !c.CheckValid( monitor ) )
                 {
-                    monitor.Error( $"Configuration n°{idx}: Configuration name is invalid." );
+                    monitor.Error( $"Configuration n°{idx} is not valid." );
                     success = false;
                 }
                 if( !dedup.Add( c.Name ) )

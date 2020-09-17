@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -38,6 +39,32 @@ namespace CK.DeviceModel
         /// Gets or sets the <see cref="DeviceConfigurationStatus"/>.
         /// </summary>
         public DeviceConfigurationStatus Status { get; set; }
+
+        /// <summary>
+        /// Checks whether this configuration is valid.
+        /// This checks that the <see cref="Name"/> is not empty and calls the protected <see cref="DoCheckValid(IActivityMonitor)"/>
+        /// that can handle specialized checks.
+        /// </summary>
+        /// <param name="monitor">The monitor to log error, warnigs or other.</param>
+        /// <returns>True if this configuration is valid, false otherwise.</returns>
+        public bool CheckValid( IActivityMonitor monitor )
+        {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            if( String.IsNullOrWhiteSpace( Name ) )
+            {
+                monitor.Error( "Configuration name must be a non empty string." );
+                return false;
+            }
+            return DoCheckValid( monitor );
+        }
+
+        /// <summary>
+        /// Optional extension point to check for validity.
+        /// Always returs true by default.
+        /// </summary>
+        /// <param name="monitor">The monitor to log error, warnigs or other.</param>
+        /// <returns>True if this configuration is valid, false otherwise.</returns>
+        protected virtual bool DoCheckValid( IActivityMonitor monitor ) => true;
 
     }
 }
