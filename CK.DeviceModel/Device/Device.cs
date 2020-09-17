@@ -30,10 +30,19 @@ namespace CK.DeviceModel
         /// Concrete device must expose a constructor with the exact same signature: initial configuration is handled by
         /// this constructor, warnings or errors must be logged and exception can be thrown if anything goes wrong. 
         /// </summary>
-        /// <param name="monitor">The monitor to use for the initialization phase.</param>
-        /// <param name="config">The initial configuration to use.</param>
+        /// <param name="monitor">
+        /// The monitor to use for the initialization phase. A reference to this monitor must not be kept.
+        /// </param>
+        /// <param name="config">
+        /// The initial configuration to use. It must be <see cref="DeviceConfiguration.CheckValid"/> otherwise
+        /// an <see cref="ArgumentException"/> is thrown.
+        /// </param>
         protected Device( IActivityMonitor monitor, TConfiguration config )
         {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            if( config == null ) throw new ArgumentNullException( nameof( config ) );
+            if( !config.CheckValid( monitor ) ) throw new ArgumentException( "Configuration must be valid.", nameof( config ) );
+
             _stateChanged = new PerfectEventSender<IDevice, DeviceStateChangedEvent>();
             Name = config.Name;
             _configStatus = config.Status;
