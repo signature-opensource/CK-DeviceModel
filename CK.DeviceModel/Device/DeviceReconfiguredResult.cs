@@ -12,7 +12,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// No reconfiguration happened.
         /// </summary>
-        None = 0,
+        None = DeviceApplyConfigurationResult.None,
 
         /// <summary>
         /// The reconfiguration is successful.

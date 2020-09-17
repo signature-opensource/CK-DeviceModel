@@ -15,10 +15,12 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets the configuration that has been applied.
-        /// This is NOT the actual configuration that the device has received and on which it may keep
-        /// a reference: configuration objects are cloned in order to isolate the running device
-        /// of any change in this configuration.
-        /// Changing this object is harmless.
+        /// This is NOT the actual configuration object reference that the device has received and
+        /// on which it may keep a reference: configuration objects are cloned in order to isolate
+        /// the running device of any change in this configuration.
+        /// <para>
+        /// Changing this object is harmless, it does nothing.
+        /// </para>
         /// </summary>
         public TConfiguration Configuration { get; }
 

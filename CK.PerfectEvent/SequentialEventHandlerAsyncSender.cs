@@ -18,6 +18,10 @@ namespace CK.PerfectEvent
     /// <summary>
     /// Implements a host for <see cref="EventHandlerAync"/> delegates.
     /// </summary>
+    /// <remarks>
+    /// This cannot be implemented as a struct because the <see cref="operator+"/> and <see cref="operator-"/> must
+    /// return the instance and a value type wouldn't correctly handle the null/single/array reference.
+    /// </remarks>
     public class SequentialEventHandlerAsyncSender<TSender, TArg>
     {
         object? _handler;
