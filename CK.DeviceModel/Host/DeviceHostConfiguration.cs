@@ -74,7 +74,7 @@ namespace CK.DeviceModel
                 ++idx;
                 if( !c.CheckValid( monitor ) )
                 {
-                    monitor.Error( $"Configuration n°{idx} is not valid." );
+                    monitor.Error( $"Configuration n°{idx} (name = '{c.Name}') is not valid." );
                     success = false;
                 }
                 if( !dedup.Add( c.Name ) )
