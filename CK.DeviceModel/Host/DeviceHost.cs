@@ -24,6 +24,8 @@ namespace CK.DeviceModel
     {
         readonly AsyncLock _lock;
         readonly PerfectEventSender<IDeviceHost, EventArgs> _devicesChanged;
+        // Used to apply single configuration: the instance is cached (stupid lazy).
+        THostConfiguration? _hostConfigCached;
 
         // This is the whole state of this Host. It is updated atomically (by setting a
         // new dictionary instance).
@@ -63,6 +65,7 @@ namespace CK.DeviceModel
         public int Count => _devices.Count;
 
         Type IDeviceHost.GetDeviceHostConfigurationType() => typeof( THostConfiguration );
+
         Type IDeviceHost.GetDeviceConfigurationType() => typeof( TConfiguration );
 
         /// <summary>
@@ -113,7 +116,9 @@ namespace CK.DeviceModel
             {
                 Success = false;
                 HostConfiguration = initialConfiguration;
-                Results = null;
+                var r = new DeviceApplyConfigurationResult[initialConfiguration.Items.Count];
+                Array.Fill( r, DeviceApplyConfigurationResult.InvalidHostConfiguration );
+                Results = r;
                 _unconfiguredDeviceNames = null;
             }
 
@@ -134,7 +139,7 @@ namespace CK.DeviceModel
             /// Gets whether the error is due to an invalid or rejected <see cref="HostConfiguration"/>
             /// (detailed <see cref="Results"/> for each device is null in such case).
             /// </summary>
-            public bool InvalidHostConfiguration => !Success && Results == null;
+            public bool InvalidHostConfiguration => !Success && _unconfiguredDeviceNames == null;
 
             /// <summary>
             /// Gets the original configuration.
@@ -143,9 +148,9 @@ namespace CK.DeviceModel
 
             /// <summary>
             /// Gets the detailed results for each <see cref="IDeviceHostConfiguration.Items"/>.
-            /// This is null if <see cref="InvalidHostConfiguration"/> is true.
+            /// If <see cref="InvalidHostConfiguration"/> is true, they are all <see cref="DeviceApplyConfigurationResult.InvalidHostConfiguration"/>.
             /// </summary>
-            public IReadOnlyList<DeviceApplyConfigurationResult>? Results { get; }
+            public IReadOnlyList<DeviceApplyConfigurationResult> Results { get; }
 
             /// <summary>
             /// Gets the device names that have been left as-is if <see cref="IDeviceHostConfiguration.IsPartialConfiguration"/> is true
@@ -161,16 +166,53 @@ namespace CK.DeviceModel
             return r.Success;
         }
 
+
         /// <summary>
-        /// Applies a host configuration.
+        /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is configured by the provided <paramref name="configuration"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="configuration">The configuration to apply.</param>
+        /// <returns>the result of the device configuration.</returns>
+        public async Task<DeviceApplyConfigurationResult> ApplyDeviceConfigurationAsync( IActivityMonitor monitor, TConfiguration configuration )
+        {
+            if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
+
+            THostConfiguration hostConfig = GetEmptyHostConfiguration();
+            hostConfig.Items.Add( configuration );
+            var result = await ApplyConfigurationAsync( monitor, hostConfig );
+            return result.Results[0];
+        }
+
+        THostConfiguration GetEmptyHostConfiguration()
+        {
+            // No synchronization, instantiating more than one instance is harmless.
+            if( _hostConfigCached == null )
+            {
+                var t = typeof( THostConfiguration );
+                var ctor = t.GetConstructor( Type.EmptyTypes );
+                if( ctor == null ) throw new InvalidOperationException( $"Type '{t.Name}' must have a default public constructor." );
+                var c = (THostConfiguration)ctor.Invoke( Array.Empty<object>() );
+                // Security for specializations.
+                c.Items.Clear();
+                c.IsPartialConfiguration = true;
+                _hostConfigCached = c;
+            }
+            return _hostConfigCached;
+        }
+
+        /// <summary>
+        /// Applies a host configuration: multiple devices can be configured at once and if <see cref="THostConfiguration.IsPartialConfiguration"/> is false,
+        /// devices for which no configuration appear are stopped and destroyed.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>
         /// <param name="allowEmptyConfiguration">By default, an empty configuration is considered as an error.</param>
-        /// <returns>A result.</returns>
+        /// <returns>The composite result of the potentially multiple configurations.</returns>
         public async Task<ConfigurationResult> ApplyConfigurationAsync( IActivityMonitor monitor, THostConfiguration configuration, bool allowEmptyConfiguration = false )
         {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
+
             var safeConfig = configuration.Clone();
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );
 
@@ -202,7 +244,6 @@ namespace CK.DeviceModel
                         monitor.Error( $"OnBeforeApplyConfigurationAsync error. Aborting configuration.", ex );
                         return new ConfigurationResult( configuration );
                     }
-
 
                     // Applying configurations by reconfiguring existing and creating new devices.
                     DeviceApplyConfigurationResult[] results = new DeviceApplyConfigurationResult[safeConfig.Items.Count];
