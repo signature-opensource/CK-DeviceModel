@@ -51,7 +51,7 @@ namespace CK.DeviceModel.Tests
 
             public Task TestAutoDestroy( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
             
-            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
+            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config, bool controllerKeyChanged )
             {
                 bool configHasChanged = config.Something != _configRef.Something;
                 _configRef = config;

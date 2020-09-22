@@ -18,6 +18,9 @@ namespace CK.DeviceModel
 
         Task<bool> AutoStopAsync( IDevice d, IActivityMonitor monitor, bool ignoreAlwaysRunning );
 
+        Task<bool> SetControllerKeyAsync( IDevice d, IActivityMonitor monitor, bool checkCurrent, string? current, string? key );
+
         Task AutoDestroyAsync( IDevice d, IActivityMonitor monitor );
+
     }
 }

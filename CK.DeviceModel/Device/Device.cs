@@ -19,11 +19,17 @@ namespace CK.DeviceModel
     {
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
+        string? _controllerKey;
+        bool _controllerKeyFromConfiguration;
         bool _isRunning;
         readonly PerfectEventSender<IDevice, DeviceStateChangedEvent> _stateChanged;
+        readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
 
         /// <inheritdoc />
         public PerfectEvent<IDevice, DeviceStateChangedEvent> StateChanged => _stateChanged.PerfectEvent;
+
+        /// <inheritdoc />
+        public PerfectEvent<IDevice, string?> ControllerKeyChanged => _controllerKeyChanged.PerfectEvent;
 
         /// <summary>
         /// Initializes a new device bound to a configuration.
@@ -44,8 +50,11 @@ namespace CK.DeviceModel
             if( !config.CheckValid( monitor ) ) throw new ArgumentException( "Configuration must be valid.", nameof( config ) );
 
             _stateChanged = new PerfectEventSender<IDevice, DeviceStateChangedEvent>();
+            _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
             Name = config.Name;
             _configStatus = config.Status;
+            _controllerKey = config.ControllerKey;
+            _controllerKeyFromConfiguration = _controllerKey != null;
             FullName = null!;
         }
 
@@ -74,6 +83,67 @@ namespace CK.DeviceModel
         /// </summary>
         public string FullName { get; private set; }
 
+        /// <inheritdoc />
+        public string? ControllerKey => _controllerKey;
+
+        /// <summary>
+        /// Sets a new <see cref="ControllerKey"/>, whatever its current value is.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="key">The controller key.</param>
+        /// <returns>
+        /// True if it has been changed, false otherwise, typically because the key has been fixed
+        /// by the <see cref="DeviceConfiguration.ControllerKey"/>.
+        /// </returns>
+        public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? key ) => DoSetControllerKeyAsync( monitor, false, null, key );
+
+        /// <summary>
+        /// Sets a new <see cref="ControllerKey"/> only if the current one is the same as the specified <paramref name="current"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="current">The current value to challenge.</param>
+        /// <param name="key">The controller key to set.</param>
+        /// <returns>
+        /// True if it has been changed, false otherwise: either the current key doesn't match or the
+        /// key has been fixed by the <see cref="DeviceConfiguration.ControllerKey"/>.
+        /// </returns>
+        public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key ) => DoSetControllerKeyAsync( monitor, true, current, key );
+
+        Task<bool> DoSetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
+        {
+            IInternalDeviceHost? h = _host;
+            return h == null
+                    ? Task.FromResult( SetControllerKeyOnDetachedAsync( monitor, key, this ) )
+                    : h.SetControllerKeyAsync( this, monitor, checkCurrent, current, key );
+        }
+
+        internal static bool SetControllerKeyOnDetachedAsync( IActivityMonitor monitor, string? key, IDevice d )
+        {
+            monitor.Error( $"Setting controller key '{key}' on detached device '{d.FullName}' is not possible." );
+            return false;
+        }
+
+        internal PerfectEventSender<IDevice, string?>? HostSetControllerKey( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
+        {
+            if( key != _controllerKey )
+            {
+                if( _controllerKeyFromConfiguration )
+                {
+                    monitor.Warn( $"Unable to take control of device '{FullName}' with key '{key}': key from configuration is '{_controllerKey}'." );
+                    return null;
+                }
+                if( checkCurrent && _controllerKey != null && current != _controllerKey )
+                {
+                    monitor.Warn( $"Unable to take control of device '{FullName}' with key '{key}': expected key is '{current}' but current key is '{_controllerKey}'." );
+                    return null;
+                }
+                monitor.Trace( $"Device {FullName}: controller key changed from '{_controllerKey}' to '{key}'." );
+                _controllerKey = key;
+            }
+            return _controllerKeyChanged;
+        }
+
+
         /// <summary>
         /// Gets whether this device has been started.
         /// From the implementation methods this property value is stable and can be trusted:
@@ -98,7 +168,7 @@ namespace CK.DeviceModel
         /// </summary>
         public DeviceConfigurationStatus ConfigurationStatus => _configStatus;
 
-        internal async Task<DeviceApplyConfigurationResult> HostReconfigureAsync( IActivityMonitor monitor, TConfiguration config )
+        internal async Task<(DeviceApplyConfigurationResult, Func<Task>?)> HostReconfigureAsync( IActivityMonitor monitor, TConfiguration config )
         {
             Debug.Assert( config.Name == Name );
 
@@ -112,10 +182,17 @@ namespace CK.DeviceModel
             {
                 _configStatus = config.Status;
             }
-            DeviceReconfiguredResult r; 
+            _controllerKeyFromConfiguration = config.ControllerKey != null;
+            bool controllerKeyChanged = _controllerKeyFromConfiguration && config.ControllerKey != _controllerKey;
+            if( controllerKeyChanged )
+            {
+                monitor.Info( $"Device {FullName}: controller key fixed by Configuration from '{_controllerKey}' to '{config.ControllerKey}'." );
+                _controllerKey = config.ControllerKey;
+            }
+            DeviceReconfiguredResult r;
             try
             {
-                r = await DoReconfigureAsync( monitor, config );
+                r = await DoReconfigureAsync( monitor, config, controllerKeyChanged );
             }
             catch( Exception ex )
             {
@@ -138,7 +215,11 @@ namespace CK.DeviceModel
                     applyResult = DeviceApplyConfigurationResult.UpdateSucceededButStartFailed;
                 }
             }
-            return applyResult;
+            if( controllerKeyChanged )
+            {
+                return (applyResult, () => _controllerKeyChanged.SafeRaiseAsync( monitor, this, _controllerKey ));
+            }
+            return (applyResult, null);
         }
 
         /// <summary>
@@ -152,8 +233,12 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="config">The configuration to apply.</param>
+        /// <param name="controllerKeyChanged">
+        /// Whether the <see cref="TConfiguration.ControllerKey"/> is not null and different from the previous <see cref="ControllerKey"/>: the latter
+        /// has been updated to the new configured value.
+        /// </param>
         /// <returns>The reconfiguration result.</returns>
-        protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
+        protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config, bool controllerKeyChanged );
 
         /// <inheritdoc />
         public Task<bool> StartAsync( IActivityMonitor monitor )
@@ -323,6 +408,9 @@ namespace CK.DeviceModel
         {
             return _host?.AutoStopAsync( this, monitor, ignoreAlwaysRunning ) ?? Task.FromResult(true);
         }
+
+        /// <inheritdoc />
+        public virtual Task<bool> HandleCommand( IActivityMonitor monitor, object commmand ) => Task.FromResult( false );
 
         /// <summary>
         /// Overridden to return the <see cref="FullName"/>.

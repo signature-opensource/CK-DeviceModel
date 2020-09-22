@@ -216,6 +216,7 @@ namespace CK.DeviceModel
             var safeConfig = configuration.Clone();
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );
 
+            List<Func<Task>>? postLockActions = null;
             bool success = true;
             using( monitor.OpenInfo( $"Reconfiguring '{DeviceHostName}'. Applying {safeConfig.Items.Count} device configurations." ) )
             {
@@ -293,11 +294,17 @@ namespace CK.DeviceModel
                             using( monitor.OpenTrace( $"Reconfiguring device '{c.Name}'." ) )
                             {
                                 currentDeviceNames.Remove( c.Name );
-                                r = await configured.Device.HostReconfigureAsync( monitor, c ).ConfigureAwait( false );
-                                if( r == DeviceApplyConfigurationResult.None ) monitor.CloseGroup( "No change." );
+                                Func<Task>? raisecontrollerKeyChanged;
+                                (r, raisecontrollerKeyChanged) = await configured.Device.HostReconfigureAsync( monitor, c ).ConfigureAwait( false );
+                                if( r == DeviceApplyConfigurationResult.None ) monitor.CloseGroup( raisecontrollerKeyChanged != null ? "No change (except ControllerKey)." : "No change." );
                                 else somethingChanged = true;
                                 // Always updates the configuration.
                                 newDevices[c.Name] = new ConfiguredDevice<T, TConfiguration>( configured.Device, c );
+                                if( raisecontrollerKeyChanged != null )
+                                {
+                                    if( postLockActions == null ) postLockActions = new List<Func<Task>>();
+                                    postLockActions.Add( raisecontrollerKeyChanged );
+                                }
                             }
                             success &= (r == DeviceApplyConfigurationResult.UpdateSucceeded || r == DeviceApplyConfigurationResult.None);
                         }
@@ -332,6 +339,10 @@ namespace CK.DeviceModel
                     if( somethingChanged )
                     {
                         await _devicesChanged.SafeRaiseAsync( monitor, this, EventArgs.Empty );
+                    }
+                    if( postLockActions != null )
+                    {
+                        foreach( var a in postLockActions ) await a();
                     }
                 }
             }
@@ -567,6 +578,29 @@ namespace CK.DeviceModel
                     monitor.Warn( $"Attempt to {a} a detached device '{d.FullName}'." );
                     success = true;
                 }
+            }
+            return success;
+        }
+
+        async Task<bool> IInternalDeviceHost.SetControllerKeyAsync( IDevice d, IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
+        {
+            bool success;
+            await _lock.EnterAsync( monitor );
+            // Nothing can throw here: avoid useless try/catch.
+            if( _devices.TryGetValue( d.Name, out var e ) )
+            {
+                var sender = e.Device.HostSetControllerKey( monitor, checkCurrent, current, key );
+                _lock.Leave( monitor );
+                success = sender != null;
+                if( success )
+                {
+                    await sender!.RaiseAsync( monitor, e.Device, key );
+                }
+            }
+            else
+            {
+                _lock.Leave( monitor );
+                success = Device<TConfiguration>.SetControllerKeyOnDetachedAsync( monitor, key, d );
             }
             return success;
         }

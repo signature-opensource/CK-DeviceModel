@@ -27,6 +27,7 @@ namespace CK.DeviceModel
         {
             Name = source.Name;
             Status = source.Status;
+            ControllerKey = source.ControllerKey;
         }
 
         /// <summary>
@@ -39,6 +40,13 @@ namespace CK.DeviceModel
         /// Gets or sets the <see cref="DeviceConfigurationStatus"/>.
         /// </summary>
         public DeviceConfigurationStatus Status { get; set; }
+
+        /// <summary>
+        /// Gets or sets the configured controller key.
+        /// When not null this locks the <see cref="IDevice.ControllerKey"/> to this value.
+        /// When a configuration is applied, this configuration value overrides any existing device's controller key.
+        /// </summary>
+        public string? ControllerKey { get; set; }
 
         /// <summary>
         /// Checks whether this configuration is valid.

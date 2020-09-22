@@ -62,8 +62,63 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Raised whenever a reconfiguration, a start or a stop happens.
+        /// When handling such event, no call should be made to this device since the async
+        /// lock is already held (and reentrancy is forbidden in such transitions).
         /// </summary>
         PerfectEvent<IDevice, DeviceStateChangedEvent> StateChanged { get; }
+
+        /// <summary>
+        /// Gets the current controller key.
+        /// </summary>
+        string? ControllerKey { get; }
+
+        /// <summary>
+        /// Sets a new <see cref="ControllerKey"/>, whatever its current value is.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="key">The controller key.</param>
+        /// <returns>
+        /// True if it has been changed, false otherwise, typically because the key has been fixed
+        /// by the <see cref="DeviceConfiguration.ControllerKey"/>.
+        /// </returns>
+        Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? key );
+
+        /// <summary>
+        /// Sets a new <see cref="ControllerKey"/> only if the current one is the same as the specified <paramref name="current"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="current">The current value to challenge.</param>
+        /// <param name="key">The controller key to set.</param>
+        /// <returns>
+        /// True if it has been changed, false otherwise: either the current key doesn't match the <paramref name="current"/>
+        /// or the key has been fixed by configuration (the <see cref="DeviceConfiguration.ControllerKey"/>).
+        /// </returns>
+        Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key );
+
+        /// <summary>
+        /// Raised whenever the <see cref="ControllerKey"/> changed, either because of a reconfiguration or
+        /// because of a call to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or <see cref="SetControllerKeyAsync(IActivityMonitor, string?, string?)"/>.
+        /// <para>
+        /// When handling such event it is possible to call methods on this device since the async lock has been released.
+        /// </para>
+        /// </summary>
+        PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
+
+        /// <summary>
+        /// Generic command handler mechanism. Device implementations are invited to expose command objects and to
+        /// handle them here in addition (if wanted) to any number of functions/methods they want.
+        /// <para>
+        /// Command pattern is simple to implement and eases the integration with other architectural parts such as the
+        /// Observable domain for instance.
+        /// </para>
+        /// <para>
+        /// Please note that when this method returns false it just means that the command has not been handled by this device.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="commmand">The command to handle.</param>
+        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
+        Task<bool> HandleCommand( IActivityMonitor monitor, object commmand );
 
     }
 
