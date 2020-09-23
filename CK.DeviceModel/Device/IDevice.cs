@@ -105,11 +105,13 @@ namespace CK.DeviceModel
         PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
         /// <summary>
-        /// Generic command handler mechanism. Device implementations are invited to expose command objects and to
-        /// handle them here in addition (if wanted) to any number of functions/methods they want.
+        /// Handles <see cref="AsyncDeviceCommand"/> command objects.
+        /// <see cref="AsyncDeviceCommand.DeviceName"/> must match this <see cref="IDevice.Name"/>) otherwise the command is ignored.
         /// <para>
+        /// Device implementations are invited to expose command objects and to handle them here in addition (if wanted) to any number
+        /// of functions/methods they want.
         /// Command pattern is simple to implement and eases the integration with other architectural parts such as the
-        /// Observable domain for instance.
+        /// Observable domain.
         /// </para>
         /// <para>
         /// Please note that when this method returns false it just means that the command has not been handled by this device.
@@ -118,7 +120,25 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="commmand">The command to handle.</param>
         /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
-        Task<bool> HandleCommand( IActivityMonitor monitor, object commmand );
+        Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand );
+
+        /// <summary>
+        /// Handles <see cref="SyncDeviceCommand"/> command objects.
+        /// <see cref="SyncDeviceCommand.DeviceName"/> must match this <see cref="IDevice.Name"/>) otherwise the command is ignored.
+        /// <para>
+        /// Device implementations are invited to expose command objects and to handle them here in addition (if wanted) to any number
+        /// of functions/methods they want.
+        /// Command pattern is simple to implement and eases the integration with other architectural parts such as the
+        /// Observable domain.
+        /// </para>
+        /// <para>
+        /// Please note that when this method returns false it just means that the command has not been handled by this device.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="commmand">The command to handle.</param>
+        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
+        bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand );
 
     }
 

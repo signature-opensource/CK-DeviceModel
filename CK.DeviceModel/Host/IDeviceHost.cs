@@ -52,5 +52,21 @@ namespace CK.DeviceModel
         /// <returns>True on success, false on error.</returns>
         Task<bool> ApplyConfigurationAsync( IActivityMonitor monitor, IDeviceHostConfiguration configuration, bool allowEmptyConfiguration = false );
 
+        /// <summary>
+        /// Handles <see cref="AsyncDeviceCommand"/> objects that will be routed to the device named <see cref="AsyncDeviceCommand.DeviceName"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="commmand">The command to execute.</param>
+        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
+        Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand );
+
+        /// <summary>
+        /// Handles <see cref="SyncDeviceCommand"/> objects that will be routed to the device named <see cref="SyncDeviceCommand.DeviceName"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="commmand">The command to execute.</param>
+        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
+        bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand );
+
     }
 }

@@ -516,6 +516,36 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device, TConfiguration configuration ) => Task.CompletedTask;
 
+        /// <inheritdoc />
+        public Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand )
+        {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
+
+            var d = commmand.DeviceName != null ? Find( commmand.DeviceName ) : null;
+            if( d == null )
+            {
+                monitor.Warn( $"Device named '{commmand.DeviceName}' not found in '{DeviceHostName}' host." );
+                return Task.FromResult( false );
+            }
+            return d.InternalHandleCommandAsync( monitor, commmand );
+        }
+
+        /// <inheritdoc />
+        public bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand )
+        {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
+
+            var d = commmand.DeviceName != null ? Find( commmand.DeviceName ) : null;
+            if( d == null )
+            {
+                monitor.Warn( $"Device named '{commmand.DeviceName}' not found in '{DeviceHostName}' host." );
+                return false;
+            }
+            return d.InternalHandleCommand( monitor, commmand );
+        }
+
         enum DeviceAction
         {
             Start,

@@ -409,8 +409,93 @@ namespace CK.DeviceModel
             return _host?.AutoStopAsync( this, monitor, ignoreAlwaysRunning ) ?? Task.FromResult(true);
         }
 
+        #region Async command handling.
         /// <inheritdoc />
-        public virtual Task<bool> HandleCommand( IActivityMonitor monitor, object commmand ) => Task.FromResult( false );
+        public Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand )
+        {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
+
+            if( commmand.DeviceName != Name )
+            {
+                monitor.Debug( $"Command skipped by {FullName}: target device name is '{commmand.DeviceName}'." );
+                return Task.FromResult( false );
+            }
+
+            return InternalHandleCommandAsync( monitor, commmand );
+        }
+
+        internal Task<bool> InternalHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
+        {
+            var key = ControllerKey;
+            if( command.ControllerKey != null && command.ControllerKey != key )
+            {
+                monitor.Warn( $"Command skipped by {FullName}: Expected ControllerKey is '{command.ControllerKey}' but current one is '{key}'." );
+                return Task.FromResult( false );
+            }
+            return DoHandleCommandAsync( monitor, command );
+        }
+
+        /// <summary>
+        /// Must handle <see cref="AsyncDeviceCommand"/> command objects that are actually targeted to this device
+        /// (<see cref="AsyncDeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="AsyncDeviceCommand.ControllerKey"/>
+        /// is either null or match the current <see cref="ControllerKey"/>).
+        /// </para>
+        /// <para>
+        /// Returns false by default and must return false whenever the command has not been handled.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="commmand">The command to handle.</param>
+        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
+        protected virtual Task<bool> DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand ) => Task.FromResult( false );
+
+        #endregion
+
+        #region Sync command handling.
+
+        /// <inheritdoc />
+        public bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand )
+        {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
+
+            if( commmand.DeviceName != Name )
+            {
+                monitor.Debug( $"Command skipped by {FullName}: target device name is '{commmand.DeviceName}'." );
+                return false;
+            }
+
+            return InternalHandleCommand( monitor, commmand );
+        }
+
+        internal bool InternalHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
+        {
+            var key = ControllerKey;
+            if( command.ControllerKey != null && command.ControllerKey != key )
+            {
+                monitor.Warn( $"Command skipped by {FullName}: Expected ControllerKey is '{command.ControllerKey}' but current one is '{key}'." );
+                return false;
+            }
+            return DoHandleCommand( monitor, command );
+        }
+
+        /// <summary>
+        /// Must handle <see cref="SyncDeviceCommand"/> command objects that are actually targeted to this device
+        /// (<see cref="SyncDeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="SyncDeviceCommand.ControllerKey"/>
+        /// is either null or match the current <see cref="ControllerKey"/>).
+        /// </para>
+        /// <para>
+        /// Returns false by default and must return false whenever the command has not been handled.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="commmand">The command to handle.</param>
+        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
+        protected virtual bool DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand ) => false;
+
+        #endregion
+
 
         /// <summary>
         /// Overridden to return the <see cref="FullName"/>.
