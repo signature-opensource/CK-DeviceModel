@@ -4,6 +4,7 @@ using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,15 +54,10 @@ namespace CK.DeviceModel
             _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
         }
 
-        /// <summary>
-        /// Gets the host name that SHOULD identify this host instance unabiguously in a running context.
-        /// Defaults to this concrete <see cref="MemberInfo.Name">type's name</see>.
-        /// </summary>
+        /// <inheritdoc />
         public string DeviceHostName => _lock.Name;
 
-        /// <summary>
-        /// Gets the number of devices.
-        /// </summary>
+        /// <inheritdoc />
         public int Count => _devices.Count;
 
         Type IDeviceHost.GetDeviceHostConfigurationType() => typeof( THostConfiguration );
@@ -82,6 +78,8 @@ namespace CK.DeviceModel
         /// <returns>The device or null if not found.</returns>
         public T? Find( string deviceName ) => _devices.GetValueOrDefault( deviceName ).Device;
 
+        IDevice? IDeviceHost.Find( string deviceName ) => Find( deviceName );
+
         /// <summary>
         /// Gets a device and its applied configuration by its name.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
@@ -93,12 +91,21 @@ namespace CK.DeviceModel
             return _devices.TryGetValue( deviceName, out var e ) ? e : (ConfiguredDevice<T, TConfiguration>?)null;
         }
 
+        (IDevice?, DeviceConfiguration?) IDeviceHost.FindWithConfiguration( string deviceName )
+        {
+            return _devices.TryGetValue( deviceName, out var e ) ? (e.Device, e.Configuration) : (null, null);
+        }
+
         /// <summary>
-        /// Gets a <see cref="PerfectEvent{TSender, TArg}"/> that is raised whenever the device list has changed
-        /// or any device's configuration has changed (<see cref="Device{TConfiguration}.DoReconfigureAsync(IActivityMonitor, TConfiguration)"/> returned
-        /// another result than <see cref="DeviceReconfiguredResult.None"/>).
-        /// This event is not raised when devices are started or stopped.
+        /// Gets a snapshot of the current device configurations.
+        /// Note that these objects are a copy of the ones that are used by the actual devices.
+        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
+        public IReadOnlyList<TConfiguration> DeviceConfigurations => _devices.Values.Select( c => c.Configuration ).ToArray();
+
+        IReadOnlyList<DeviceConfiguration> IDeviceHost.DeviceConfigurations => _devices.Values.Select( c => c.Configuration ).ToArray();
+
+        /// <inheritdoc />
         public PerfectEvent<IDeviceHost, EventArgs> DevicesChanged => _devicesChanged.PerfectEvent;
 
         /// <summary>
@@ -158,7 +165,6 @@ namespace CK.DeviceModel
             /// </summary>
             public IReadOnlyCollection<string> UnconfiguredDeviceNames => _unconfiguredDeviceNames ?? Array.Empty<string>();
         }
-
 
         async Task<bool> IDeviceHost.ApplyConfigurationAsync( IActivityMonitor monitor, IDeviceHostConfiguration configuration, bool allowEmptyConfiguration )
         {

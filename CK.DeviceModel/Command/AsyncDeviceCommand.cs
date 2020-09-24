@@ -11,15 +11,15 @@ namespace CK.DeviceModel
     {
         /// <summary>
         /// Gets or sets the target device name.
-        /// <see cref="K0010Device.HandleCommand(CK.Core.IActivityMonitor, object)"/> requires this
-        /// name to be the one of the device (see <see cref="CK.DeviceModel.IDevice.Name"/>) otherwise
+        /// <see cref="IDevice.HandleCommandAsync(Core.IActivityMonitor, AsyncDeviceCommand)"/> requires this
+        /// name to be the one of the device (see <see cref="IDevice.Name"/>) otherwise
         /// the command is ignored.
         /// </summary>
         public string? DeviceName { get; set; }
 
         /// <summary>
-        /// Gets or sets the required <see cref="CK.DeviceModel.IDevice.ControllerKey"/>.
-        /// When not null, <see cref="K0010Device.HandleCommand(CK.Core.IActivityMonitor, object)"/> requires
+        /// Gets or sets the required <see cref="IDevice.ControllerKey"/>.
+        /// When not null, <see cref="IDevice.HandleCommandAsync(Core.IActivityMonitor, AsyncDeviceCommand)"/> requires
         /// this key to be the current controller key otherwise the command is ignored.
         /// </summary>
         public string? ControllerKey { get; set; }

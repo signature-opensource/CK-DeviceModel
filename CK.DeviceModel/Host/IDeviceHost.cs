@@ -68,5 +68,35 @@ namespace CK.DeviceModel
         /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
         bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand );
 
+        /// <summary>
+        /// Gets a device by its name.
+        /// </summary>
+        /// <param name="deviceName">The device name to find.</param>
+        /// <returns>The device or null if not found.</returns>
+        IDevice? Find( string deviceName );
+
+        /// <summary>
+        /// Gets a device and its applied configuration by its name.
+        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
+        /// </summary>
+        /// <param name="deviceName">The device name to find.</param>
+        /// <returns>The device and its configuration (or null references if not found).</returns>
+        (IDevice?, DeviceConfiguration?) FindWithConfiguration( string deviceName );
+
+        /// <summary>
+        /// Gets a snapshot of the current device configurations.
+        /// Note that these objects are a copy of the ones that are used by the actual devices.
+        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
+        /// </summary>
+        IReadOnlyList<DeviceConfiguration> DeviceConfigurations { get; }
+
+        /// <summary>
+        /// Gets a <see cref="PerfectEvent{TSender, TArg}"/> that is raised whenever the device list has changed
+        /// or any device's configuration has changed (<see cref="Device{TConfiguration}.DoReconfigureAsync(IActivityMonitor, TConfiguration)"/> returned
+        /// another result than <see cref="DeviceReconfiguredResult.None"/>).
+        /// This event is not raised when devices are started or stopped or when their <see cref="IDevice.ControllerKey"/> changed.
+        /// </summary>
+        PerfectEvent<IDeviceHost, EventArgs> DevicesChanged { get; }
+
     }
 }
