@@ -38,6 +38,20 @@ namespace CK.DeviceModel
         bool IsDestroyed { get; }
 
         /// <summary>
+        /// Gets the <see cref="DeviceStatus"/> that captures the last change that occurred.
+        /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
+        /// based on this "instant" status should be avoided.
+        /// </summary>
+        public DeviceStatus Status { get; }
+
+        /// <summary>
+        /// Raised whenever a reconfiguration, a start or a stop happens.
+        /// When handling such event, no call should be made to this device since the async
+        /// lock is already held (and reentrancy is forbidden in such transitions).
+        /// </summary>
+        PerfectEvent<IDevice, DeviceStatus> StatusChanged { get; }
+
+        /// <summary>
         /// Gets the current configuration status of this device.
         /// Just like <see cref="IsRunning"/>, since a device lives in multi-threaded/concurrent contexts,
         /// any sensible decision based on this "instant" status should be avoided.
@@ -59,13 +73,6 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false if this device cannot start.</returns>
         Task<bool> StartAsync( IActivityMonitor monitor );
-
-        /// <summary>
-        /// Raised whenever a reconfiguration, a start or a stop happens.
-        /// When handling such event, no call should be made to this device since the async
-        /// lock is already held (and reentrancy is forbidden in such transitions).
-        /// </summary>
-        PerfectEvent<IDevice, DeviceStateChangedEvent> StateChanged { get; }
 
         /// <summary>
         /// Gets the current controller key.

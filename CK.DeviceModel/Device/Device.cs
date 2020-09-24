@@ -20,13 +20,14 @@ namespace CK.DeviceModel
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
         string? _controllerKey;
+        DeviceStatus _status;
         bool _controllerKeyFromConfiguration;
         bool _isRunning;
-        readonly PerfectEventSender<IDevice, DeviceStateChangedEvent> _stateChanged;
+        readonly PerfectEventSender<IDevice, DeviceStatus> _stateChanged;
         readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
 
         /// <inheritdoc />
-        public PerfectEvent<IDevice, DeviceStateChangedEvent> StateChanged => _stateChanged.PerfectEvent;
+        public PerfectEvent<IDevice, DeviceStatus> StatusChanged => _stateChanged.PerfectEvent;
 
         /// <inheritdoc />
         public PerfectEvent<IDevice, string?> ControllerKeyChanged => _controllerKeyChanged.PerfectEvent;
@@ -49,7 +50,7 @@ namespace CK.DeviceModel
             if( config == null ) throw new ArgumentNullException( nameof( config ) );
             if( !config.CheckValid( monitor ) ) throw new ArgumentException( "Configuration must be valid.", nameof( config ) );
 
-            _stateChanged = new PerfectEventSender<IDevice, DeviceStateChangedEvent>();
+            _stateChanged = new PerfectEventSender<IDevice, DeviceStatus>();
             _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
             Name = config.Name;
             _configStatus = config.Status;
@@ -151,7 +152,7 @@ namespace CK.DeviceModel
         ///     <item><see cref="DoReconfigureAsync"/>: true or false (this is the only method where it can be true or false).</item>
         ///     <item><see cref="DoStartAsync"/>: false.</item>
         ///     <item><see cref="DoStopAsync"/>: true.</item>
-        ///     <item><see cref="DoDestroyAsync"/>: false (since it nas been necessarily stopped before destroyed).</item>
+        ///     <item><see cref="DoDestroyAsync"/>: false (since it has been necessarily stopped before destroyed).</item>
         /// </list>
         /// </summary>
         public bool IsRunning => _isRunning;
@@ -160,6 +161,15 @@ namespace CK.DeviceModel
         /// Gets whether this device has been destroyed.
         /// </summary>
         public bool IsDestroyed => _host == null;
+
+        /// <inheritdoc />
+        public DeviceStatus Status => _status;
+
+        Task SetDeviceStatusAsync( IActivityMonitor monitor, DeviceStatus status )
+        {
+            _status = status;
+            return _stateChanged.SafeRaiseAsync( monitor, this, status );
+        }
 
         /// <summary>
         /// Gets the current configuration status of this device.
@@ -202,7 +212,7 @@ namespace CK.DeviceModel
 
             if( r != DeviceReconfiguredResult.None )
             {
-                await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStateChangedEvent( r ) );
+                await SetDeviceStatusAsync( monitor, new DeviceStatus( r, _isRunning ) );
             }
 
             DeviceApplyConfigurationResult applyResult = (DeviceApplyConfigurationResult)r;
@@ -285,7 +295,7 @@ namespace CK.DeviceModel
             {
                 monitor.Error( $"While starting '{FullName}'.", ex );
             }
-            if( _isRunning ) await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStateChangedEvent( reason ) );
+            if( _isRunning ) await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
             return _isRunning;
         }
 
@@ -355,7 +365,7 @@ namespace CK.DeviceModel
                     _isRunning = false;
                 }
             }
-            await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStateChangedEvent( reason ) );
+            await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStatus( reason ) );
             return true;
         }
 

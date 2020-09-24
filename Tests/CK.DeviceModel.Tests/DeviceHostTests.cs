@@ -167,8 +167,8 @@ namespace CK.DeviceModel.Tests
 
             int devicesSyncCalled = 0;
             int devicesAsyncCalled = 0;
-            DeviceStateChangedEvent? lastSyncEvent = null;
-            DeviceStateChangedEvent? lastAsyncEvent = null;
+            DeviceStatus? lastSyncEvent = null;
+            DeviceStatus? lastAsyncEvent = null;
 
             void DevicesChanged_Sync( IActivityMonitor monitor, IDeviceHost sender, EventArgs e )
             {
@@ -181,12 +181,12 @@ namespace CK.DeviceModel.Tests
                 return Task.CompletedTask;
             }
 
-            void StateChanged_Sync( IActivityMonitor monitor, IDevice sender, DeviceStateChangedEvent e )
+            void StateChanged_Sync( IActivityMonitor monitor, IDevice sender, DeviceStatus e )
             {
                 lastSyncEvent = e;
             }
 
-            Task StateChanged_Async( IActivityMonitor monitor, IDevice sender, DeviceStateChangedEvent e )
+            Task StateChanged_Async( IActivityMonitor monitor, IDevice sender, DeviceStatus e )
             {
                 lastAsyncEvent = e;
                 return Task.CompletedTask;
@@ -210,8 +210,8 @@ namespace CK.DeviceModel.Tests
 
             var cameraC = host["C"];
             Debug.Assert( cameraC != null );
-            cameraC.StateChanged.Async += StateChanged_Async;
-            cameraC.StateChanged.Sync += StateChanged_Sync;
+            cameraC.StatusChanged.Async += StateChanged_Async;
+            cameraC.StatusChanged.Sync += StateChanged_Sync;
             lastSyncEvent.Should().BeNull();
             lastAsyncEvent.Should().BeNull();
 
@@ -234,9 +234,9 @@ namespace CK.DeviceModel.Tests
             devicesAsyncCalled.Should().Be( 2 );
             Debug.Assert( lastSyncEvent != null && lastSyncEvent.Equals( lastAsyncEvent ) );
 
-            lastSyncEvent.Value.IsStartedEvent.Should().BeFalse();
-            lastSyncEvent.Value.IsReconfiguredEvent.Should().BeTrue();
-            lastSyncEvent.Value.IsStoppedEvent.Should().BeFalse();
+            lastSyncEvent.Value.IsStarted.Should().BeFalse();
+            lastSyncEvent.Value.IsReconfigured.Should().BeTrue();
+            lastSyncEvent.Value.IsStopped.Should().BeFalse();
             lastSyncEvent.Value.ReconfiguredResult.Should().Be( DeviceReconfiguredResult.UpdateSucceeded );
 
             (await cameraC.StartAsync( TestHelper.Monitor )).Should().BeFalse( "Disabled." );
@@ -257,9 +257,9 @@ namespace CK.DeviceModel.Tests
             (await cameraC.StartAsync( TestHelper.Monitor )).Should().BeTrue();
             Debug.Assert( lastSyncEvent != null && lastSyncEvent.Equals( lastAsyncEvent ) );
 
-            lastSyncEvent.Value.IsStartedEvent.Should().BeTrue();
-            lastSyncEvent.Value.IsReconfiguredEvent.Should().BeFalse();
-            lastSyncEvent.Value.IsStoppedEvent.Should().BeFalse();
+            lastSyncEvent.Value.IsStarted.Should().BeTrue();
+            lastSyncEvent.Value.IsReconfigured.Should().BeFalse();
+            lastSyncEvent.Value.IsStopped.Should().BeFalse();
             lastSyncEvent.Value.StartedReason.Should().Be( DeviceStartedReason.StartedCall );
 
             // AutoDestroying.
@@ -269,9 +269,9 @@ namespace CK.DeviceModel.Tests
             devicesAsyncCalled.Should().Be( 3 );
             host.Find( "C" ).Should().BeNull();
             Debug.Assert( lastSyncEvent != null && lastSyncEvent.Equals( lastAsyncEvent ) );
-            lastSyncEvent.Value.IsStartedEvent.Should().BeFalse();
-            lastSyncEvent.Value.IsReconfiguredEvent.Should().BeFalse();
-            lastSyncEvent.Value.IsStoppedEvent.Should().BeTrue();
+            lastSyncEvent.Value.IsStarted.Should().BeFalse();
+            lastSyncEvent.Value.IsReconfigured.Should().BeFalse();
+            lastSyncEvent.Value.IsStopped.Should().BeTrue();
             lastSyncEvent.Value.StoppedReason.Should().Be( DeviceStoppedReason.StoppedBeforeDestroy );
 
             Camera.TotalCount.Should().Be( 0 );
