@@ -2,26 +2,31 @@ using CK.Core;
 
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace CK.PerfectEvent
 {
 
     /// <summary>
-    /// Event handler that can be combined into a <see cref="SequentialEventHandlerSender{T}"/>.
+    /// Async event handler that can be combined into a <see cref="SequentialEventHandlerAsyncSender{TSender, TArg}"/>.
     /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
+    /// <typeparam name="TSender">Type of the sender.</typeparam>
+    /// <typeparam name="TArg">Type of the event argument.</typeparam>
+    /// <param name="monitor">The monitor that must be used to log activities.</param>
     /// <param name="sender">The source of the event.</param>
     /// <param name="e">The event argument.</param>
-    public delegate void SequentialEventHandler<TEvent>( IActivityMonitor monitor, TEvent e );
+    public delegate Task SequentialEventHandlerAsync<TSender, TArg>( IActivityMonitor monitor, TSender sender, TArg e );
 
     /// <summary>
-    /// Implements a host for <see cref="SequentialEventHandler{TSender,TArg}"/> delegates.
+    /// Implements a host for <see cref="EventHandlerAync"/> delegates.
     /// </summary>
     /// <remarks>
     /// This cannot be implemented as a struct because the <see cref="operator+"/> and <see cref="operator-"/> must
     /// return the instance and a value type wouldn't correctly handle the null/single/array reference.
     /// </remarks>
-    public class SequentialEventHandlerSender<TEvent>
+    /// <typeparam name="TSender">Type of the sender.</typeparam>
+    /// <typeparam name="TArg">Type of the event argument.</typeparam>
+    public class SequentialEventHandlerAsyncSender<TSender, TArg>
     {
         object? _handler;
 
@@ -34,14 +39,14 @@ namespace CK.PerfectEvent
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
         /// <param name="h">Non null handler.</param>
-        public SequentialEventHandlerSender<TEvent> Add( SequentialEventHandler<TEvent> handler )
+        public SequentialEventHandlerAsyncSender<TSender, TArg> Add( SequentialEventHandlerAsync<TSender, TArg> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
             Util.InterlockedSet( ref _handler, h =>
             {
                 if( h == null ) return handler;
-                if( h is SequentialEventHandler<TEvent> a ) return new SequentialEventHandler<TEvent>[] { a, handler };
-                var ah = (SequentialEventHandler<TEvent>[])h;
+                if( h is SequentialEventHandlerAsync<TSender, TArg> a ) return new SequentialEventHandlerAsync<TSender, TArg>[] { a, handler };
+                var ah = (SequentialEventHandlerAsync<TSender, TArg>[])h;
                 int len = ah.Length;
                 Array.Resize( ref ah, len + 1 );
                 ah[len] = handler;
@@ -54,18 +59,17 @@ namespace CK.PerfectEvent
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
         /// <param name="h">The handler to remove. Cannot be null.</param>
-        public SequentialEventHandlerSender<TEvent> Remove( SequentialEventHandler<TEvent> handler )
+        public SequentialEventHandlerAsyncSender<TSender, TArg> Remove( SequentialEventHandlerAsync<TSender, TArg> handler )
         {
-            if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
             Util.InterlockedSet( ref _handler, h =>
             {
                 if( h == null ) return null;
-                if( h is SequentialEventHandler<TEvent> a ) return a == handler ? null : h;
-                var current = (SequentialEventHandler<TEvent>[])h;
+                if( h is SequentialEventHandlerAsync<TSender, TArg> a ) return a == handler ? null : h;
+                var current = (SequentialEventHandlerAsync<TSender, TArg>[])h;
                 int idx = Array.IndexOf( current, handler );
                 if( idx < 0 ) return current;
                 Debug.Assert( current.Length > 1 );
-                var ah = new SequentialEventHandler<TEvent>[current.Length - 1];
+                var ah = new SequentialEventHandlerAsync<TSender, TArg>[current.Length - 1];
                 Array.Copy( current, 0, ah, 0, idx );
                 Array.Copy( current, idx + 1, ah, idx, ah.Length - idx );
                 return ah;
@@ -79,7 +83,7 @@ namespace CK.PerfectEvent
         /// <param name="eventHost">The host.</param>
         /// <param name="handler">The non null handler to add.</param>
         /// <returns>The host.</returns>
-        public static SequentialEventHandlerSender<TEvent> operator +( SequentialEventHandlerSender<TEvent> eventHost, SequentialEventHandler<TEvent> handler ) => eventHost.Add( handler );
+        public static SequentialEventHandlerAsyncSender<TSender, TArg> operator +( SequentialEventHandlerAsyncSender<TSender, TArg> eventHost, SequentialEventHandlerAsync<TSender, TArg> handler ) => eventHost.Add( handler );
 
         /// <summary>
         /// Relays to <see cref="Remove"/>.
@@ -87,7 +91,7 @@ namespace CK.PerfectEvent
         /// <param name="eventHost">The host.</param>
         /// <param name="handler">The non null handler to remove.</param>
         /// <returns>The host.</returns>
-        public static SequentialEventHandlerSender<TEvent> operator -( SequentialEventHandlerSender<TEvent> eventHost, SequentialEventHandler<TEvent> handler ) => eventHost.Remove( handler );
+        public static SequentialEventHandlerAsyncSender<TSender, TArg> operator -( SequentialEventHandlerAsyncSender<TSender, TArg> eventHost, SequentialEventHandlerAsync<TSender, TArg> handler ) => eventHost.Remove( handler );
 
         /// <summary>
         /// Clears the delegate list.
@@ -98,17 +102,19 @@ namespace CK.PerfectEvent
         /// Raises this event.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="e">The event argument.</param>
-        public void Raise( IActivityMonitor monitor, TEvent e )
+        /// <param name="sender">The sender of the event.</param>
+        /// <param name="args">The event argument.</param>
+        public Task RaiseAsync( IActivityMonitor monitor, TSender sender, TArg args )
         {
             var h = _handler;
-            if( h == null ) return;
-            if( h is SequentialEventHandler<TEvent> a ) a( monitor, e );
-            else
-            {
-                var all = (SequentialEventHandler<TEvent>[])h;
-                foreach( var x in all ) x( monitor, e );
-            }
+            if( h == null ) return Task.CompletedTask;
+            if( h is SequentialEventHandlerAsync<TSender, TArg> a ) return a( monitor, sender, args );
+            return RaiseSequentialAsync( monitor, (SequentialEventHandlerAsync<TSender, TArg>[])h, sender, args );
+        }
+
+        static async Task RaiseSequentialAsync( IActivityMonitor monitor, SequentialEventHandlerAsync<TSender, TArg>[] all, TSender sender, TArg args )
+        {
+            foreach( var h in all ) await h( monitor, sender, args );
         }
     }
 }

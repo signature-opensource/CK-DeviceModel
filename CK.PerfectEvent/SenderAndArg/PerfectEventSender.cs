@@ -13,34 +13,34 @@ namespace CK.PerfectEvent
     /// or directly add or remove one of the 3 handler types, either by using the Add/Remove method overloads
     /// or, more directly, <c>+=</c> and <c>-=</c> standard event operators.
     /// <para>
-    /// Instances of this class should be kept private: only the sender object should be able to call <see cref="RaiseAsync(IActivityMonitor, TEvent)"/>
-    /// or <see cref="SafeRaiseAsync(IActivityMonitor, TEvent, string?, int)"/>.
+    /// Instances of this class should be kept private: only the sender object should be able to call <see cref="RaiseAsync(IActivityMonitor, TSender, TArg)"/>
+    /// or <see cref="SafeRaiseAsync(IActivityMonitor, TSender, TArg, string?, int)"/>.
     /// What should be exposed is the <see cref="PerfectEvent"/> property that restricts the API to event registration.
     /// </para>
     /// </summary>
     /// <typeparam name="TSender">The type of the event sender.</typeparam>
     /// <typeparam name="TArg">The type of the event argument.</typeparam>
-    public class PerfectEventSender<TEvent>
+    public class PerfectEventSender<TSender, TArg>
     {
-        readonly SequentialEventHandlerSender<TEvent> _seq;
-        readonly SequentialEventHandlerAsyncSender<TEvent> _seqAsync;
-        readonly ParallelEventHandlerAsyncSender<TEvent> _parallelAsync;
+        readonly SequentialEventHandlerSender<TSender, TArg> _seq;
+        readonly SequentialEventHandlerAsyncSender<TSender, TArg> _seqAsync;
+        readonly ParallelEventHandlerAsyncSender<TSender, TArg> _parallelAsync;
 
         /// <summary>
-        /// Initializes a new <see cref="PerfectEventSender{TEvent}"/>.
+        /// Initializes a new <see cref="PerfectEventSender{TSender, TArg}"/>.
         /// </summary>
         public PerfectEventSender()
         {
-            _seq = new SequentialEventHandlerSender<TEvent>();
-            _seqAsync = new SequentialEventHandlerAsyncSender<TEvent>();
-            _parallelAsync = new ParallelEventHandlerAsyncSender<TEvent>();
+            _seq = new SequentialEventHandlerSender<TSender, TArg>();
+            _seqAsync = new SequentialEventHandlerAsyncSender<TSender, TArg>();
+            _parallelAsync = new ParallelEventHandlerAsyncSender<TSender, TArg>();
         }
 
         /// <summary>
-        /// Gets the event that should be exposed to the external world: through the <see cref="PerfectEvent{TEvent}"/>,
+        /// Gets the event that should be exposed to the external world: through the <see cref="PerfectEvent{TSender, TArg}"/>,
         /// only registration/unregistration is possible.
         /// </summary>
-        public PerfectEvent<TEvent> PerfectEvent => new PerfectEvent<TEvent>( this );
+        public PerfectEvent<TSender, TArg> PerfectEvent => new PerfectEvent<TSender, TArg>( this );
 
         /// <summary>
         /// Gets whether at least one handler is registered.
@@ -61,10 +61,10 @@ namespace CK.PerfectEvent
         /// Gets the Synchronous event registration point.
         /// </summary>
         /// <remarks>
-        /// Note that handlers of the 3 types can be added and removed directly to this <see cref="PerfectEventSender{TEvent}"/>:
+        /// Note that handlers of the 3 types can be added and removed directly to this <see cref="PerfectEventSender{TSender, TArg}"/>:
         /// this event is a helper that better express the intent of the code.
         /// </remarks>
-        public event SequentialEventHandler<TEvent> Sync
+        public event SequentialEventHandler<TSender, TArg> Sync
         {
             add => _seq.Add( value );
             remove => _seq.Remove( value );
@@ -74,10 +74,10 @@ namespace CK.PerfectEvent
         /// Gets the Asynchronous event registration point.
         /// </summary>
         /// <remarks>
-        /// Note that handlers of the 3 types can be added and removed directly to this <see cref="PerfectEventSender{TEvent}"/>:
+        /// Note that handlers of the 3 types can be added and removed directly to this <see cref="PerfectEventSender{TSender, TArg}"/>:
         /// this event is a helper that better express the intent of the code.
         /// </remarks>
-        public event SequentialEventHandlerAsync<TEvent> Async
+        public event SequentialEventHandlerAsync<TSender, TArg> Async
         {
             add => _seqAsync.Add( value );
             remove => _seqAsync.Remove( value );
@@ -87,10 +87,10 @@ namespace CK.PerfectEvent
         /// Gets the Parallel Asynchronous event registration point.
         /// </summary>
         /// <remarks>
-        /// Note that handlers of the 3 types can be added and removed directly to this <see cref="PerfectEventSender{TEvent}"/>:
+        /// Note that handlers of the 3 types can be added and removed directly to this <see cref="PerfectEventSender{TSender, TArg}"/>:
         /// this event is a helper that better express the intent of the code.
         /// </remarks>
-        public event ParallelEventHandlerAsync<TEvent> ParallelAsync
+        public event ParallelEventHandlerAsync<TSender, TArg> ParallelAsync
         {
             add => _parallelAsync.Add( value );
             remove => _parallelAsync.Add( value );
@@ -103,7 +103,7 @@ namespace CK.PerfectEvent
         /// </summary>
         /// <param name="h">Non null handler.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public PerfectEventSender<TEvent> Add( SequentialEventHandler<TEvent> handler )
+        public PerfectEventSender<TSender, TArg> Add( SequentialEventHandler<TSender, TArg> handler )
         {
             _seq.Add( handler );
             return this;
@@ -114,27 +114,27 @@ namespace CK.PerfectEvent
         /// </summary>
         /// <param name="h">The handler to remove. Cannot be null.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public PerfectEventSender<TEvent> Remove( SequentialEventHandler<TEvent> handler )
+        public PerfectEventSender<TSender, TArg> Remove( SequentialEventHandler<TSender, TArg> handler )
         {
             _seq.Remove( handler );
             return this;
         }
 
         /// <summary>
-        /// Relays to <see cref="Add(SequentialEventHandler{TEvent})"/>.
+        /// Relays to <see cref="Add(SequentialEventHandler{TSender, TArg})"/>.
         /// </summary>
         /// <param name="this">This PerfectEventSender.</param>
         /// <param name="handler">The non null handler to add.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public static PerfectEventSender<TEvent> operator +( PerfectEventSender<TEvent> @this, SequentialEventHandler<TEvent> handler ) => @this.Add( handler );
+        public static PerfectEventSender<TSender, TArg> operator +( PerfectEventSender<TSender, TArg> @this, SequentialEventHandler<TSender, TArg> handler ) => @this.Add( handler );
 
         /// <summary>
-        /// Relays to <see cref="Remove(SequentialEventHandler{TEvent})"/>.
+        /// Relays to <see cref="Remove(SequentialEventHandler{TSender, TArg})"/>.
         /// </summary>
         /// <param name="this">The host.</param>
         /// <param name="handler">The non null handler to remove.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public static PerfectEventSender<TEvent> operator -( PerfectEventSender<TEvent> @this, SequentialEventHandler<TEvent> handler ) => @this.Remove( handler );
+        public static PerfectEventSender<TSender, TArg> operator -( PerfectEventSender<TSender, TArg> @this, SequentialEventHandler<TSender, TArg> handler ) => @this.Remove( handler );
 
         #endregion
 
@@ -145,7 +145,7 @@ namespace CK.PerfectEvent
         /// </summary>
         /// <param name="h">Non null handler.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public PerfectEventSender<TEvent> Add( SequentialEventHandlerAsync<TEvent> handler )
+        public PerfectEventSender<TSender, TArg> Add( SequentialEventHandlerAsync<TSender, TArg> handler )
         {
             _seqAsync.Add( handler );
             return this;
@@ -156,7 +156,7 @@ namespace CK.PerfectEvent
         /// </summary>
         /// <param name="h">The handler to remove. Cannot be null.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public PerfectEventSender<TEvent> Remove( SequentialEventHandlerAsync<TEvent> handler )
+        public PerfectEventSender<TSender, TArg> Remove( SequentialEventHandlerAsync<TSender, TArg> handler )
         {
             _seqAsync.Remove( handler );
             return this;
@@ -168,7 +168,7 @@ namespace CK.PerfectEvent
         /// <param name="this">This PerfectEventSender.</param>
         /// <param name="handler">The non null handler to add.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public static PerfectEventSender<TEvent> operator +( PerfectEventSender<TEvent> @this, SequentialEventHandlerAsync<TEvent> handler ) => @this.Add( handler );
+        public static PerfectEventSender<TSender, TArg> operator +( PerfectEventSender<TSender, TArg> @this, SequentialEventHandlerAsync<TSender, TArg> handler ) => @this.Add( handler );
 
         /// <summary>
         /// Relays to <see cref="Remove"/>.
@@ -176,7 +176,7 @@ namespace CK.PerfectEvent
         /// <param name="this">This PerfectEventSender.</param>
         /// <param name="handler">The non null handler to remove.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public static PerfectEventSender<TEvent> operator -( PerfectEventSender<TEvent> @this, SequentialEventHandlerAsync<TEvent> handler ) => @this.Remove( handler );
+        public static PerfectEventSender<TSender, TArg> operator -( PerfectEventSender<TSender, TArg> @this, SequentialEventHandlerAsync<TSender, TArg> handler ) => @this.Remove( handler );
 
         #endregion
 
@@ -187,7 +187,7 @@ namespace CK.PerfectEvent
         /// </summary>
         /// <param name="h">Non null handler.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public PerfectEventSender<TEvent> Add( ParallelEventHandlerAsync<TEvent> handler )
+        public PerfectEventSender<TSender, TArg> Add( ParallelEventHandlerAsync<TSender, TArg> handler )
         {
             _parallelAsync.Add( handler );
             return this;
@@ -198,27 +198,27 @@ namespace CK.PerfectEvent
         /// </summary>
         /// <param name="h">The handler to remove. Cannot be null.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public PerfectEventSender<TEvent> Remove( ParallelEventHandlerAsync<TEvent> handler )
+        public PerfectEventSender<TSender, TArg> Remove( ParallelEventHandlerAsync<TSender, TArg> handler )
         {
             _parallelAsync.Remove( handler );
             return this;
         }
 
         /// <summary>
-        /// Relays to <see cref="Add(ParallelEventHandlerAsync{TEvent})"/>.
+        /// Relays to <see cref="Add(ParallelEventHandlerAsync{TSender, TArg})"/>.
         /// </summary>
         /// <param name="this">This PerfectEventSender.</param>
         /// <param name="handler">The non null handler to add.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public static PerfectEventSender<TEvent> operator +( PerfectEventSender<TEvent> @this, ParallelEventHandlerAsync<TEvent> handler ) => @this.Add( handler );
+        public static PerfectEventSender<TSender, TArg> operator +( PerfectEventSender<TSender, TArg> @this, ParallelEventHandlerAsync<TSender, TArg> handler ) => @this.Add( handler );
 
         /// <summary>
-        /// Relays to <see cref="Remove(ParallelEventHandlerAsync{TEvent})"/>.
+        /// Relays to <see cref="Remove(ParallelEventHandlerAsync{TSender, TArg})"/>.
         /// </summary>
         /// <param name="this">This PerfectEventSender.</param>
         /// <param name="handler">The non null handler to remove.</param>
         /// <returns>This PerfectEventSender.</returns>
-        public static PerfectEventSender<TEvent> operator -( PerfectEventSender<TEvent> @this, ParallelEventHandlerAsync<TEvent> handler ) => @this.Remove( handler );
+        public static PerfectEventSender<TSender, TArg> operator -( PerfectEventSender<TSender, TArg> @this, ParallelEventHandlerAsync<TSender, TArg> handler ) => @this.Remove( handler );
 
 
         #endregion
@@ -234,17 +234,18 @@ namespace CK.PerfectEvent
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
+        /// <param name="sender">The sender of the event.</param>
         /// <param name="e">The argument of the event.</param>
         /// <param name="fileName">The source filename where this event is raised.</param>
         /// <param name="lineNumber">The source line number in the filename where this event is raised.</param>
         /// <returns>True on success, false if an exception occurred.</returns>
-        public async Task<bool> SafeRaiseAsync( IActivityMonitor monitor, TEvent e, [CallerFilePath] string? fileName = null, [CallerLineNumber] int lineNumber = 0 )
+        public async Task<bool> SafeRaiseAsync( IActivityMonitor monitor, TSender sender, TArg e, [CallerFilePath] string? fileName = null, [CallerLineNumber] int lineNumber = 0 )
         {
             try
             {
-                Task task = _parallelAsync.RaiseAsync( monitor, e );
-                _seq.Raise( monitor, e );
-                await Task.WhenAll( task, _seqAsync.RaiseAsync( monitor, e ) );
+                Task task = _parallelAsync.RaiseAsync( monitor, sender, e );
+                _seq.Raise( monitor, sender, e );
+                await Task.WhenAll( task, _seqAsync.RaiseAsync( monitor, sender, e ) );
                 return true;
             }
             catch( Exception ex )
@@ -263,12 +264,13 @@ namespace CK.PerfectEvent
         /// The returned task is resolved once the parrallels, the synchronous and the asynhronous event handlers have finished their jobs.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
+        /// <param name="sender">The sender of the event.</param>
         /// <param name="e">The argument of the event.</param>
-        public Task RaiseAsync( IActivityMonitor monitor, TEvent e )
+        public Task RaiseAsync( IActivityMonitor monitor, TSender sender, TArg e )
         {
-            Task task = _parallelAsync.RaiseAsync( monitor, e );
-            _seq.Raise( monitor, e );
-            return Task.WhenAll( task, _seqAsync.RaiseAsync( monitor, e ) );
+            Task task = _parallelAsync.RaiseAsync( monitor, sender, e );
+            _seq.Raise( monitor, sender, e );
+            return Task.WhenAll( task, _seqAsync.RaiseAsync( monitor, sender, e ) );
         }
 
 
