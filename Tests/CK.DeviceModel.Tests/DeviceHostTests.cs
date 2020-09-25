@@ -181,14 +181,14 @@ namespace CK.DeviceModel.Tests
                 return Task.CompletedTask;
             }
 
-            void StateChanged_Sync( IActivityMonitor monitor, IDevice sender, DeviceStatus e )
+            void StateChanged_Sync( IActivityMonitor monitor, IDevice sender )
             {
-                lastSyncEvent = e;
+                lastSyncEvent = sender.Status;
             }
 
-            Task StateChanged_Async( IActivityMonitor monitor, IDevice sender, DeviceStatus e )
+            Task StateChanged_Async( IActivityMonitor monitor, IDevice sender )
             {
-                lastAsyncEvent = e;
+                lastAsyncEvent = sender.Status;
                 return Task.CompletedTask;
             }
 
@@ -238,14 +238,25 @@ namespace CK.DeviceModel.Tests
             lastSyncEvent.Value.IsReconfigured.Should().BeTrue();
             lastSyncEvent.Value.IsStopped.Should().BeFalse();
             lastSyncEvent.Value.ReconfiguredResult.Should().Be( DeviceReconfiguredResult.UpdateSucceeded );
+            lastSyncEvent.ToString().Should().Be( "Stopped (UpdateSucceeded)" );
 
             (await cameraC.StartAsync( TestHelper.Monitor )).Should().BeFalse( "Disabled." );
+            cameraC.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
 
             lastSyncEvent = null;
+            result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
+            lastSyncEvent.Should().BeNull( "No official change (DeviceReconfiguredResult.None returned by Device.DoReconfigureAsync) and no ConfigurationStatus change." );
+            devicesSyncCalled.Should().Be( 2 );
+            devicesAsyncCalled.Should().Be( 2 );
+
+            // Changes the Configuration status. Nothing change except this Device.ConfigurationStatus...
             config.Status = DeviceConfigurationStatus.Runnable;
             result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
 
-            lastSyncEvent.Should().BeNull( "No official change (DeviceReconfiguredResult.None returned by Device.DoReconfigureAsync)." );
+            // The Status did not change but the ConfigurationStatus did.
+            lastSyncEvent.ToString().Should().Be( "Stopped (UpdateSucceeded)" );
+            cameraC.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Runnable );
+
             devicesSyncCalled.Should().Be( 2 );
             devicesAsyncCalled.Should().Be( 2 );
 
@@ -272,7 +283,7 @@ namespace CK.DeviceModel.Tests
             lastSyncEvent.Value.IsStarted.Should().BeFalse();
             lastSyncEvent.Value.IsReconfigured.Should().BeFalse();
             lastSyncEvent.Value.IsStopped.Should().BeTrue();
-            lastSyncEvent.Value.StoppedReason.Should().Be( DeviceStoppedReason.StoppedBeforeDestroy );
+            lastSyncEvent.Value.StoppedReason.Should().Be( DeviceStoppedReason.Destroyed );
 
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );

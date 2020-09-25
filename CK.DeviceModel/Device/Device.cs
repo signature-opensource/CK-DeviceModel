@@ -23,11 +23,11 @@ namespace CK.DeviceModel
         DeviceStatus _status;
         bool _controllerKeyFromConfiguration;
         bool _isRunning;
-        readonly PerfectEventSender<IDevice, DeviceStatus> _stateChanged;
+        readonly PerfectEventSender<IDevice> _statusChanged;
         readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
 
         /// <inheritdoc />
-        public PerfectEvent<IDevice, DeviceStatus> StatusChanged => _stateChanged.PerfectEvent;
+        public PerfectEvent<IDevice> StatusChanged => _statusChanged.PerfectEvent;
 
         /// <inheritdoc />
         public PerfectEvent<IDevice, string?> ControllerKeyChanged => _controllerKeyChanged.PerfectEvent;
@@ -50,7 +50,7 @@ namespace CK.DeviceModel
             if( config == null ) throw new ArgumentNullException( nameof( config ) );
             if( !config.CheckValid( monitor ) ) throw new ArgumentException( "Configuration must be valid.", nameof( config ) );
 
-            _stateChanged = new PerfectEventSender<IDevice, DeviceStatus>();
+            _statusChanged = new PerfectEventSender<IDevice>();
             _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
             Name = config.Name;
             _configStatus = config.Status;
@@ -73,6 +73,8 @@ namespace CK.DeviceModel
             FullName += " (Detached)";
             return DoDestroyAsync( monitor );
         }
+
+        internal Task HostRaiseDestroyStatusAsync( IActivityMonitor monitor ) => SetDeviceStatusAsync( monitor, new DeviceStatus( DeviceStoppedReason.Destroyed ) );
 
         /// <summary>
         /// Gets the name. Necessarily not null or whitespace.
@@ -168,7 +170,7 @@ namespace CK.DeviceModel
         Task SetDeviceStatusAsync( IActivityMonitor monitor, DeviceStatus status )
         {
             _status = status;
-            return _stateChanged.SafeRaiseAsync( monitor, this, status );
+            return _statusChanged.SafeRaiseAsync( monitor, this );
         }
 
         /// <summary>
@@ -182,14 +184,18 @@ namespace CK.DeviceModel
         {
             Debug.Assert( config.Name == Name );
 
+            bool configStatusChanged = false;
             if( _isRunning && config.Status == DeviceConfigurationStatus.Disabled )
             {
-                _configStatus = DeviceConfigurationStatus.Disabled;
+                // The _configStatus is set to DeviceConfigurationStatus.Disabled by HostStopAsync that also 
+                // raised the StatusChanged: if the update of the configuration decided that nothing has changed,
+                // we have no more event to raise.
                 await HostStopAsync( monitor, DeviceStoppedReason.StoppedByDisabledConfiguration );
                 Debug.Assert( _isRunning == false, "DoStop DOES stop." );
             }
             else
             {
+                configStatusChanged = _configStatus != config.Status;
                 _configStatus = config.Status;
             }
             _controllerKeyFromConfiguration = config.ControllerKey != null;
@@ -199,31 +205,45 @@ namespace CK.DeviceModel
                 monitor.Info( $"Device {FullName}: controller key fixed by Configuration from '{_controllerKey}' to '{config.ControllerKey}'." );
                 _controllerKey = config.ControllerKey;
             }
-            DeviceReconfiguredResult r;
+            DeviceReconfiguredResult reconfigResult;
             try
             {
-                r = await DoReconfigureAsync( monitor, config, controllerKeyChanged );
+                reconfigResult = await DoReconfigureAsync( monitor, config, controllerKeyChanged );
             }
             catch( Exception ex )
             {
                 monitor.Error( ex );
-                r = DeviceReconfiguredResult.UpdateFailed;
+                reconfigResult = DeviceReconfiguredResult.UpdateFailed;
             }
 
-            if( r != DeviceReconfiguredResult.None )
+            bool shouldEmitDeviceStatusChanged = reconfigResult != DeviceReconfiguredResult.None;
+
+            if( shouldEmitDeviceStatusChanged )
             {
-                await SetDeviceStatusAsync( monitor, new DeviceStatus( r, _isRunning ) );
+                // Don't emit the change of status right now.
+                _status = new DeviceStatus( reconfigResult, _isRunning );
             }
 
-            DeviceApplyConfigurationResult applyResult = (DeviceApplyConfigurationResult)r;
-            if( (r == DeviceReconfiguredResult.UpdateSucceeded || r == DeviceReconfiguredResult.None)
+            DeviceApplyConfigurationResult applyResult = (DeviceApplyConfigurationResult)reconfigResult;
+            if( (reconfigResult == DeviceReconfiguredResult.UpdateSucceeded || reconfigResult == DeviceReconfiguredResult.None)
                 && !_isRunning
                 && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
             {
                 if( !await HostStartAsync( monitor, DeviceStartedReason.StartedByAlwaysRunningConfiguration ) )
                 {
+                    Debug.Assert( !_isRunning );
                     applyResult = DeviceApplyConfigurationResult.UpdateSucceededButStartFailed;
                 }
+                else
+                {
+                    Debug.Assert( _isRunning );
+                    // A StatusChanged has been emitted.
+                    shouldEmitDeviceStatusChanged = configStatusChanged = false;
+                }
+            }
+            if( shouldEmitDeviceStatusChanged || configStatusChanged )
+            {
+                await _statusChanged.SafeRaiseAsync( monitor, this );
             }
             if( controllerKeyChanged )
             {
@@ -341,7 +361,7 @@ namespace CK.DeviceModel
             Debug.Assert( _host != null && _isRunning );
             using( monitor.OpenInfo( $"Stopping {FullName} ({reason})" ) )
             {
-                if( reason == DeviceStoppedReason.StoppedByDisabledConfiguration || reason == DeviceStoppedReason.StoppedBeforeDestroy )
+                if( reason == DeviceStoppedReason.StoppedByDisabledConfiguration || reason == DeviceStoppedReason.Destroyed )
                 {
                     _configStatus = DeviceConfigurationStatus.Disabled;
                 }
@@ -365,7 +385,10 @@ namespace CK.DeviceModel
                     _isRunning = false;
                 }
             }
-            await _stateChanged.SafeRaiseAsync( monitor, this, new DeviceStatus( reason ) );
+            if( reason != DeviceStoppedReason.Destroyed )
+            {
+                await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
+            }
             return true;
         }
 

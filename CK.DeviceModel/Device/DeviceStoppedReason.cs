@@ -1,7 +1,7 @@
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Defines the reason why a device stopped.
+    /// Defines the reason why a device is stopped.
     /// </summary>
     public enum DeviceStoppedReason
     {
@@ -32,9 +32,9 @@ namespace CK.DeviceModel
         AutoStoppedForceCall,
 
         /// <summary>
-        /// The device has stopped because it will be destroyed.
+        /// The device has stopped because it has been destroyed.
         /// </summary>
-        StoppedBeforeDestroy
+        Destroyed
     }
 }
 

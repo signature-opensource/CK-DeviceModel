@@ -381,7 +381,7 @@ namespace CK.DeviceModel
             {
                 if( e.Device.IsRunning )
                 {
-                    await e.Device.HostStopAsync( monitor, DeviceStoppedReason.StoppedBeforeDestroy );
+                    await e.Device.HostStopAsync( monitor, DeviceStoppedReason.Destroyed );
                     Debug.Assert( !e.Device.IsRunning );
                 }
                 try
@@ -392,6 +392,7 @@ namespace CK.DeviceModel
                 {
                     monitor.Warn( $"'{e.Device.FullName}'.OnDestroyAsync error. This is ignored.", ex );
                 }
+                await e.Device.HostRaiseDestroyStatusAsync( monitor );
                 try
                 {
                     await OnDeviceDestroyedAsync( monitor, e.Device, e.Configuration );

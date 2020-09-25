@@ -5,8 +5,7 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Unifies lifetime status exposed of a <see cref="IDevice"/>: this captures
-    /// the last change that occurred.
+    /// Unifies <see cref="IDevice"/>'s lifetime status: this captures the last change that occurred.
     /// </summary>
     public readonly struct DeviceStatus
     {
@@ -33,6 +32,11 @@ namespace CK.DeviceModel
         public bool IsRunning { get; }
 
         /// <summary>
+        /// Gets whether the device has been destroyed.
+        /// </summary>
+        public bool IsDestroyed => IsStopped && StoppedReason == DeviceStoppedReason.Destroyed;
+
+        /// <summary>
         /// Gets the <see cref="DeviceReconfiguredResult"/> if <see cref="IsReconfigured"/> is true (<see cref="DeviceReconfiguredResult.None"/> otherwise).
         /// </summary>
         public DeviceReconfiguredResult ReconfiguredResult => IsReconfigured ? (DeviceReconfiguredResult)_status : DeviceReconfiguredResult.None;
@@ -48,7 +52,7 @@ namespace CK.DeviceModel
         public DeviceStoppedReason StoppedReason => IsStopped ? (DeviceStoppedReason)_status : DeviceStoppedReason.None;
 
         /// <summary>
-        /// Returns "Running" or "Stopped" followed by the appropriate enum string in parentheses.
+        /// Returns "Running" or "Stopped" followed by the appropriate enum reason string inside parentheses.
         /// </summary>
         /// <returns>A readable string.</returns>
         public override string ToString()
@@ -58,7 +62,7 @@ namespace CK.DeviceModel
                         ? StartedReason.ToString()
                         : (IsStopped
                             ? StoppedReason.ToString()
-                            : ReconfiguredResult.ToString()));
+                            : ReconfiguredResult.ToString())) + ")";
         }
 
         internal DeviceStatus( DeviceReconfiguredResult r, bool isRunning )

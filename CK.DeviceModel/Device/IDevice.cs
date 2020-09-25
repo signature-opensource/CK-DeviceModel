@@ -3,6 +3,7 @@ using CK.PerfectEvent;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
@@ -45,11 +46,12 @@ namespace CK.DeviceModel
         public DeviceStatus Status { get; }
 
         /// <summary>
-        /// Raised whenever a reconfiguration, a start or a stop happens.
-        /// When handling such event, no call should be made to this device since the async
-        /// lock is already held (and reentrancy is forbidden in such transitions).
+        /// Raised whenever a reconfiguration, a start or a stop happens: either the <see cref="IDevice.ConfigurationStatus"/>
+        /// or <see cref="IDevice.Status"/> has changed.
+        /// Reentrancy is forbidden: while handling this event, calling <see cref="StopAsync"/>, <see cref="StartAsync"/> or <see cref="IDeviceHost.ApplyConfigurationAsync"/>
+        /// will throw a <see cref="LockRecursionException"/>.
         /// </summary>
-        PerfectEvent<IDevice, DeviceStatus> StatusChanged { get; }
+        PerfectEvent<IDevice> StatusChanged { get; }
 
         /// <summary>
         /// Gets the current configuration status of this device.
