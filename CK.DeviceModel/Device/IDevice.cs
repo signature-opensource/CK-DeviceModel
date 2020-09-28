@@ -78,6 +78,8 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets the current controller key.
+        /// When null, <see cref="HandleCommand(IActivityMonitor, SyncDeviceCommand)"/> and <see cref="HandleCommandAsync(IActivityMonitor, AsyncDeviceCommand)"/>
+        /// don't filter the commands: <see cref="DeviceCommand.ControllerKey"/> can be anything.
         /// </summary>
         string? ControllerKey { get; }
 

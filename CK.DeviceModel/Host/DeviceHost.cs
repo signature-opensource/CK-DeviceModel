@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.DeviceModel.Command;
 using CK.PerfectEvent;
 using CK.Text;
 using System;
@@ -526,8 +527,11 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
+            if( !commmand.HostType.IsAssignableFrom( GetType() ) ) return Task.FromResult( false );
+            Debug.Assert( commmand.GetType().IsGenericType, "Thaks to the private protected constructors, only AsyncDeviceCommand{THost} can exist." );
+
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
 
             var d = commmand.DeviceName != null ? Find( commmand.DeviceName ) : null;
             if( d == null )
@@ -535,14 +539,26 @@ namespace CK.DeviceModel
                 monitor.Warn( $"Device named '{commmand.DeviceName}' not found in '{DeviceHostName}' host." );
                 return Task.FromResult( false );
             }
+            if( commmand is IBasicCommand b )
+            {
+                switch( b.Operation )
+                {
+                    case BasicControlDeviceOperation.Start: return d.StartAsync( monitor );
+                    case BasicControlDeviceOperation.Stop: return d.StopAsync( monitor );
+                    case BasicControlDeviceOperation.ResetControllerKey: return d.SetControllerKeyAsync( monitor, commmand.ControllerKey );
+                    default: throw new ArgumentOutOfRangeException( nameof( IBasicCommand.Operation ) );
+                }
+            }
             return d.InternalHandleCommandAsync( monitor, commmand );
         }
 
         /// <inheritdoc />
         public bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
+            if( !commmand.HostType.IsAssignableFrom( GetType() ) ) return false;
+            
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
 
             var d = commmand.DeviceName != null ? Find( commmand.DeviceName ) : null;
             if( d == null )

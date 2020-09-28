@@ -2,7 +2,6 @@ using NUnit.Framework;
 using FluentAssertions;
 using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
 using static CK.Testing.MonitorTestHelper;
@@ -14,72 +13,6 @@ namespace CK.DeviceModel.Tests
     [TestFixture]
     public class DeviceHostTests
     {
-
-        public class CameraConfiguration : DeviceConfiguration
-        {
-            public CameraConfiguration()
-            {
-            }
-
-            public CameraConfiguration( CameraConfiguration o )
-                : base( o )
-            {
-                Something = o.Something;
-            }
-
-            /// <summary>
-            /// Used as a key to detect "equality".
-            /// </summary>
-            public int Something { get; set; }
-        }
-
-        public class Camera : Device<CameraConfiguration>
-        {
-            public static int TotalCount;
-            public static int TotalRunning;
-
-            // A device can keep a reference to the current configuration:
-            // this configuration is an independent clone that is accessible only to the Device.
-            CameraConfiguration _configRef;
-
-            public Camera( IActivityMonitor monitor, CameraConfiguration config )
-                : base( monitor, config )
-            {
-                Interlocked.Increment( ref TotalCount );
-                _configRef = config;
-            }
-
-            public Task TestAutoDestroy( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
-            
-            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config, bool controllerKeyChanged )
-            {
-                bool configHasChanged = config.Something != _configRef.Something;
-                _configRef = config;
-                return Task.FromResult( configHasChanged ? DeviceReconfiguredResult.UpdateSucceeded : DeviceReconfiguredResult.None );
-            }
-
-            protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
-            {
-                Interlocked.Increment( ref TotalRunning );
-                return Task.FromResult( true );
-            }
-
-            protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
-            {
-                Interlocked.Decrement( ref TotalRunning );
-                return Task.CompletedTask;
-            }
-
-            protected override Task DoDestroyAsync( IActivityMonitor monitor )
-            {
-                Interlocked.Decrement( ref TotalCount );
-                return Task.CompletedTask;
-            }
-        }
-
-        public class CameraHost : DeviceHost<Camera,DeviceHostConfiguration<CameraConfiguration>,CameraConfiguration>
-        {
-        }
 
         [Test]
         public async Task playing_with_configurations()
@@ -224,7 +157,7 @@ namespace CK.DeviceModel.Tests
             lastSyncEvent.Should().BeNull( "None doesn't raise." );
             lastAsyncEvent.Should().BeNull();
 
-            config.Something = 1;
+            config.FlashColor = 1;
 
             result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             result.Success.Should().BeTrue();
