@@ -572,14 +572,14 @@ namespace CK.DeviceModel
                 monitor.Warn( $"Device named '{commmand.DeviceName}' not found in '{DeviceHostName}' host." );
                 return Task.FromResult( false );
             }
-            if( commmand is IBasicCommand b )
+            if( commmand is BasicControlDeviceCommand b )
             {
                 switch( b.Operation )
                 {
                     case BasicControlDeviceOperation.Start: return d.StartAsync( monitor );
                     case BasicControlDeviceOperation.Stop: return d.StopAsync( monitor );
                     case BasicControlDeviceOperation.ResetControllerKey: return d.SetControllerKeyAsync( monitor, commmand.ControllerKey );
-                    default: throw new ArgumentOutOfRangeException( nameof( IBasicCommand.Operation ) );
+                    default: throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) );
                 }
             }
             return d.InternalHandleCommandAsync( monitor, commmand );
