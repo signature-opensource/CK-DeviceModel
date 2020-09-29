@@ -1,55 +1,59 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Unifies <see cref="IDevice"/>'s lifetime status: this captures the last change that occurred.
+    /// Unifies <see cref="IDevice"/>'s lifetime status: this captures the last change that occurred
+    /// and whether it is currently <see cref="IsRunning"/> or <see cref="IsDestroyed"/>.
     /// </summary>
     public readonly struct DeviceStatus
     {
         readonly int _status;
+        readonly byte _last;
+        readonly bool _running;
 
         /// <summary>
         /// Gets whether the device has started.
         /// </summary>
-        public bool IsStarted { get; }
+        public bool HasStarted => _last == 1;
 
         /// <summary>
         /// Gets whether the device has stopped.
         /// </summary>
-        public bool IsStopped { get; }
+        public bool HasStopped => _last == 2;
 
         /// <summary>
         /// Gets whether the device has been reconfigured.
         /// </summary>
-        public bool IsReconfigured { get; }
+        public bool HasBeenReconfigured => _last == 3;
 
         /// <summary>
         /// Gets whether the device is currently running.
         /// </summary>
-        public bool IsRunning { get; }
+        public bool IsRunning => _running;
 
         /// <summary>
         /// Gets whether the device has been destroyed.
         /// </summary>
-        public bool IsDestroyed => IsStopped && StoppedReason == DeviceStoppedReason.Destroyed;
+        public bool IsDestroyed => HasStopped && StoppedReason == DeviceStoppedReason.Destroyed;
 
         /// <summary>
-        /// Gets the <see cref="DeviceReconfiguredResult"/> if <see cref="IsReconfigured"/> is true (<see cref="DeviceReconfiguredResult.None"/> otherwise).
+        /// Gets the <see cref="DeviceReconfiguredResult"/> if <see cref="HasBeenReconfigured"/> is true (<see cref="DeviceReconfiguredResult.None"/> otherwise).
         /// </summary>
-        public DeviceReconfiguredResult ReconfiguredResult => IsReconfigured ? (DeviceReconfiguredResult)_status : DeviceReconfiguredResult.None;
+        public DeviceReconfiguredResult ReconfiguredResult => HasBeenReconfigured ? (DeviceReconfiguredResult)_status : DeviceReconfiguredResult.None;
 
         /// <summary>
-        /// Gets the <see cref="DeviceStartedReason"/> if <see cref="IsStarted"/> is true (<see cref="DeviceStartedReason.None"/> otherwise).
+        /// Gets the <see cref="DeviceStartedReason"/> if <see cref="HasStarted"/> is true (<see cref="DeviceStartedReason.None"/> otherwise).
         /// </summary>
-        public DeviceStartedReason StartedReason => IsStarted ? (DeviceStartedReason)_status : DeviceStartedReason.None;
+        public DeviceStartedReason StartedReason => HasStarted ? (DeviceStartedReason)_status : DeviceStartedReason.None;
 
         /// <summary>
-        /// Gets the <see cref="DeviceStoppedReason"/> if <see cref="IsStopped"/> is true (<see cref="DeviceStoppedReason.None"/> otherwise).
+        /// Gets the <see cref="DeviceStoppedReason"/> if <see cref="HasStopped"/> is true (<see cref="DeviceStoppedReason.None"/> otherwise).
         /// </summary>
-        public DeviceStoppedReason StoppedReason => IsStopped ? (DeviceStoppedReason)_status : DeviceStoppedReason.None;
+        public DeviceStoppedReason StoppedReason => HasStopped ? (DeviceStoppedReason)_status : DeviceStoppedReason.None;
 
         /// <summary>
         /// Returns "Running" or "Stopped" followed by the appropriate enum reason string inside parentheses.
@@ -58,9 +62,9 @@ namespace CK.DeviceModel
         public override string ToString()
         {
             return (IsRunning ? "Running (" : "Stopped (" )
-                    + (IsStarted
+                    + (HasStarted
                         ? StartedReason.ToString()
-                        : (IsStopped
+                        : (HasStopped
                             ? StoppedReason.ToString()
                             : ReconfiguredResult.ToString())) + ")";
         }
@@ -68,28 +72,25 @@ namespace CK.DeviceModel
         internal DeviceStatus( DeviceReconfiguredResult r, bool isRunning )
         {
             _status = (int)r;
-            IsReconfigured = true;
-            IsStarted = false;
-            IsStopped = false;
-            IsRunning = isRunning;
+            _last = 3;
+            _running = isRunning;
+            Debug.Assert( !HasStarted && !HasStopped && HasBeenReconfigured );
         }
 
         internal DeviceStatus( DeviceStartedReason r )
         {
             _status = (int)r;
-            IsReconfigured = false;
-            IsStarted = true;
-            IsStopped = false;
-            IsRunning = true;
+            _last = 1;
+            _running = true;
+            Debug.Assert( HasStarted && !HasStopped && !HasBeenReconfigured );
         }
 
         internal DeviceStatus( DeviceStoppedReason r )
         {
             _status = (int)r;
-            IsReconfigured = false;
-            IsStarted = false;
-            IsStopped = true;
-            IsRunning = false;
+            _last = 2;
+            _running = false;
+            Debug.Assert( !HasStarted && HasStopped && !HasBeenReconfigured );
         }
 
     }

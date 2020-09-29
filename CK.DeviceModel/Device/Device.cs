@@ -184,18 +184,21 @@ namespace CK.DeviceModel
         {
             Debug.Assert( config.Name == Name );
 
-            bool configStatusChanged = false;
+            bool specialCaseOfDisabled = false;
+            bool configStatusChanged = _configStatus != config.Status;
             if( _isRunning && config.Status == DeviceConfigurationStatus.Disabled )
             {
                 // The _configStatus is set to DeviceConfigurationStatus.Disabled by HostStopAsync that also 
-                // raised the StatusChanged: if the update of the configuration decided that nothing has changed,
-                // we have no more event to raise.
+                // raised the StatusChanged: if the nothing else has changed, we have no more event to raise.
+                // However we want the returned DeviceApplyConfigurationResult to the caller to not be "None"!
+                // This is why this awful specialCaseOfDisabled is here: to ultimately correct the returned result.
                 await HostStopAsync( monitor, DeviceStoppedReason.StoppedByDisabledConfiguration );
                 Debug.Assert( _isRunning == false, "DoStop DOES stop." );
+                configStatusChanged = false;
+                specialCaseOfDisabled = true;
             }
             else
             {
-                configStatusChanged = _configStatus != config.Status;
                 _configStatus = config.Status;
             }
             _controllerKeyFromConfiguration = config.ControllerKey != null;
@@ -208,7 +211,11 @@ namespace CK.DeviceModel
             DeviceReconfiguredResult reconfigResult;
             try
             {
-                reconfigResult = await DoReconfigureAsync( monitor, config, controllerKeyChanged );
+                reconfigResult = await DoReconfigureAsync( monitor, config );
+                if( reconfigResult == DeviceReconfiguredResult.None && (configStatusChanged || controllerKeyChanged) )
+                {
+                    reconfigResult = DeviceReconfiguredResult.UpdateSucceeded;
+                }
             }
             catch( Exception ex )
             {
@@ -217,7 +224,6 @@ namespace CK.DeviceModel
             }
 
             bool shouldEmitDeviceStatusChanged = reconfigResult != DeviceReconfiguredResult.None;
-
             if( shouldEmitDeviceStatusChanged )
             {
                 // Don't emit the change of status right now.
@@ -237,13 +243,17 @@ namespace CK.DeviceModel
                 else
                 {
                     Debug.Assert( _isRunning );
-                    // A StatusChanged has been emitted.
-                    shouldEmitDeviceStatusChanged = configStatusChanged = false;
+                    // A StatusChanged has been emitted by HostStartAsync.
+                    shouldEmitDeviceStatusChanged = false;
                 }
             }
-            if( shouldEmitDeviceStatusChanged || configStatusChanged )
+            if( shouldEmitDeviceStatusChanged )
             {
                 await _statusChanged.SafeRaiseAsync( monitor, this );
+            }
+            if( specialCaseOfDisabled && applyResult == DeviceApplyConfigurationResult.None )
+            {
+                applyResult = DeviceApplyConfigurationResult.UpdateSucceeded;
             }
             if( controllerKeyChanged )
             {
@@ -263,12 +273,8 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="config">The configuration to apply.</param>
-        /// <param name="controllerKeyChanged">
-        /// Whether the <see cref="TConfiguration.ControllerKey"/> is not null and different from the previous <see cref="ControllerKey"/>: the latter
-        /// has been updated to the new configured value.
-        /// </param>
         /// <returns>The reconfiguration result.</returns>
-        protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config, bool controllerKeyChanged );
+        protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
 
         /// <inheritdoc />
         public Task<bool> StartAsync( IActivityMonitor monitor )

@@ -41,7 +41,7 @@ namespace CK.DeviceModel.Configuration.Tests
                 Interlocked.Increment( ref TotalCount );
             }
 
-            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config, bool controllerKeyChanged )
+            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
             {
                 return Task.FromResult( DeviceReconfiguredResult.UpdateSucceeded );
             }
@@ -98,7 +98,7 @@ namespace CK.DeviceModel.Configuration.Tests
                 Interlocked.Increment( ref TotalCount );
             }
 
-            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, LightControllerConfiguration config, bool controllerKeyChanged )
+            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, LightControllerConfiguration config )
             {
                 return Task.FromResult( DeviceReconfiguredResult.UpdateSucceeded );
             }

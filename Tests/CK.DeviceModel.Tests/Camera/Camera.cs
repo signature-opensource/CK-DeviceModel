@@ -27,7 +27,7 @@ namespace CK.DeviceModel.Tests
 
         public Task TestAutoDestroy( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
 
-        protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config, bool controllerKeyChanged )
+        protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
         {
             bool configHasChanged = config.FlashColor != _configRef.FlashColor;
             _configRef = config;

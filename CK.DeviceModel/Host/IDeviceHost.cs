@@ -53,6 +53,22 @@ namespace CK.DeviceModel
         Task<bool> ApplyConfigurationAsync( IActivityMonitor monitor, IDeviceHostConfiguration configuration, bool allowEmptyConfiguration = false );
 
         /// <summary>
+        /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is configured by the provided <paramref name="configuration"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="configuration">The configuration to apply.</param>
+        /// <returns>the result of the device configuration.</returns>
+        Task<DeviceApplyConfigurationResult> ApplyDeviceConfigurationAsync( IActivityMonitor monitor, DeviceConfiguration configuration );
+
+        /// <summary>
+        /// Attempts to destroy a device.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="deviceName">The device name.</param>
+        /// <returns>The awaitable.</returns>
+        Task DestroyDeviceAsync( IActivityMonitor monitor, string deviceName );
+
+        /// <summary>
         /// Handles <see cref="AsyncDeviceCommand"/> objects that will be routed to the device named <see cref="AsyncDeviceCommand.DeviceName"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -92,11 +108,10 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets a <see cref="PerfectEvent{TSender, TArg}"/> that is raised whenever the device list has changed
-        /// or any device's configuration has changed (<see cref="Device{TConfiguration}.DoReconfigureAsync(IActivityMonitor, TConfiguration)"/> returned
-        /// another result than <see cref="DeviceReconfiguredResult.None"/>).
+        /// or any device's configuration has changed.
         /// This event is not raised when devices are started or stopped or when their <see cref="IDevice.ControllerKey"/> changed.
         /// </summary>
-        PerfectEvent<IDeviceHost, EventArgs> DevicesChanged { get; }
+        PerfectEvent<IDeviceHost> DevicesChanged { get; }
 
     }
 }

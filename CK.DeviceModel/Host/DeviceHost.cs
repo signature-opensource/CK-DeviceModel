@@ -6,7 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,9 +27,9 @@ namespace CK.DeviceModel
         where TConfiguration : DeviceConfiguration
     {
         readonly AsyncLock _lock;
-        readonly PerfectEventSender<IDeviceHost, EventArgs> _devicesChanged;
-        // Used to apply single configuration: the instance is cached (stupid lazy).
-        THostConfiguration? _hostConfigCached;
+        readonly PerfectEventSender<IDeviceHost> _devicesChanged;
+        // Compile cached lambda.
+        Func<THostConfiguration> _hostConfigFactory;
 
         // This is the whole state of this Host. It is updated atomically (by setting a
         // new dictionary instance).
@@ -38,10 +40,9 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="deviceHostName">A name that SHOULD identify this host instance unabiguously in a running context.</param>
         protected DeviceHost( string deviceHostName )
+            : this( true )
         {
             if( String.IsNullOrWhiteSpace( deviceHostName ) ) throw new ArgumentException( nameof( deviceHostName ) );
-            _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
-            _devicesChanged = new PerfectEventSender<IDeviceHost, EventArgs>();
             _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, deviceHostName );
         }
 
@@ -49,10 +50,24 @@ namespace CK.DeviceModel
         /// Initializes a new host with a <see cref="DeviceHostName"/> sets to its type name.
         /// </summary>
         protected DeviceHost()
+            : this( true )
+        {
+            _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
+        }
+
+        DeviceHost( bool privateCall )
         {
             _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
-            _devicesChanged = new PerfectEventSender<IDeviceHost, EventArgs>();
-            _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
+            _devicesChanged = new PerfectEventSender<IDeviceHost>();
+
+            var t = typeof( THostConfiguration );
+            var ctor = t.GetConstructor( Type.EmptyTypes );
+            if( ctor == null ) throw new InvalidOperationException( $"Type '{t.Name}' must have a default public constructor." );
+            var m = new DynamicMethod( "CreateInstance", t, Type.EmptyTypes, true );
+            ILGenerator ilGenerator = m.GetILGenerator();
+            ilGenerator.Emit( OpCodes.Newobj, ctor );
+            ilGenerator.Emit( OpCodes.Ret );
+            _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
         }
 
         /// <inheritdoc />
@@ -107,7 +122,7 @@ namespace CK.DeviceModel
         IReadOnlyList<DeviceConfiguration> IDeviceHost.DeviceConfigurations => _devices.Values.Select( c => c.Configuration ).ToArray();
 
         /// <inheritdoc />
-        public PerfectEvent<IDeviceHost, EventArgs> DevicesChanged => _devicesChanged.PerfectEvent;
+        public PerfectEvent<IDeviceHost> DevicesChanged => _devicesChanged.PerfectEvent;
 
         /// <summary>
         /// Captures the result of <see cref="ApplyConfigurationAsync"/>.
@@ -167,12 +182,10 @@ namespace CK.DeviceModel
             public IReadOnlyCollection<string> UnconfiguredDeviceNames => _unconfiguredDeviceNames ?? Array.Empty<string>();
         }
 
-        async Task<bool> IDeviceHost.ApplyConfigurationAsync( IActivityMonitor monitor, IDeviceHostConfiguration configuration, bool allowEmptyConfiguration )
+        Task<DeviceApplyConfigurationResult> IDeviceHost.ApplyDeviceConfigurationAsync( IActivityMonitor monitor, DeviceConfiguration configuration )
         {
-            var r = await ApplyConfigurationAsync( monitor, (THostConfiguration)configuration, allowEmptyConfiguration ).ConfigureAwait( false );
-            return r.Success;
+            return ApplyDeviceConfigurationAsync( monitor, (TConfiguration)configuration );
         }
-
 
         /// <summary>
         /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is configured by the provided <paramref name="configuration"/>.
@@ -184,27 +197,16 @@ namespace CK.DeviceModel
         {
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
 
-            THostConfiguration hostConfig = GetEmptyHostConfiguration();
+            THostConfiguration hostConfig = _hostConfigFactory();
             hostConfig.Items.Add( configuration );
             var result = await ApplyConfigurationAsync( monitor, hostConfig );
             return result.Results[0];
         }
 
-        THostConfiguration GetEmptyHostConfiguration()
+        async Task<bool> IDeviceHost.ApplyConfigurationAsync( IActivityMonitor monitor, IDeviceHostConfiguration configuration, bool allowEmptyConfiguration )
         {
-            // No synchronization, instantiating more than one instance is harmless.
-            if( _hostConfigCached == null )
-            {
-                var t = typeof( THostConfiguration );
-                var ctor = t.GetConstructor( Type.EmptyTypes );
-                if( ctor == null ) throw new InvalidOperationException( $"Type '{t.Name}' must have a default public constructor." );
-                var c = (THostConfiguration)ctor.Invoke( Array.Empty<object>() );
-                // Security for specializations.
-                c.Items.Clear();
-                c.IsPartialConfiguration = true;
-                _hostConfigCached = c;
-            }
-            return _hostConfigCached;
+            var r = await ApplyConfigurationAsync( monitor, (THostConfiguration)configuration, allowEmptyConfiguration ).ConfigureAwait( false );
+            return r.Success;
         }
 
         /// <summary>
@@ -241,7 +243,7 @@ namespace CK.DeviceModel
                     // Safe call to OnBeforeApplyConfigurationAsync.
                     try
                     {
-                        if( !await OnBeforeApplyConfigurationAsync( monitor, newDevices, safeConfig ) )
+                        if( !await OnBeforeApplyConfigurationAsync( monitor, newDevices, safeConfig ).ConfigureAwait( false ) )
                         {
                             monitor.Debug( $"OnBeforeApplyConfigurationAsync returned false: aborting configuration." );
                             return new ConfigurationResult( configuration );
@@ -283,7 +285,7 @@ namespace CK.DeviceModel
                                         monitor.Trace( $"Starting device because Status is {c.Status}." );
                                         if( !await d.HostStartAsync( monitor, c.Status == DeviceConfigurationStatus.RunnableStarted
                                                                                 ? DeviceStartedReason.StartedByRunnableStartedConfiguration
-                                                                                : DeviceStartedReason.StartedByAlwaysRunningConfiguration ) )
+                                                                                : DeviceStartedReason.StartedByAlwaysRunningConfiguration ).ConfigureAwait( false ) )
                                         {
                                             r = DeviceApplyConfigurationResult.CreateSucceededButStartFailed;
                                             success = false;
@@ -301,16 +303,17 @@ namespace CK.DeviceModel
                             using( monitor.OpenTrace( $"Reconfiguring device '{c.Name}'." ) )
                             {
                                 currentDeviceNames.Remove( c.Name );
-                                Func<Task>? raisecontrollerKeyChanged;
-                                (r, raisecontrollerKeyChanged) = await configured.Device.HostReconfigureAsync( monitor, c ).ConfigureAwait( false );
-                                if( r == DeviceApplyConfigurationResult.None ) monitor.CloseGroup( raisecontrollerKeyChanged != null ? "No change (except ControllerKey)." : "No change." );
-                                else somethingChanged = true;
+                                Func<Task>? raiseControllerKeyChanged;
+                                (r, raiseControllerKeyChanged) = await configured.Device.HostReconfigureAsync( monitor, c ).ConfigureAwait( false );
+                                somethingChanged = r != DeviceApplyConfigurationResult.None;
                                 // Always updates the configuration.
                                 newDevices[c.Name] = new ConfiguredDevice<T, TConfiguration>( configured.Device, c );
-                                if( raisecontrollerKeyChanged != null )
+                                // Raising the ControllerKeyChanged is done outside of the lock. 
+                                if( raiseControllerKeyChanged != null )
                                 {
                                     if( postLockActions == null ) postLockActions = new List<Func<Task>>();
-                                    postLockActions.Add( raisecontrollerKeyChanged );
+                                    postLockActions.Add( raiseControllerKeyChanged );
+                                    Debug.Assert( r != DeviceApplyConfigurationResult.None );
                                 }
                             }
                             success &= (r == DeviceApplyConfigurationResult.UpdateSucceeded || r == DeviceApplyConfigurationResult.None);
@@ -330,7 +333,7 @@ namespace CK.DeviceModel
                             {
                                 var e = newDevices[noMore];
                                 newDevices.Remove( noMore );
-                                await DestroyDevice( monitor, e ).ConfigureAwait( false );
+                                await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
                                 somethingChanged = true;
                             }
                         }
@@ -345,12 +348,42 @@ namespace CK.DeviceModel
                     _lock.Leave( monitor );
                     if( somethingChanged )
                     {
-                        await _devicesChanged.SafeRaiseAsync( monitor, this, EventArgs.Empty );
+                        await _devicesChanged.SafeRaiseAsync( monitor, this ).ConfigureAwait( false );
                     }
                     if( postLockActions != null )
                     {
                         foreach( var a in postLockActions ) await a();
                     }
+                }
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task DestroyDeviceAsync( IActivityMonitor monitor, string deviceName )
+        {
+            // The Changed event is raised outside of the lock.
+            bool somethingChanged = false;
+            await _lock.EnterAsync( monitor );
+            try
+            {
+                if( _devices.TryGetValue( deviceName, out var e ) )
+                {
+                    using( monitor.OpenInfo( $"Destroying {deviceName} device." ) )
+                    {
+                        var newDevices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
+                        newDevices.Remove( e.Device.Name );
+                        await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
+                        somethingChanged = true;
+                        _devices = newDevices;
+                    }
+                }
+            }
+            finally
+            {
+                _lock.Leave( monitor );
+                if( somethingChanged )
+                {
+                    await _devicesChanged.SafeRaiseAsync( monitor, this ).ConfigureAwait( false );
                 }
             }
         }
@@ -365,7 +398,7 @@ namespace CK.DeviceModel
                 {
                     foreach( var e in _devices.Values )
                     {
-                        await DestroyDevice( monitor, e );
+                        await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
                     }
                     _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
                 }
@@ -376,27 +409,27 @@ namespace CK.DeviceModel
             }
         }
 
-        async Task DestroyDevice( IActivityMonitor monitor, ConfiguredDevice<T,TConfiguration> e )
+        async Task DestroyDeviceAsync( IActivityMonitor monitor, ConfiguredDevice<T,TConfiguration> e )
         {
             using( monitor.OpenInfo( $"Destroying device '{e.Device.FullName}'." ) )
             {
                 if( e.Device.IsRunning )
                 {
-                    await e.Device.HostStopAsync( monitor, DeviceStoppedReason.Destroyed );
+                    await e.Device.HostStopAsync( monitor, DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
                     Debug.Assert( !e.Device.IsRunning );
                 }
                 try
                 {
-                    await e.Device.HostDestroyAsync( monitor );
+                    await e.Device.HostDestroyAsync( monitor ).ConfigureAwait( false );
                 }
                 catch( Exception ex )
                 {
                     monitor.Warn( $"'{e.Device.FullName}'.OnDestroyAsync error. This is ignored.", ex );
                 }
-                await e.Device.HostRaiseDestroyStatusAsync( monitor );
+                await e.Device.HostRaiseDestroyStatusAsync( monitor ).ConfigureAwait( false );
                 try
                 {
-                    await OnDeviceDestroyedAsync( monitor, e.Device, e.Configuration );
+                    await OnDeviceDestroyedAsync( monitor, e.Device, e.Configuration ).ConfigureAwait( false );
                 }
                 catch( Exception ex )
                 {
@@ -603,7 +636,7 @@ namespace CK.DeviceModel
                     case DeviceAction.AutoDestroy:
                         {
                             var newDevices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
-                            await DestroyDevice( monitor, e );
+                            await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
                             newDevices.Remove( d.Name );
                             success = raiseChanged = true;
                             _devices = newDevices;
@@ -614,7 +647,7 @@ namespace CK.DeviceModel
                 _lock.Leave( monitor );
                 if( raiseChanged )
                 {
-                    await _devicesChanged.SafeRaiseAsync( monitor, this, EventArgs.Empty );
+                    await _devicesChanged.SafeRaiseAsync( monitor, this );
                 }
 
             }
