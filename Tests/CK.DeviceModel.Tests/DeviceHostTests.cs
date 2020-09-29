@@ -283,5 +283,59 @@ namespace CK.DeviceModel.Tests
             host.Awaiting( h => h.DestroyDeviceAsync( TestHelper.Monitor, "n°1" ) ).Should().NotThrow();
 
         }
+
+        [Test]
+        public async Task executing_commands_without_ControllerKey()
+        {
+            Camera.TotalCount.Should().Be( 0 );
+            Camera.TotalRunning.Should().Be( 0 );
+
+            var host = new CameraHost();
+            var config = new CameraConfiguration()
+            {
+                Name = "n°1",
+                FlashColor = 78,
+                Status = DeviceConfigurationStatus.RunnableStarted
+            };
+            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+
+            var d = host.Find( "n°1" );
+            Debug.Assert( d != null );
+
+            int flashLastColor = 0;
+            d.Flash.Sync += (m,c,color) => flashLastColor = color;
+
+            var cmdAsync = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
+            var execA = host.Handle( TestHelper.Monitor, cmdAsync );
+            execA.Success.Should().BeTrue();
+            execA.IsAsync.Should().BeTrue();
+            execA.Invoking( x => x.Execute( TestHelper.Monitor ) ).Should().Throw<InvalidCastException>();
+            execA.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().NotThrow();
+
+            flashLastColor.Should().Be( 78 );
+
+            var cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 }; ;
+            var execS = host.Handle( TestHelper.Monitor, cmdS );
+            execS.Success.Should().BeTrue();
+            execS.IsAsync.Should().BeFalse();
+            execS.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().Throw<InvalidCastException>();
+            execS.Invoking( x => x.Execute( TestHelper.Monitor ) ).Should().NotThrow();
+
+            flashLastColor.Should().Be( 78 );
+            execA.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().NotThrow();
+            flashLastColor.Should().Be( 3712 );
+
+            cmdS.DeviceName = "Not the 1";
+            execS = host.Handle( TestHelper.Monitor, cmdS );
+            execS.Success.Should().BeFalse();
+            execS.IsAsync.Should().BeNull();
+
+            await host.DestroyDeviceAsync( TestHelper.Monitor, "n°1" );
+
+            Camera.TotalCount.Should().Be( 0 );
+            Camera.TotalRunning.Should().Be( 0 );
+
+        }
+
     }
 }

@@ -69,22 +69,6 @@ namespace CK.DeviceModel
         Task DestroyDeviceAsync( IActivityMonitor monitor, string deviceName );
 
         /// <summary>
-        /// Handles <see cref="AsyncDeviceCommand"/> objects that will be routed to the device named <see cref="AsyncDeviceCommand.DeviceName"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="commmand">The command to execute.</param>
-        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
-        Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand );
-
-        /// <summary>
-        /// Handles <see cref="SyncDeviceCommand"/> objects that will be routed to the device named <see cref="SyncDeviceCommand.DeviceName"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="commmand">The command to execute.</param>
-        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
-        bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand );
-
-        /// <summary>
         /// Gets a device by its name.
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
@@ -112,6 +96,20 @@ namespace CK.DeviceModel
         /// This event is not raised when devices are started or stopped or when their <see cref="IDevice.ControllerKey"/> changed.
         /// </summary>
         PerfectEvent<IDeviceHost> DevicesChanged { get; }
+
+        /// <summary>
+        /// Determines whether the <see cref="DeviceCommand.HostType"/> is compatible with the actual type of this host,
+        /// finds the target device based on <see cref="DeviceCommand.DeviceName"/> and checks the <see cref="DeviceCommand.ControllerKey"/>
+        /// against the <see cref="IDevice.ControllerKey"/>.
+        /// <para>
+        /// When <see cref="RoutedDeviceCommand.Success"/> is true, the command can be executed synchronously or asynchronously by
+        /// the <see cref="RoutedDeviceCommand"/>.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to route.</param>
+        /// <returns>The routing result.</returns>
+        RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command );
 
     }
 }

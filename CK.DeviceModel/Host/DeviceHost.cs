@@ -557,49 +557,28 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device, TConfiguration configuration ) => Task.CompletedTask;
 
-        /// <inheritdoc />
-        public Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand )
+        public RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command )
         {
-            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
-            if( !commmand.HostType.IsAssignableFrom( GetType() ) ) return Task.FromResult( false );
-            Debug.Assert( commmand.GetType().IsGenericType, "Thaks to the private protected constructors, only AsyncDeviceCommand{THost} can exist." );
-
+            if( command == null ) throw new ArgumentNullException( nameof( command ) );
+            if( !command.HostType.IsAssignableFrom( GetType() ) ) return default;
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
 
-            var d = commmand.DeviceName != null ? Find( commmand.DeviceName ) : null;
+            var d = command.DeviceName != null ? Find( command.DeviceName ) : null;
             if( d == null )
             {
-                monitor.Warn( $"Device named '{commmand.DeviceName}' not found in '{DeviceHostName}' host." );
-                return Task.FromResult( false );
+                monitor.Warn( $"Device named '{command.DeviceName}' not found in '{DeviceHostName}' host." );
+                return default;
             }
-            if( commmand is BasicControlDeviceCommand b )
+            if( !(command is BasicControlDeviceCommand b) || b.Operation != BasicControlDeviceOperation.ResetControllerKey )
             {
-                switch( b.Operation )
+                var key = d.ControllerKey;
+                if( key != null && command.ControllerKey != key )
                 {
-                    case BasicControlDeviceOperation.Start: return d.StartAsync( monitor );
-                    case BasicControlDeviceOperation.Stop: return d.StopAsync( monitor );
-                    case BasicControlDeviceOperation.ResetControllerKey: return d.SetControllerKeyAsync( monitor, commmand.ControllerKey );
-                    default: throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) );
+                    monitor.Warn( $"Command skipped by {d.FullName}: Expected ControllerKey is '{command.ControllerKey}' but current one is '{key}'." );
+                    return default;
                 }
             }
-            return d.InternalHandleCommandAsync( monitor, commmand );
-        }
-
-        /// <inheritdoc />
-        public bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand )
-        {
-            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
-            if( !commmand.HostType.IsAssignableFrom( GetType() ) ) return false;
-            
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-
-            var d = commmand.DeviceName != null ? Find( commmand.DeviceName ) : null;
-            if( d == null )
-            {
-                monitor.Warn( $"Device named '{commmand.DeviceName}' not found in '{DeviceHostName}' host." );
-                return false;
-            }
-            return d.InternalHandleCommand( monitor, commmand );
+            return new RoutedDeviceCommand( command, d );
         }
 
         enum DeviceAction

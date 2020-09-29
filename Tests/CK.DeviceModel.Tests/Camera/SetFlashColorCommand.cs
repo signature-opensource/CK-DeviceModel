@@ -8,8 +8,8 @@ namespace CK.DeviceModel.Tests
     /// Here, recordinf command is synchronous.
     /// Being synchronous is possible as long as no event must be raised by the handling of the command.
     /// </summary>
-    public class RecordingCommand : SyncDeviceCommand<CameraHost>
+    public class SetFlashColorCommand : SyncDeviceCommand<CameraHost>
     {
-        public bool Record { get; set; }
+        public int Color { get; set; }
     }
 }

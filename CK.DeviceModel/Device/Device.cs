@@ -6,16 +6,16 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
+using CK.DeviceModel.Command;
 using CK.PerfectEvent;
 
 namespace CK.DeviceModel
 {
-
     /// <summary>
     /// Abstract base class for a device.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract partial class Device<TConfiguration> : IDevice where TConfiguration : DeviceConfiguration
+    public abstract class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration
     {
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
@@ -448,31 +448,27 @@ namespace CK.DeviceModel
             return _host?.AutoStopAsync( this, monitor, ignoreAlwaysRunning ) ?? Task.FromResult(true);
         }
 
-        #region Async command handling.
-        /// <inheritdoc />
-        public Task<bool> HandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand )
+        void IInternalDevice.Execute( IActivityMonitor monitor, SyncDeviceCommand c )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
-
-            if( commmand.DeviceName != Name )
-            {
-                monitor.Debug( $"Command skipped by {FullName}: target device name is '{commmand.DeviceName}'." );
-                return Task.FromResult( false );
-            }
-
-            return InternalHandleCommandAsync( monitor, commmand );
+            DoHandleCommand( monitor, c );
         }
 
-        internal Task<bool> InternalHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
+        Task IInternalDevice.ExecuteAsync( IActivityMonitor monitor, AsyncDeviceCommand c )
         {
-            var key = ControllerKey;
-            if( command.ControllerKey != null && command.ControllerKey != key )
+            if( c is BasicControlDeviceCommand b )
             {
-                monitor.Warn( $"Command skipped by {FullName}: Expected ControllerKey is '{command.ControllerKey}' but current one is '{key}'." );
-                return Task.FromResult( false );
+                switch( b.Operation )
+                {
+                    case BasicControlDeviceOperation.Start: return StartAsync( monitor );
+                    case BasicControlDeviceOperation.Stop: return StopAsync( monitor );
+                    case BasicControlDeviceOperation.ResetControllerKey: return SetControllerKeyAsync( monitor, b.ControllerKey );
+                    default: throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) );
+                }
             }
-            return DoHandleCommandAsync( monitor, command );
+            else
+            {
+                return DoHandleCommandAsync( monitor, c );
+            }
         }
 
         /// <summary>
@@ -481,42 +477,15 @@ namespace CK.DeviceModel
         /// is either null or match the current <see cref="ControllerKey"/>).
         /// </para>
         /// <para>
-        /// Returns false by default and must return false whenever the command has not been handled.
+        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="commmand">The command to handle.</param>
-        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
-        protected virtual Task<bool> DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand ) => Task.FromResult( false );
-
-        #endregion
-
-        #region Sync command handling.
-
-        /// <inheritdoc />
-        public bool HandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand )
+        /// <param name="command">The command to handle.</param>
+        /// <returns>The awaitable.</returns>
+        protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            if( commmand == null ) throw new ArgumentNullException( nameof( commmand ) );
-
-            if( commmand.DeviceName != Name )
-            {
-                monitor.Debug( $"Command skipped by {FullName}: target device name is '{commmand.DeviceName}'." );
-                return false;
-            }
-
-            return InternalHandleCommand( monitor, commmand );
-        }
-
-        internal bool InternalHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
-        {
-            var key = ControllerKey;
-            if( command.ControllerKey != null && command.ControllerKey != key )
-            {
-                monitor.Warn( $"Command skipped by {FullName}: Expected ControllerKey is '{command.ControllerKey}' but current one is '{key}'." );
-                return false;
-            }
-            return DoHandleCommand( monitor, command );
+            throw new ArgumentException( $"Unhandled asynchronous command {command.GetType().Name}.", nameof(command) );
         }
 
         /// <summary>
@@ -525,16 +494,15 @@ namespace CK.DeviceModel
         /// is either null or match the current <see cref="ControllerKey"/>).
         /// </para>
         /// <para>
-        /// Returns false by default and must return false whenever the command has not been handled.
+        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="commmand">The command to handle.</param>
-        /// <returns>True if the command has been handled, false if the command has been ignored by this handler.</returns>
-        protected virtual bool DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand commmand ) => false;
-
-        #endregion
-
+        /// <param name="command">The command to handle.</param>
+        protected virtual void DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
+        {
+            throw new ArgumentException( $"Unhandled synchronous command {command.GetType().Name}.", nameof( command ) );
+        }
 
         /// <summary>
         /// Overridden to return the <see cref="FullName"/>.

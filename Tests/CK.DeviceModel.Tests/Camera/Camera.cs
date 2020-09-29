@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
@@ -13,17 +14,17 @@ namespace CK.DeviceModel.Tests
         // A device can keep a reference to the current configuration:
         // this configuration is an independent clone that is accessible only to the Device.
         CameraConfiguration _configRef;
-        readonly PerfectEventSender<Camera> _flash;
+        readonly PerfectEventSender<Camera,int> _flash;
 
         public Camera( IActivityMonitor monitor, CameraConfiguration config )
             : base( monitor, config )
         {
             Interlocked.Increment( ref TotalCount );
             _configRef = config;
-            _flash = new PerfectEventSender<Camera>();
+            _flash = new PerfectEventSender<Camera,int>();
         }
 
-        public PerfectEvent<Camera> Flash => _flash.PerfectEvent;
+        public PerfectEvent<Camera,int> Flash => _flash.PerfectEvent;
 
         public Task TestAutoDestroy( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
 
@@ -46,13 +47,23 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override async Task<bool> DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand commmand )
+        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
         {
-            if( commmand is FlashCommand )
+            if( command is FlashCommand )
             {
-                await _flash.RaiseAsync( monitor, this );
+                return _flash.RaiseAsync( monitor, this, _configRef.FlashColor );
             }
-            return false;
+            return base.DoHandleCommandAsync( monitor, command );
+        }
+
+        protected override void DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
+        {
+            if( command is SetFlashColorCommand f )
+            {
+                _configRef.FlashColor = f.Color;
+                return;
+            }
+            base.DoHandleCommand( monitor, command );
         }
 
         protected override Task DoDestroyAsync( IActivityMonitor monitor )
