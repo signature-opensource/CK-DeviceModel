@@ -12,7 +12,7 @@ namespace CK.PerfectEvent
     /// Async event handler that can be combined into a <see cref="ParallelEventHandlerAsyncSender{TEvent}"/>.
     /// </summary>
     /// <typeparam name="TEvent">The type of the event.</typeparam>
-    /// <param name="token">The activity token to use in any other monitor.</param
+    /// <param name="token">The activity token to use in any other monitor.</param>
     /// <param name="e">The event argument.</param>
     public delegate Task ParallelEventHandlerAsync<TEvent>( ActivityMonitor.DependentToken token, TEvent e );
 
@@ -36,7 +36,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         public ParallelEventHandlerAsyncSender<TEvent> Add( ParallelEventHandlerAsync<TEvent> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
@@ -56,7 +56,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         public ParallelEventHandlerAsyncSender<TEvent> Remove( ParallelEventHandlerAsync<TEvent> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );

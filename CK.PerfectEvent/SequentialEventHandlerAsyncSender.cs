@@ -15,7 +15,7 @@ namespace CK.PerfectEvent
     public delegate Task SequentialEventHandlerAsync<TEvent>( IActivityMonitor monitor, TEvent e );
 
     /// <summary>
-    /// Implements a host for <see cref="EventHandlerAync"/> delegates.
+    /// Implements a host for <see cref="SequentialEventHandlerAsync{TEvent}"/> delegates.
     /// </summary>
     /// <remarks>
     /// This cannot be implemented as a struct because the <see cref="operator+"/> and <see cref="operator-"/> must
@@ -33,7 +33,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         public SequentialEventHandlerAsyncSender<TEvent> Add( SequentialEventHandlerAsync<TEvent> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
@@ -53,7 +53,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         public SequentialEventHandlerAsyncSender<TEvent> Remove( SequentialEventHandlerAsync<TEvent> handler )
         {
             Util.InterlockedSet( ref _handler, h =>

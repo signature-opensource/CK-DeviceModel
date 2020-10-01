@@ -19,7 +19,7 @@ namespace CK.PerfectEvent
     public delegate Task ParallelEventHandlerAsync<TSender, TArg>( ActivityMonitor.DependentToken token, TSender sender, TArg e );
 
     /// <summary>
-    /// Implements a host for <see cref="ParallelEventHandlerAync"/> delegates.
+    /// Implements a host for <see cref="ParallelEventHandlerAsync{TSender,TArg}"/> delegates.
     /// </summary>
     /// <remarks>
     /// This cannot be implemented as a struct because the <see cref="operator+"/> and <see cref="operator-"/> must
@@ -39,7 +39,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         public ParallelEventHandlerAsyncSender<TSender, TArg> Add( ParallelEventHandlerAsync<TSender, TArg> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
@@ -59,7 +59,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         public ParallelEventHandlerAsyncSender<TSender, TArg> Remove( ParallelEventHandlerAsync<TSender, TArg> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );

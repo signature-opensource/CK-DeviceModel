@@ -19,8 +19,8 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets or sets the target device name.
-        /// <see cref="IDevice.HandleCommand(Core.IActivityMonitor, SyncDeviceCommand)"/> and <see cref="IDevice.HandleCommandAsync(Core.IActivityMonitor, AsyncDeviceCommand)"/>
-        /// require this name to be the one of the device (see <see cref="IDevice.Name"/>) otherwise the command is ignored.
+        /// <see cref="IDeviceHost.Handle(Core.IActivityMonitor, DeviceCommand)"/> requires this name to be the one of the device (see <see cref="IDevice.Name"/>)
+        /// otherwise the command is ignored.
         /// <para>
         /// Note that when handling this command is submitted to <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>, this
         /// name must not be null nor empty (and, more generally, <see cref="CheckValidity(IActivityMonitor)"/> must return true).

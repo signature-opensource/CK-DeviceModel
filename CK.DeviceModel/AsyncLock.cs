@@ -65,7 +65,7 @@ namespace CK.Core
 
         /// <summary>
         /// Helper to support using statement.
-        /// <see cref="EnterAsync(IActivityMonitor)(IActivityMonitor)"/> this lock and returns an awaitable <see cref="IDisposable"/> that
+        /// <see cref="EnterAsync(IActivityMonitor)"/> this lock and returns an awaitable <see cref="IDisposable"/> that
         /// will <see cref="Leave(IActivityMonitor)"/> this lock.
         /// <para>
         /// This returns a ValueTask (that is not IDisposable): forgetting the await in the <c>using( await _lock.LockAsync() )</c> is not possible
@@ -232,7 +232,7 @@ namespace CK.Core
 
         /// <summary>
         /// Releases all resources used by this lock.
-        /// Simply calls <see cref="SemaphoreSlim.Dispose"/> that should be called once this lock
+        /// Simply calls <see cref="SemaphoreSlim.Dispose()"/> that should be called once this lock
         /// is not used anymore.
         /// </summary>
         public void Dispose() => _semaphore.Dispose();

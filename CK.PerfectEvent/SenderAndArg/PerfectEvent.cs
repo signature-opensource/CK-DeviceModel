@@ -68,7 +68,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         /// <returns>This PerfectEvent.</returns>
         public PerfectEvent<TSender, TArg> Add( SequentialEventHandler<TSender, TArg> handler )
         {
@@ -79,7 +79,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         /// <returns>This PerfectEvent.</returns>
         public PerfectEvent<TSender, TArg> Remove( SequentialEventHandler<TSender, TArg> handler )
         {
@@ -110,7 +110,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         /// <returns>This PerfectEvent.</returns>
         public PerfectEvent<TSender, TArg> Add( SequentialEventHandlerAsync<TSender, TArg> handler )
         {
@@ -121,7 +121,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         /// <returns>This PerfectEvent.</returns>
         public PerfectEvent<TSender, TArg> Remove( SequentialEventHandlerAsync<TSender, TArg> handler )
         {
@@ -130,7 +130,7 @@ namespace CK.PerfectEvent
         }
 
         /// <summary>
-        /// Relays to <see cref="Add"/>.
+        /// Relays to <see cref="Add(SequentialEventHandlerAsync{TSender,TArg})"/>.
         /// </summary>
         /// <param name="this">This PerfectEvent.</param>
         /// <param name="handler">The non null handler to add.</param>
@@ -138,7 +138,7 @@ namespace CK.PerfectEvent
         public static PerfectEvent<TSender, TArg> operator +( PerfectEvent<TSender, TArg> @this, SequentialEventHandlerAsync<TSender, TArg> handler ) => @this.Add( handler );
 
         /// <summary>
-        /// Relays to <see cref="Remove"/>.
+        /// Relays to <see cref="Remove(SequentialEventHandlerAsync{TSender,TArg})"/>.
         /// </summary>
         /// <param name="this">This PerfectEvent.</param>
         /// <param name="handler">The non null handler to remove.</param>
@@ -152,7 +152,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         /// <returns>This PerfectEvent.</returns>
         public PerfectEvent<TSender, TArg> Add( ParallelEventHandlerAsync<TSender, TArg> handler )
         {
@@ -163,7 +163,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         /// <returns>This PerfectEvent.</returns>
         public PerfectEvent<TSender, TArg> Remove( ParallelEventHandlerAsync<TSender, TArg> handler )
         {

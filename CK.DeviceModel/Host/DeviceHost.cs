@@ -68,6 +68,7 @@ namespace CK.DeviceModel
             ilGenerator.Emit( OpCodes.Newobj, ctor );
             ilGenerator.Emit( OpCodes.Ret );
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
+            Debug.Assert( _lock != null );
         }
 
         /// <inheritdoc />
@@ -210,7 +211,7 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Applies a host configuration: multiple devices can be configured at once and if <see cref="THostConfiguration.IsPartialConfiguration"/> is false,
+        /// Applies a host configuration: multiple devices can be configured at once and if <see cref="DeviceHostConfiguration{TConfiguration}.IsPartialConfiguration"/> is false,
         /// devices for which no configuration appear are stopped and destroyed.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -557,6 +558,7 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device, TConfiguration configuration ) => Task.CompletedTask;
 
+        /// <inheritdoc />
         public RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command )
         {
             if( command == null ) throw new ArgumentNullException( nameof( command ) );

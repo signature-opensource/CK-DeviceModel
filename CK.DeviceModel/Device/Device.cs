@@ -331,6 +331,7 @@ namespace CK.DeviceModel
         /// Implements this device's Start behavior.
         /// False must be returned if anything prevents this device to start (this can throw).
         /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="reason">Reason of the start.</param>
         /// <returns>True if the device has been successfully started, false otherwise.</returns>
         protected abstract Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason );
@@ -404,7 +405,7 @@ namespace CK.DeviceModel
         /// Implements this device's Stop behavior.
         /// This should always succeed: after having called this method (that may throw), this device is considered stopped.
         /// Note that this method is never called if this device must be <see cref="DeviceConfigurationStatus.AlwaysRunning"/>
-        /// (except with the <see cref="DeviceStoppedReason."/>) or it is already stopped.
+        /// (except with the <see cref="DeviceStoppedReason.Destroyed"/>) or it is already stopped.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reason">The reason to stop.</param>
@@ -475,9 +476,8 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Must handle <see cref="AsyncDeviceCommand"/> command objects that are actually targeted to this device
-        /// (<see cref="AsyncDeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="AsyncDeviceCommand.ControllerKey"/>
+        /// (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="DeviceCommand.ControllerKey"/>
         /// is either null or match the current <see cref="ControllerKey"/>).
-        /// </para>
         /// <para>
         /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
         /// </para>
@@ -492,9 +492,8 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Must handle <see cref="SyncDeviceCommand"/> command objects that are actually targeted to this device
-        /// (<see cref="SyncDeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="SyncDeviceCommand.ControllerKey"/>
+        /// (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="DeviceCommand.ControllerKey"/>
         /// is either null or match the current <see cref="ControllerKey"/>).
-        /// </para>
         /// <para>
         /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
         /// </para>

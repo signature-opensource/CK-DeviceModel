@@ -37,7 +37,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         public SequentialEventHandlerSender<TSender, TArg> Add( SequentialEventHandler<TSender, TArg> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
@@ -57,7 +57,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         public SequentialEventHandlerSender<TSender, TArg> Remove( SequentialEventHandler<TSender, TArg> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );

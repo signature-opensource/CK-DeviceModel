@@ -25,7 +25,7 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Copy constructor implements the required <see cref="Clone"/> method:
+        /// Copy constructor implements the required Clone method:
         /// specialized configurations must implement their copy constructor.
         /// </summary>
         /// <param name="source">The source configuration to copy.</param>
@@ -47,7 +47,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets a mutable list of configurations.
-        /// <see cref="IDeviceConfiguration.Name"/> must be unique: this will be checked when this 
+        /// <see cref="DeviceConfiguration.Name"/> must be unique: this will be checked when this 
         /// configuration will be applied.
         /// </summary>
         public IList<TConfiguration> Items { get; }
@@ -57,7 +57,7 @@ namespace CK.DeviceModel
         void IDeviceHostConfiguration.Add( DeviceConfiguration c ) => Items.Add( (TConfiguration)c );
 
         /// <summary>
-        /// Checks the validity of this configuration: all <see cref="IDeviceConfiguration.Name"/> must be non empy or white space, be
+        /// Checks the validity of this configuration: all <see cref="DeviceConfiguration.Name"/> must be non empy or white space, be
         /// unique among the different configurations, and optionally, at least one configuration must exist.
         /// This calls <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> for each configuration.
         /// </summary>

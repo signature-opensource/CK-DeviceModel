@@ -10,7 +10,6 @@ namespace CK.PerfectEvent
     /// Event handler that can be combined into a <see cref="SequentialEventHandlerSender{T}"/>.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="sender">The source of the event.</param>
     /// <param name="e">The event argument.</param>
     public delegate void SequentialEventHandler<TEvent>( IActivityMonitor monitor, TEvent e );
 
@@ -33,7 +32,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Adds a handler. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">Non null handler.</param>
+        /// <param name="handler">Non null handler.</param>
         public SequentialEventHandlerSender<TEvent> Add( SequentialEventHandler<TEvent> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
@@ -53,7 +52,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Removes a handler if it exists. This is an atomic (thread safe) operation.
         /// </summary>
-        /// <param name="h">The handler to remove. Cannot be null.</param>
+        /// <param name="handler">The handler to remove. Cannot be null.</param>
         public SequentialEventHandlerSender<TEvent> Remove( SequentialEventHandler<TEvent> handler )
         {
             if( handler == null ) throw new ArgumentNullException( nameof( handler ) );
