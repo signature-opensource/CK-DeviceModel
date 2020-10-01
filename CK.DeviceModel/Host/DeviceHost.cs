@@ -560,10 +560,13 @@ namespace CK.DeviceModel
         public RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command )
         {
             if( command == null ) throw new ArgumentNullException( nameof( command ) );
+            if( !command.CheckValidity( monitor ) ) throw new ArgumentException( $"{command.GetType().Name}: CheckValidity failed. See logs.", nameof( command ) );
+
             if( !command.HostType.IsAssignableFrom( GetType() ) ) return default;
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
 
-            var d = command.DeviceName != null ? Find( command.DeviceName ) : null;
+            Debug.Assert( command.DeviceName != null, "CheckValidity ensured that." );
+            var d = Find( command.DeviceName );
             if( d == null )
             {
                 monitor.Warn( $"Device named '{command.DeviceName}' not found in '{DeviceHostName}' host." );

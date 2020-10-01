@@ -77,9 +77,9 @@ namespace CK.DeviceModel
         Task<bool> StartAsync( IActivityMonitor monitor );
 
         /// <summary>
-        /// Gets the current controller key.
-        /// When null, <see cref="HandleCommand(IActivityMonitor, SyncDeviceCommand)"/> and <see cref="HandleCommandAsync(IActivityMonitor, AsyncDeviceCommand)"/>
-        /// don't filter the commands: <see cref="DeviceCommand.ControllerKey"/> can be anything.
+        /// Gets the current controller key. It can be null but not the empty string.
+        /// When null, the <see cref="DeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>
+        /// checks that the command's controller key is the same as this one otherwise the command is not handled.
         /// </summary>
         string? ControllerKey { get; }
 

@@ -54,7 +54,7 @@ namespace CK.DeviceModel
             _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
             Name = config.Name;
             _configStatus = config.Status;
-            _controllerKey = config.ControllerKey;
+            _controllerKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
             _controllerKeyFromConfiguration = _controllerKey != null;
             FullName = null!;
         }
@@ -128,6 +128,7 @@ namespace CK.DeviceModel
 
         internal PerfectEventSender<IDevice, string?>? HostSetControllerKey( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
         {
+            if( String.IsNullOrEmpty( key ) ) key = null;
             if( key != _controllerKey )
             {
                 if( _controllerKeyFromConfiguration )
@@ -201,12 +202,13 @@ namespace CK.DeviceModel
             {
                 _configStatus = config.Status;
             }
-            _controllerKeyFromConfiguration = config.ControllerKey != null;
-            bool controllerKeyChanged = _controllerKeyFromConfiguration && config.ControllerKey != _controllerKey;
+            var configKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
+            _controllerKeyFromConfiguration = configKey != null;
+            bool controllerKeyChanged = _controllerKeyFromConfiguration && configKey != _controllerKey;
             if( controllerKeyChanged )
             {
-                monitor.Info( $"Device {FullName}: controller key fixed by Configuration from '{_controllerKey}' to '{config.ControllerKey}'." );
-                _controllerKey = config.ControllerKey;
+                monitor.Info( $"Device {FullName}: controller key fixed by Configuration from '{_controllerKey}' to '{configKey}'." );
+                _controllerKey = configKey;
             }
             DeviceReconfiguredResult reconfigResult;
             try

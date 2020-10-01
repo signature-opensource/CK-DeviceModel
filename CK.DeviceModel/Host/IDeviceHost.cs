@@ -105,6 +105,9 @@ namespace CK.DeviceModel
         /// When <see cref="RoutedDeviceCommand.Success"/> is true, the command can be executed synchronously or asynchronously by
         /// the <see cref="RoutedDeviceCommand"/>.
         /// </para>
+        /// <para>
+        /// Note that <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to route.</param>
