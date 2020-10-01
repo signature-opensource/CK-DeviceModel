@@ -68,7 +68,6 @@ namespace CK.DeviceModel
             ilGenerator.Emit( OpCodes.Newobj, ctor );
             ilGenerator.Emit( OpCodes.Ret );
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
-            Debug.Assert( _lock != null );
         }
 
         /// <inheritdoc />
