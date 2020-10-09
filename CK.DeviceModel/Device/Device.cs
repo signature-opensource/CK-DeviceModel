@@ -98,7 +98,7 @@ namespace CK.DeviceModel
         /// True if it has been changed, false otherwise, typically because the key has been fixed
         /// by the <see cref="DeviceConfiguration.ControllerKey"/>.
         /// </returns>
-        public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? key ) => DoSetControllerKeyAsync( monitor, false, null, key );
+        public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? key ) => SetControllerKeyAsync( monitor, false, null, key );
 
         /// <summary>
         /// Sets a new <see cref="ControllerKey"/> only if the current one is the same as the specified <paramref name="current"/>.
@@ -110,9 +110,9 @@ namespace CK.DeviceModel
         /// True if it has been changed, false otherwise: either the current key doesn't match or the
         /// key has been fixed by the <see cref="DeviceConfiguration.ControllerKey"/>.
         /// </returns>
-        public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key ) => DoSetControllerKeyAsync( monitor, true, current, key );
+        public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key ) => SetControllerKeyAsync( monitor, true, current, key );
 
-        Task<bool> DoSetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
+        Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
         {
             IInternalDeviceHost? h = _host;
             return h == null

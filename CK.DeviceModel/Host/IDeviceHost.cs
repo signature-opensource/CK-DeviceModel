@@ -44,7 +44,7 @@ namespace CK.DeviceModel
         Type GetDeviceConfigurationType();
 
         /// <summary>
-        /// Applies a configuration. Configuration's ype must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
+        /// Applies a configuration. Configuration's type must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>

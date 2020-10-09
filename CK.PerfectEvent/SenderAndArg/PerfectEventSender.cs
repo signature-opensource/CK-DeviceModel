@@ -261,7 +261,7 @@ namespace CK.PerfectEvent
         /// <summary>
         /// Raises this event: <see cref="ParallelAsync"/> events are executing while <see cref="Sync"/> events and then <see cref="Async"/>
         /// events are executing.
-        /// The returned task is resolved once the parrallels, the synchronous and the asynhronous event handlers have finished their jobs.
+        /// The returned task is resolved once the parallels, the synchronous and the asynhronous event handlers have finished their jobs.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="sender">The sender of the event.</param>
