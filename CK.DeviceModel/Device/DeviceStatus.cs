@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text;
 
 namespace CK.DeviceModel
@@ -9,7 +10,7 @@ namespace CK.DeviceModel
     /// Unifies <see cref="IDevice"/>'s lifetime status: this captures the last change that occurred
     /// and whether it is currently <see cref="IsRunning"/> or <see cref="IsDestroyed"/>.
     /// </summary>
-    public readonly struct DeviceStatus
+    public readonly struct DeviceStatus : IEquatable<DeviceStatus>
     {
         readonly int _status;
         readonly byte _last;
@@ -68,6 +69,31 @@ namespace CK.DeviceModel
                             ? StoppedReason.ToString()
                             : ReconfiguredResult.ToString())) + ")";
         }
+
+        /// <summary>
+        /// Implements simple value equality.
+        /// </summary>
+        /// <param name="other">The other status.</param>
+        /// <returns>True if they are equal, false otherwise.</returns>
+        public bool Equals( DeviceStatus other )
+        {
+            return _status == other._status
+                    && _last == other._last
+                    && _running == other._running;
+        }
+
+        /// <summary>
+        /// Simple relay to <see cref="Equals(DeviceStatus)"/>.
+        /// </summary>
+        /// <param name="obj">The other object.</param>
+        /// <returns>True if they are equal, false otherwise.</returns>
+        public override bool Equals( object obj ) => obj is DeviceStatus s ? Equals( s ) : false;
+
+        /// <summary>
+        /// Computes hash based on value equality. 
+        /// </summary>
+        /// <returns>The hash.</returns>
+        public override int GetHashCode() => HashCode.Combine( _status, _last, _running );
 
         internal DeviceStatus( DeviceReconfiguredResult r, bool isRunning )
         {
