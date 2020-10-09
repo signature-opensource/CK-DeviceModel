@@ -95,6 +95,11 @@ namespace CK.DeviceModel
         /// <returns>The hash.</returns>
         public override int GetHashCode() => HashCode.Combine( _status, _last, _running );
 
+#pragma warning disable 1591
+        public static bool operator ==( DeviceStatus s1, DeviceStatus s2 ) => s1.Equals( s2 );
+        public static bool operator !=( DeviceStatus s1, DeviceStatus s2 ) => !s1.Equals( s2 );
+#pragma warning restore 1591
+
         internal DeviceStatus( DeviceReconfiguredResult r, bool isRunning )
         {
             _status = (int)r;
