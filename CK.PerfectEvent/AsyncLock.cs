@@ -152,7 +152,7 @@ namespace CK.Core
             if( await _semaphore.WaitAsync( millisecondsTimeout, cancellationToken ).ConfigureAwait( false ) )
             {
                 Debug.Assert( _recCount == 0 );
-                monitor.Trace( $"Entered AsyncLock '{_name}' (async)." );
+                if( ShouldLog( monitor ) ) SendLine( monitor, $"Entered AsyncLock '{_name}' (async)." );
                 _current = monitor.Output;
                 return true;
             }
@@ -192,13 +192,13 @@ namespace CK.Core
             {
                 if( _policy == LockRecursionPolicy.NoRecursion ) throw new LockRecursionException( Name );
                 ++_recCount;
-                monitor.Trace( $"Incremented AsyncLock '{_name}' recursion count ({_recCount})." );
+                if( ShouldLog( monitor ) ) SendLine( monitor, $"Incremented AsyncLock '{_name}' recursion count ({_recCount})." );
                 return true;
             }
             if( _semaphore.Wait( millisecondsTimeout, cancellationToken ) )
             {
                 Debug.Assert( _recCount == 0 );
-                monitor.Trace( $"Synchronously entered AsyncLock '{_name}'." );
+                if( ShouldLog( monitor ) ) SendLine( monitor, $"Synchronously entered AsyncLock '{_name}'." );
                 _current = monitor.Output;
                 return true;
             }
@@ -213,22 +213,26 @@ namespace CK.Core
         {
             if( _current != monitor.Output )
             {
-                monitor.Fatal( $"Attempt to Release AsyncLock '{_name}' that has {(_current == null ? "never been acquired" : $"been aquired by another monitor")}." );
-                throw new SynchronizationLockException();
+                var msg = $"Attempt to Release AsyncLock '{_name}' that has {(_current == null ? "never been acquired" : $"been aquired by another monitor")}.";
+                throw new SynchronizationLockException( msg );
             }
             Debug.Assert( _recCount >= 0 );
             if( _recCount == 0 )
             {
-                monitor.Trace( $"Released AsyncLock '{_name}'." );
+                if( ShouldLog( monitor ) ) SendLine( monitor, $"Released AsyncLock '{_name}'." );
                 _current = null;
                 _semaphore.Release();
             }
             else
             {
-                monitor.Trace( $"Decremented AsyncLock '{_name}' recursion count ({_recCount})." );
+                if( ShouldLog( monitor ) ) SendLine( monitor, $"Decremented AsyncLock '{_name}' recursion count ({_recCount})." );
                 --_recCount;
             }
         }
+
+        static bool ShouldLog( IActivityMonitor monitor ) => monitor.ShouldLogLine( LogLevel.Debug );
+
+        static void SendLine( IActivityMonitor monitor, string text ) => monitor.UnfilteredLog( null, LogLevel.Debug | LogLevel.IsFiltered, text, monitor.NextLogTime(), null );
 
         /// <summary>
         /// Releases all resources used by this lock.
