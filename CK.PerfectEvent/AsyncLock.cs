@@ -10,10 +10,15 @@ namespace CK.Core
 {
     /// <summary>
     /// Asynchronous/synchronous lock with recursion support based on a <see cref="SemaphoreSlim"/>.
-    /// Recursion support is based on the <see cref="IActivityMonitor"/> that is a required parameter
+    /// Recursion support relies on the <see cref="IActivityMonitor"/> that is a required parameter
     /// of all the methods: it is this monitor that acts as the "acquisition context".
     /// </summary>
-    public class AsyncLock : IDisposable
+    /// <remarks>
+    /// This lock not disposable and this is intentional because unnecessary: a SemaphoreSlim must be
+    /// disposed only if its <see cref="SemaphoreSlim.AvailableWaitHandle"/> has been used and since we
+    /// encapsulate the semaphore and don't use it, we can avoid the IDisposable burden.
+    /// </remarks>
+    public class AsyncLock
     {
         readonly SemaphoreSlim _semaphore;
         readonly LockRecursionPolicy _policy;
@@ -57,7 +62,7 @@ namespace CK.Core
         /// </summary>
         /// <param name="monitor">The monitor that identifies the activity.</param>
         /// <returns>The disposable to release the lock.</returns>
-        public IDisposable Lock( IActivityMonitor monitor )
+        public Releaser Lock( IActivityMonitor monitor )
         {
             Enter( monitor );
             return new Releaser( this, monitor );
@@ -74,26 +79,32 @@ namespace CK.Core
         /// </summary>
         /// <param name="monitor">The monitor that identifies the activity.</param>
         /// <returns>The disposable to release the lock.</returns>
-        public ValueTask<IDisposable> LockAsync( IActivityMonitor monitor ) => new ValueTask<IDisposable>( DoLockAsync( monitor ) );
+        public ValueTask<Releaser> LockAsync( IActivityMonitor monitor ) => new ValueTask<Releaser>( DoLockAsync( monitor ) );
 
-        async Task<IDisposable> DoLockAsync( IActivityMonitor monitor )
+        async Task<Releaser> DoLockAsync( IActivityMonitor monitor )
         {
             await EnterAsync( monitor );
             return new Releaser( this, monitor );
         }
 
-        class Releaser : IDisposable
+        /// <summary>
+        /// Disposabe value type.
+        /// Note that the Dispose explicit implementation must not be called more
+        /// than once. (Using an explicit implementation here and exposing this Releaser
+        /// type should avoid any misuse.)
+        /// </summary>
+        public readonly struct Releaser : IDisposable
         {
             readonly AsyncLock _lock;
             readonly IActivityMonitor _monitor;
 
-            public Releaser( AsyncLock l, IActivityMonitor m )
+            internal Releaser( AsyncLock l, IActivityMonitor m )
             {
                 _lock = l;
                 _monitor = m;
             }
 
-            public void Dispose()
+            void IDisposable.Dispose()
             {
                 _lock.Leave( _monitor );
             }
@@ -233,13 +244,6 @@ namespace CK.Core
         static bool ShouldLog( IActivityMonitor monitor ) => monitor.ShouldLogLine( LogLevel.Debug );
 
         static void SendLine( IActivityMonitor monitor, string text ) => monitor.UnfilteredLog( null, LogLevel.Debug | LogLevel.IsFiltered, text, monitor.NextLogTime(), null );
-
-        /// <summary>
-        /// Releases all resources used by this lock.
-        /// Simply calls <see cref="SemaphoreSlim.Dispose()"/> that should be called once this lock
-        /// is not used anymore.
-        /// </summary>
-        public void Dispose() => _semaphore.Dispose();
 
         /// <summary>
         /// Overridden to return the name of this lock.

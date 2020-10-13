@@ -43,7 +43,7 @@ namespace CK.DeviceModel.Tests
         [TestCase( false, true, false )]
         [TestCase( false, false, true )]
         [TestCase( false, false, false )]
-        public async Task our_AsyncLock_handles_reentrancy(bool firstAsync, bool secondAsync, bool thirdAsync )
+        public async Task our_AsyncLock_handles_reentrancy( bool firstAsync, bool secondAsync, bool thirdAsync )
         {
             var m = TestHelper.Monitor;
 
