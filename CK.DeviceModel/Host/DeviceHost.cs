@@ -21,7 +21,7 @@ namespace CK.DeviceModel
     /// <typeparam name="THostConfiguration">The configuration type for this host.</typeparam>
     /// <typeparam name="TConfiguration">The Device's configuration type.</typeparam>
     [CKTypeDefiner]
-    public abstract class DeviceHost<T, THostConfiguration, TConfiguration> : IDeviceHost, IInternalDeviceHost
+    public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> : IDeviceHost, IInternalDeviceHost
         where T : Device<TConfiguration>
         where THostConfiguration : DeviceHostConfiguration<TConfiguration>
         where TConfiguration : DeviceConfiguration
@@ -38,9 +38,10 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new host.
         /// </summary>
-        /// <param name="deviceHostName">A name that SHOULD identify this host instance unabiguously in a running context.</param>
-        protected DeviceHost( string deviceHostName )
-            : this( true )
+        /// <param name="deviceHostName">A name that SHOULD identify this host instance unambiguously in a running context.</param>
+        /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
+        protected DeviceHost( string deviceHostName, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
+            : this( true, alwaysRunningPolicy )
         {
             if( String.IsNullOrWhiteSpace( deviceHostName ) ) throw new ArgumentException( nameof( deviceHostName ) );
             _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, deviceHostName );
@@ -49,16 +50,19 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new host with a <see cref="DeviceHostName"/> sets to its type name.
         /// </summary>
-        protected DeviceHost()
-            : this( true )
+        /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
+        protected DeviceHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
+            : this( true, alwaysRunningPolicy )
         {
             _lock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
         }
 
-        DeviceHost( bool privateCall )
+        // This is the only CS8618 warning that must be raised here: Non-nullable field '_lock' is uninitialized.
+        DeviceHost( bool privateCall, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
         {
             _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
             _devicesChanged = new PerfectEventSender<IDeviceHost>();
+            _alwaysRunningPolicy = alwaysRunningPolicy;
 
             var t = typeof( THostConfiguration );
             var ctor = t.GetConstructor( Type.EmptyTypes );
@@ -68,6 +72,8 @@ namespace CK.DeviceModel
             ilGenerator.Emit( OpCodes.Newobj, ctor );
             ilGenerator.Emit( OpCodes.Ret );
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
+            _alwayRunningStopped = new List<(IDevice Device, int Count, DateTime NextCall)>();
+            _alwayRunningStoppedSafe = Array.Empty<(IDevice, int, DateTime)>();
         }
 
         /// <inheritdoc />
@@ -113,13 +119,21 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Gets a snapshot of the current device configurations.
+        /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
         /// Note that these objects are a copy of the ones that are used by the actual devices.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
-        public IReadOnlyList<TConfiguration> DeviceConfigurations => _devices.Values.Select( c => c.Configuration ).ToArray();
+        public IReadOnlyList<ConfiguredDevice<T, TConfiguration>> GetDeviceConfigurations( Func<T, TConfiguration, bool> predicate )
+        {
+            return _devices.Values.Where( e => predicate( e.Device, e.Configuration ) ).ToArray();
+        }
 
-        IReadOnlyList<DeviceConfiguration> IDeviceHost.DeviceConfigurations => _devices.Values.Select( c => c.Configuration ).ToArray();
+        IReadOnlyList<(IDevice, DeviceConfiguration)> IDeviceHost.GetDeviceConfigurations( Func<IDevice, DeviceConfiguration, bool> predicate )
+        {
+            return _devices.Values.Where( e => predicate(e.Device,e.Configuration) )
+                                   .Select( e => ((IDevice)e.Device, (DeviceConfiguration)e.Configuration) )
+                                   .ToArray();
+        }
 
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost> DevicesChanged => _devicesChanged.PerfectEvent;
@@ -188,7 +202,8 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is configured by the provided <paramref name="configuration"/>.
+        /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is
+        /// configured by the provided <paramref name="configuration"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>

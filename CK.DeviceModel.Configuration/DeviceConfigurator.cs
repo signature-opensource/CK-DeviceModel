@@ -14,7 +14,9 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Handles the "Device" configuration section by configuring all the <see cref="IDeviceHost"/> available in the DI Container.
+    /// Handles the "Device" configuration section (it it exists) by configuring all the <see cref="IDeviceHost"/> available in the DI Container
+    /// and supports the "restarter daemon" that allows devices with <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration
+    /// to be monitored and automatically restarted when stopped (see <see cref="IDeviceAlwaysRunningPolicy"/>).
     /// </summary>
     public class DeviceConfigurator : ISingletonAutoService, IHostedService
     {
@@ -53,24 +55,23 @@ namespace CK.DeviceModel
 
         async Task TheLoop()
         {
-            IActivityMonitor monitor = new ActivityMonitor( nameof( DeviceConfigurator ) + " (ApplyConfiguration)" );
+            Debug.Assert( _changeMonitor != null );
             var tRun = _run.Token;
             while( !_run.IsCancellationRequested )
             {
                 var toApply = await _applyChannel.Reader.ReadAsync( tRun );
-                await ApplyOnceAsync( monitor, toApply, tRun );
+                await ApplyOnceAsync( _changeMonitor, toApply, tRun );
             }
-            monitor.MonitorEnd();
         }
 
         async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply, CancellationToken cancellationToken )
         {
-            foreach( var (device, config) in toApply )
+            foreach( var (host, config) in toApply )
             {
-                if( device == null ) break;
+                if( host == null ) break;
                 try
                 {
-                    await device.ApplyConfigurationAsync( monitor, config );
+                    await host.ApplyConfigurationAsync( monitor, config );
                 }
                 catch( Exception ex )
                 {

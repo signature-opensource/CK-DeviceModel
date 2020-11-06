@@ -11,7 +11,7 @@ namespace CK.DeviceModel
     /// call these methods.
     /// <para>
     /// This is public because IDeviceHost is a IAutoService (also [IsMultiple]) and so it must be public...
-    /// Internal interface specializations should be allowed: this public is temporary.
+    /// Internal (non public) interface specializations should be allowed: this public is temporary.
     /// </para>
     /// </summary>
     public interface IInternalDeviceHost : IDeviceHost
@@ -26,5 +26,10 @@ namespace CK.DeviceModel
 
         Task AutoDestroyAsync( IDevice d, IActivityMonitor monitor );
 
+        void OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor );
+
+        void SetDaemon( DeviceHostDaemon daemon );
+
+        ValueTask<int> CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
     }
 }

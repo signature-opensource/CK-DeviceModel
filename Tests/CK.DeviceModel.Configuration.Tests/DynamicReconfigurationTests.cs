@@ -69,7 +69,8 @@ namespace CK.DeviceModel.Configuration.Tests
         {
             public static CameraHost? Instance;
 
-            public CameraHost()
+            public CameraHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
+                : base( alwaysRunningPolicy )
             {
                 Instance = this;
             }
@@ -126,7 +127,8 @@ namespace CK.DeviceModel.Configuration.Tests
         {
             public static LightControllerHost? Instance;
 
-            public LightControllerHost()
+            public LightControllerHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
+                : base( alwaysRunningPolicy )
             {
                 Instance = this;
             }
@@ -325,7 +327,7 @@ namespace CK.DeviceModel.Configuration.Tests
                 // Setting IsPartialConfiguration to false: the C1 device doesn't exist anymore!
                 config.Provider.Set( "Device:CameraHost:IsPartialConfiguration", "false" );
                 config.Provider.RaiseChanged();
-                await Task.Delay( 50 );
+                await Task.Delay( 150 );
 
                 c1.IsDestroyed.Should().BeTrue( "C1 is dead." );
                 c2.IsRunning.Should().BeTrue();
@@ -357,6 +359,8 @@ namespace CK.DeviceModel.Configuration.Tests
                                             services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, LightControllerHost>( sp => sp.GetRequiredService<LightControllerHost>() ) );
                                             services.AddSingleton<CameraHost>();
                                             services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, CameraHost>( sp => sp.GetRequiredService<CameraHost>() ) );
+                                            services.AddHostedService<DeviceHostDaemon>();
+                                            services.AddSingleton<IDeviceAlwaysRunningPolicy, DefaultDeviceAlwaysRunningPolicy>();
                                             services.AddHostedService<DeviceConfigurator>();
                                         } )
                                         .Build() )

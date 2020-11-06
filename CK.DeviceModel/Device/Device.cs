@@ -324,6 +324,10 @@ namespace CK.DeviceModel
                 monitor.Error( $"While starting '{FullName}'.", ex );
             }
             if( _isRunning ) await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
+            if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
+            {
+                _host.OnAlwaysRunningCheck( this, monitor );
+            }
             return _isRunning;
         }
 
@@ -368,6 +372,7 @@ namespace CK.DeviceModel
         internal async Task<bool> HostStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
         {
             Debug.Assert( _host != null && _isRunning );
+            var isAlwaysRunning = _configStatus == DeviceConfigurationStatus.AlwaysRunning;
             using( monitor.OpenInfo( $"Stopping {FullName} ({reason})" ) )
             {
                 if( reason == DeviceStoppedReason.StoppedByDisabledConfiguration || reason == DeviceStoppedReason.Destroyed )
@@ -397,6 +402,10 @@ namespace CK.DeviceModel
             if( reason != DeviceStoppedReason.Destroyed )
             {
                 await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
+            }
+            if( isAlwaysRunning )
+            {
+                _host.OnAlwaysRunningCheck( this, monitor );
             }
             return true;
         }
