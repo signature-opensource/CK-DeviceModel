@@ -8,8 +8,12 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Implements the default retry policy: handle short-time disconnection: it calls <see cref="IDevice.StartAsync(IActivityMonitor)"/> only
-    /// 3 times (with the following durations: 500ms, 1s and 1s) before giving up.
+    /// 4 times (with the following durations: 250, 500, 500 and eventually 750 milliseconds) before giving up.
     /// </summary>
+    /// <remarks>
+    /// Just like any <see cref="IAutoService"/>, this is replaceable, can be "covered" by a similar service by appearing in the constructor's argument
+    /// or, since it is not sealed and <see cref="RetryStartAsync"/> is virtual, can be specialized.
+    /// </remarks>
     public class DefaultDeviceAlwaysRunningPolicy : IDeviceAlwaysRunningPolicy
     {
         /// <summary>
@@ -23,15 +27,16 @@ namespace CK.DeviceModel
         /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
         public virtual async Task<int> RetryStartAsync( IActivityMonitor monitor, IDeviceHost host, IDevice device, int retryCount )
         {
-            if( await device.StartAsync( monitor ) )
+            if( await device.StartAsync( monitor ).ConfigureAwait( false ) )
             {
                 return 0;
             }
             switch( retryCount )
             {
-                case 0: return 500; 
-                case 1: 
-                case 2: return 1000;
+                case 0: return 250; 
+                case 1:
+                case 2: return 500;
+                case 3: return 750;
                 default: return 0;
             }
         }

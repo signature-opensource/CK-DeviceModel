@@ -1,7 +1,9 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -14,7 +16,7 @@ namespace CK.DeviceModel
         readonly List<(IDevice Device, int Count, DateTime NextCall)> _alwayRunningStopped;
         readonly IDeviceAlwaysRunningPolicy _alwaysRunningPolicy;
         DeviceHostDaemon? _daemon;
-        ( IDevice Device, int Count, DateTime NextCall)[] _alwayRunningStoppedSafe;
+        volatile (IDevice Device, int Count, DateTime NextCall)[] _alwayRunningStoppedSafe;
 
         void IInternalDeviceHost.SetDaemon( DeviceHostDaemon daemon )
         {
@@ -25,43 +27,49 @@ namespace CK.DeviceModel
         void IInternalDeviceHost.OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor )
         {
             Debug.Assert( _lock.IsEnteredBy( monitor ) );
-            int idx = _alwayRunningStopped.IndexOf( e => e.Device == d );
-            if( idx >= 0 )
+            using( monitor.OpenDebug( $"OnAlwaysRunningCheck for device '{d}'." ) )
             {
-                if( d.IsRunning || d.ConfigurationStatus != DeviceConfigurationStatus.AlwaysRunning )
+                int idx = _alwayRunningStopped.IndexOf( e => e.Device == d );
+                if( idx >= 0 )
                 {
-                    _alwayRunningStopped.RemoveAt( idx );
-                    _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
+                    monitor.Debug( "Device is registered." );
+                    if( d.IsRunning || d.ConfigurationStatus != DeviceConfigurationStatus.AlwaysRunning )
+                    {
+                        _alwayRunningStopped.RemoveAt( idx );
+                        CaptureAlwayRunningStoppedSafe( monitor, false );
+                    }
+                    else
+                    {
+                        Debug.Assert( d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning );
+                        // Let the NextCall unchanged: manual Starts are ignored.
+                        _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count + 1, _alwayRunningStopped[idx].NextCall);
+                        CaptureAlwayRunningStoppedSafe( monitor, true );
+                    }
                 }
                 else
                 {
-                    Debug.Assert( d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning );
-                    // Let the NextCall unchanged: manual Starts are ignored.
-                    _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count + 1, _alwayRunningStopped[idx].NextCall );
-                    _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
-                    _daemon?.Signal();
-                }
-            }
-            else
-            {
-                if( !d.IsRunning && d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning )
-                {
-                    // Next call (Count = 0) is asap.
-                    _alwayRunningStopped.Add( (d, 0, Util.UtcMinValue) );
-                    _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
-                    _daemon?.Signal();
+                    if( !d.IsRunning && d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning )
+                    {
+                        // Next call (Count = 0) is asap.
+                        _alwayRunningStopped.Add( (d, 0, DateTime.UtcNow) );
+                        CaptureAlwayRunningStoppedSafe( monitor, true );
+                    }
+                    else
+                    {
+                        monitor.CloseGroup( "Nothing to do (device is running and was not registered)." );
+                    }
                 }
             }
         }
 
-        async ValueTask<int> IInternalDeviceHost.CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now )
+        async ValueTask<long> IInternalDeviceHost.CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now )
         {
             // Fast path: nothing to do (hence the ValueTask).
             var devices = _alwayRunningStoppedSafe;
-            if( devices.Length == 0 ) return Int32.MaxValue;
+            if( devices.Length == 0 ) return Int64.MaxValue;
 
             // Slow path: check times and call Policy.RetryStartAsync.
-            int[] updatedDeltas = new int[devices.Length];
+            long[] updatedDeltas = new long[devices.Length];
             try
             {
                 int idx = 0;
@@ -69,15 +77,19 @@ namespace CK.DeviceModel
                 {
                     var d = e.Device;
                     // Delta 0 means: the device should be removed from the _alwayRunningStopped list.
-                    int delta = 0;
+                    long delta = 0;
                     if( !d.IsRunning && d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning )
                     {
-                        delta = (int)((now - e.NextCall).Ticks / TimeSpan.TicksPerMillisecond);
+                        delta = (e.NextCall - now).Ticks;
                         if( delta <= 0 )
                         {
-                            delta = await _alwaysRunningPolicy.RetryStartAsync( monitor, this, d, e.Count );
+                            delta = await _alwaysRunningPolicy.RetryStartAsync( monitor, this, d, e.Count ).ConfigureAwait( false );
                             if( d.IsRunning || delta < 0 ) delta = 0;
-                            // A positive Delta means that the NextCallDate in the _alwayRunningStopped list must be updated.
+                            else
+                            {
+                                delta *= TimeSpan.TicksPerMillisecond;
+                                // A positive Delta means that the NextCallDate in the _alwayRunningStopped list must be updated.
+                            }
                         }
                         else
                         {
@@ -93,10 +105,10 @@ namespace CK.DeviceModel
                 monitor.Fatal( $"Buggy retry policy {_alwaysRunningPolicy}.", ex );
                 return Int32.MaxValue;
             }
-            // Very slow path: update the list.
+            // Lock the host: update the list.
             bool changed = false;
-            int minDelta = Int32.MaxValue;
-            using( _lock.EnterAsync( monitor ) )
+            long minDelta = Int64.MaxValue;
+            using( await _lock.LockAsync( monitor ) )
             {
                 for( int i = 0; i < devices.Length; ++i )
                 {
@@ -109,7 +121,7 @@ namespace CK.DeviceModel
                         if( delta > 0 )
                         {
                             changed = true;
-                            _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count, now.AddMilliseconds( delta ));
+                            _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count + 1, now.AddTicks( delta ));
                             if( minDelta > delta ) minDelta = delta;
                         }
                         else if( delta == 0 )
@@ -128,10 +140,21 @@ namespace CK.DeviceModel
                 }
                 if( changed )
                 {
-                    _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
+                    CaptureAlwayRunningStoppedSafe( monitor, false );
                 }
             }
             return minDelta;
+        }
+
+        private void CaptureAlwayRunningStoppedSafe( IActivityMonitor monitor, bool signalHost )
+        {
+            _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
+            if( monitor.ShouldLogLine( LogLevel.Debug ) )
+            {
+                monitor.UnfilteredLog( null, LogLevel.Debug|LogLevel.IsFiltered, $"Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall.ToString( "HH:mm.ss.ff" )})" ).Concatenate( ", (" )}).", monitor.NextLogTime(), null );
+                monitor.UnfilteredLog( null, LogLevel.Debug|LogLevel.IsFiltered, signalHost ? "Host signaled!" : "(no signal.)", monitor.NextLogTime(), null );
+            }
+            if( signalHost ) _daemon?.Signal();
         }
     }
 

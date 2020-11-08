@@ -195,9 +195,9 @@ namespace CK.DeviceModel.Configuration.Tests
                 Camera.TotalRunning.Should().Be( 0 );
                 LightController.TotalCount.Should().Be( 1 );
                 LightController.TotalRunning.Should().Be( 0 );
-                var c1 = CameraHost.Instance.FindWithConfiguration( "C1" );
-                var c2 = CameraHost.Instance.FindWithConfiguration( "C2" );
-                var l1 = LightControllerHost.Instance.FindWithConfiguration( "L1" );
+                var c1 = CameraHost.Instance.GetConfiguredDevice( "C1" );
+                var c2 = CameraHost.Instance.GetConfiguredDevice( "C2" );
+                var l1 = LightControllerHost.Instance.GetConfiguredDevice( "L1" );
                 Debug.Assert( c1 != null && c2 != null && l1 != null );
                 c1.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
                 c2.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable );

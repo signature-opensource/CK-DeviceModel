@@ -6,35 +6,29 @@ using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests
 {
-    public class Camera : Device<CameraConfiguration>, ITestDevice
+    public class Machine : Device<MachineConfiguration>, ITestDevice
     {
         public static int TotalCount;
         public static int TotalRunning;
 
         // A device can keep a reference to the current configuration:
         // this configuration is an independent clone that is accessible only to the Device.
-        CameraConfiguration _configRef;
-        readonly PerfectEventSender<Camera,int> _flash;
+        MachineConfiguration _configRef;
 
-        public Camera( IActivityMonitor monitor, CameraConfiguration config )
+        public Machine( IActivityMonitor monitor, MachineConfiguration config )
             : base( monitor, config )
         {
             Interlocked.Increment( ref TotalCount );
             _configRef = config;
-            _flash = new PerfectEventSender<Camera,int>();
         }
-
-        public PerfectEvent<Camera,int> Flash => _flash.PerfectEvent;
 
         public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
 
         public Task TestForceStopAsync( IActivityMonitor monitor ) => AutoStopAsync( monitor, ignoreAlwaysRunning: true );
 
-        protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
+        protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, MachineConfiguration config )
         {
-            bool configHasChanged = config.FlashColor != _configRef.FlashColor;
-            _configRef = config;
-            return Task.FromResult( configHasChanged ? DeviceReconfiguredResult.UpdateSucceeded : DeviceReconfiguredResult.None );
+            return Task.FromResult( DeviceReconfiguredResult.None );
         }
 
         protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
@@ -47,25 +41,6 @@ namespace CK.DeviceModel.Tests
         {
             Interlocked.Decrement( ref TotalRunning );
             return Task.CompletedTask;
-        }
-
-        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
-        {
-            if( command is FlashCommand )
-            {
-                return _flash.RaiseAsync( monitor, this, _configRef.FlashColor );
-            }
-            return base.DoHandleCommandAsync( monitor, command );
-        }
-
-        protected override void DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
-        {
-            if( command is SetFlashColorCommand f )
-            {
-                _configRef.FlashColor = f.Color;
-                return;
-            }
-            base.DoHandleCommand( monitor, command );
         }
 
         protected override Task DoDestroyAsync( IActivityMonitor monitor )

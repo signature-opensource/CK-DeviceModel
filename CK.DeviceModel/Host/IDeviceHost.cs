@@ -81,14 +81,16 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device and its configuration (or null references if not found).</returns>
-        (IDevice?, DeviceConfiguration?) FindWithConfiguration( string deviceName );
+        (IDevice?, DeviceConfiguration?) GetConfiguredDevice( string deviceName );
 
         /// <summary>
         /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
         /// Note that these objects are a copy of the ones that are used by the actual devices.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
-        IReadOnlyList<(IDevice, DeviceConfiguration)> GetDeviceConfigurations( Func<IDevice, DeviceConfiguration, bool> predicate );
+        /// <param name="predicate">Optional predicate to filter the snapshoted result.</param>
+        /// <returns>The snapshot of the configured devices.</returns>
+        IReadOnlyList<(IDevice, DeviceConfiguration)> GetConfiguredDevices( Func<IDevice, DeviceConfiguration, bool>? predicate = null );
 
         /// <summary>
         /// Gets a <see cref="PerfectEvent{IDeviceHost}"/> that is raised whenever the device list has changed

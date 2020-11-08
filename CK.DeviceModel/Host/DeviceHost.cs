@@ -108,12 +108,12 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device and its configuration or null if not found.</returns>
-        public ConfiguredDevice<T, TConfiguration>? FindWithConfiguration( string deviceName )
+        public ConfiguredDevice<T, TConfiguration>? GetConfiguredDevice( string deviceName )
         {
             return _devices.TryGetValue( deviceName, out var e ) ? e : (ConfiguredDevice<T, TConfiguration>?)null;
         }
 
-        (IDevice?, DeviceConfiguration?) IDeviceHost.FindWithConfiguration( string deviceName )
+        (IDevice?, DeviceConfiguration?) IDeviceHost.GetConfiguredDevice( string deviceName )
         {
             return _devices.TryGetValue( deviceName, out var e ) ? (e.Device, e.Configuration) : (null, null);
         }
@@ -123,16 +123,19 @@ namespace CK.DeviceModel
         /// Note that these objects are a copy of the ones that are used by the actual devices.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
-        public IReadOnlyList<ConfiguredDevice<T, TConfiguration>> GetDeviceConfigurations( Func<T, TConfiguration, bool> predicate )
+        /// <param name="predicate">Optional predicate to filter the snapshoted result.</param>
+        /// <returns>The snapshot of the configured devices.</returns>
+        public IReadOnlyList<ConfiguredDevice<T, TConfiguration>> GetConfiguredDevices( Func<T, TConfiguration, bool>? predicate = null )
         {
-            return _devices.Values.Where( e => predicate( e.Device, e.Configuration ) ).ToArray();
+            return predicate != null
+                        ? _devices.Values.Where( e => predicate( e.Device, e.Configuration ) ).ToArray()
+                        : _devices.Values.ToArray();
         }
 
-        IReadOnlyList<(IDevice, DeviceConfiguration)> IDeviceHost.GetDeviceConfigurations( Func<IDevice, DeviceConfiguration, bool> predicate )
+        IReadOnlyList<(IDevice, DeviceConfiguration)> IDeviceHost.GetConfiguredDevices( Func<IDevice, DeviceConfiguration, bool>? predicate )
         {
-            return _devices.Values.Where( e => predicate(e.Device,e.Configuration) )
-                                   .Select( e => ((IDevice)e.Device, (DeviceConfiguration)e.Configuration) )
-                                   .ToArray();
+            var set = predicate != null ? _devices.Values.Where( e => predicate( e.Device, e.Configuration ) ) : _devices.Values;
+            return set.Select( e => ((IDevice)e.Device, (DeviceConfiguration)e.Configuration) ).ToArray();
         }
 
         /// <inheritdoc />
@@ -214,7 +217,7 @@ namespace CK.DeviceModel
 
             THostConfiguration hostConfig = _hostConfigFactory();
             hostConfig.Items.Add( configuration );
-            var result = await ApplyConfigurationAsync( monitor, hostConfig );
+            var result = await ApplyConfigurationAsync( monitor, hostConfig ).ConfigureAwait( false );
             return result.Results[0];
         }
 
@@ -248,7 +251,7 @@ namespace CK.DeviceModel
                 // Note that the Changed event is raised outside of the lock.
                 bool somethingChanged = false;
 
-                await _lock.EnterAsync( monitor );
+                await _lock.EnterAsync( monitor ).ConfigureAwait( false );
                 try
                 {
                     // Captures and works on a copy of the _devices dictionary (the lock is taken): Find() can work lock-free on _devices.
@@ -367,7 +370,7 @@ namespace CK.DeviceModel
                     }
                     if( postLockActions != null )
                     {
-                        foreach( var a in postLockActions ) await a();
+                        foreach( var a in postLockActions ) await a().ConfigureAwait( false );
                     }
                 }
             }
@@ -378,7 +381,7 @@ namespace CK.DeviceModel
         {
             // The Changed event is raised outside of the lock.
             bool somethingChanged = false;
-            await _lock.EnterAsync( monitor );
+            await _lock.EnterAsync( monitor ).ConfigureAwait( false );
             try
             {
                 if( _devices.TryGetValue( deviceName, out var e ) )
@@ -406,7 +409,7 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task ClearAsync( IActivityMonitor monitor )
         {
-            await _lock.EnterAsync( monitor );
+            await _lock.EnterAsync( monitor ).ConfigureAwait( false );
             try
             {
                 using( monitor.OpenInfo( $"Closing '{DeviceHostName}': stopping {_devices.Count} devices." ) )
@@ -613,24 +616,24 @@ namespace CK.DeviceModel
 
         Task<bool> IInternalDeviceHost.StopAsync( IDevice d, IActivityMonitor monitor ) => DeviceActionAsync( d, monitor, DeviceAction.Stop );
 
-        Task<bool> IInternalDeviceHost.AutoStopAsync( IDevice d, IActivityMonitor monitor, bool ignoreAlwaysRunning ) => DeviceActionAsync( d, monitor, ignoreAlwaysRunning ? DeviceAction.AutoStop : DeviceAction.AutoStopForce );
+        Task<bool> IInternalDeviceHost.AutoStopAsync( IDevice d, IActivityMonitor monitor, bool ignoreAlwaysRunning ) => DeviceActionAsync( d, monitor, ignoreAlwaysRunning ? DeviceAction.AutoStopForce : DeviceAction.AutoStop );
 
         Task IInternalDeviceHost.AutoDestroyAsync( IDevice d, IActivityMonitor monitor ) => DeviceActionAsync( d, monitor, DeviceAction.AutoDestroy );
 
         async Task<bool> DeviceActionAsync( IDevice d, IActivityMonitor monitor, DeviceAction a )
         {
             bool success;
-            await _lock.EnterAsync( monitor );
+            await _lock.EnterAsync( monitor ).ConfigureAwait( false );
             // Nothing can throw here: avoid useless try/catch.
             if( _devices.TryGetValue( d.Name, out var e ) )
             {
                 bool raiseChanged = false;
                 switch( a )
                 {
-                    case DeviceAction.Start: success = e.Device.IsRunning || await e.Device.HostStartAsync( monitor, DeviceStartedReason.StartedCall ); break;
-                    case DeviceAction.Stop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.StoppedCall ); break;
-                    case DeviceAction.AutoStop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedCall ); break;
-                    case DeviceAction.AutoStopForce: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedForceCall ); break;
+                    case DeviceAction.Start: success = e.Device.IsRunning || await e.Device.HostStartAsync( monitor, DeviceStartedReason.StartedCall ).ConfigureAwait( false ); break;
+                    case DeviceAction.Stop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.StoppedCall ).ConfigureAwait( false ); break;
+                    case DeviceAction.AutoStop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedCall ).ConfigureAwait( false ); break;
+                    case DeviceAction.AutoStopForce: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedForceCall ).ConfigureAwait( false ); break;
                     case DeviceAction.AutoDestroy:
                         {
                             var newDevices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
@@ -645,7 +648,7 @@ namespace CK.DeviceModel
                 _lock.Leave( monitor );
                 if( raiseChanged )
                 {
-                    await _devicesChanged.SafeRaiseAsync( monitor, this );
+                    await _devicesChanged.SafeRaiseAsync( monitor, this ).ConfigureAwait( false );
                 }
 
             }
@@ -669,7 +672,7 @@ namespace CK.DeviceModel
         async Task<bool> IInternalDeviceHost.SetControllerKeyAsync( IDevice d, IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
         {
             bool success;
-            await _lock.EnterAsync( monitor );
+            await _lock.EnterAsync( monitor ).ConfigureAwait( false );
             // Nothing can throw here: avoid useless try/catch.
             if( _devices.TryGetValue( d.Name, out var e ) )
             {
@@ -678,7 +681,7 @@ namespace CK.DeviceModel
                 success = sender != null;
                 if( success )
                 {
-                    await sender!.RaiseAsync( monitor, e.Device, key );
+                    await sender!.RaiseAsync( monitor, e.Device, key ).ConfigureAwait( false );
                 }
             }
             else

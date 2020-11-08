@@ -4,9 +4,9 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using CK.Core;
-using static CK.Testing.MonitorTestHelper;
 using System.Diagnostics;
 using FluentAssertions.Execution;
+using static CK.Testing.MonitorTestHelper;
 
 namespace CK.DeviceModel.Tests
 {
@@ -194,7 +194,7 @@ namespace CK.DeviceModel.Tests
             devicesSyncCalled.Should().Be( 3 );
             devicesAsyncCalled.Should().Be( 3 );
 
-            var cAndConfig = host.FindWithConfiguration( "C" );
+            var cAndConfig = host.GetConfiguredDevice( "C" );
             Debug.Assert( cAndConfig != null );
             cAndConfig.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable, "Even if Device decided that nothing changed, the updated configuration is captured." );
 
@@ -209,7 +209,7 @@ namespace CK.DeviceModel.Tests
 
             // AutoDestroying.
             lastSyncEvent = null;
-            await cameraC.TestAutoDestroy( TestHelper.Monitor );
+            await cameraC.TestAutoDestroyAsync( TestHelper.Monitor );
             devicesSyncCalled.Should().Be( 4, "Device removed!" );
             devicesAsyncCalled.Should().Be( 4 );
             host.Find( "C" ).Should().BeNull();

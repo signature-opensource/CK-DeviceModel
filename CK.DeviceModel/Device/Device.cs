@@ -301,6 +301,7 @@ namespace CK.DeviceModel
             }
             if( _isRunning )
             {
+                monitor.Debug( "Already running." );
                 return true;
             }
             return null;
@@ -309,26 +310,29 @@ namespace CK.DeviceModel
         internal async Task<bool> HostStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
         {
             Debug.Assert( _host != null );
-            var check = SyncStateStartCheck( monitor );
-            if( check.HasValue ) return check.Value;
-            Debug.Assert( _isRunning == false );
-            try
+            using( monitor.OpenInfo( $"Starting {FullName} ({reason})" ).ConcludeWith( () => _isRunning ? "Success." : "Failed." ) )
             {
-                if( await DoStartAsync( monitor, reason ) )
+                var check = SyncStateStartCheck( monitor );
+                if( check.HasValue ) return check.Value;
+                Debug.Assert( _isRunning == false );
+                try
                 {
-                    _isRunning = true;
+                    if( await DoStartAsync( monitor, reason ) )
+                    {
+                        _isRunning = true;
+                    }
                 }
+                catch( Exception ex )
+                {
+                    monitor.Error( $"While starting '{FullName}'.", ex );
+                }
+                if( _isRunning ) await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
+                if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
+                {
+                    _host.OnAlwaysRunningCheck( this, monitor );
+                }
+                return _isRunning;
             }
-            catch( Exception ex )
-            {
-                monitor.Error( $"While starting '{FullName}'.", ex );
-            }
-            if( _isRunning ) await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
-            if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
-            {
-                _host.OnAlwaysRunningCheck( this, monitor );
-            }
-            return _isRunning;
         }
 
         /// <summary>
@@ -398,14 +402,14 @@ namespace CK.DeviceModel
                 {
                     _isRunning = false;
                 }
-            }
-            if( reason != DeviceStoppedReason.Destroyed )
-            {
-                await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
-            }
-            if( isAlwaysRunning )
-            {
-                _host.OnAlwaysRunningCheck( this, monitor );
+                if( reason != DeviceStoppedReason.Destroyed )
+                {
+                    await SetDeviceStatusAsync( monitor, new DeviceStatus( reason ) );
+                }
+                if( isAlwaysRunning )
+                {
+                    _host.OnAlwaysRunningCheck( this, monitor );
+                }
             }
             return true;
         }

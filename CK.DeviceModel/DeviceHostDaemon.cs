@@ -21,15 +21,14 @@ namespace CK.DeviceModel
         readonly IInternalDeviceHost[] _deviceHosts;
         readonly CancellationTokenSource _run;
 
-        TaskCompletionSource<bool> _signal;
+        volatile TaskCompletionSource<bool> _signal;
         IActivityMonitor? _daemonMonitor;
 
         /// <summary>
         /// Initializes a new <see cref="DeviceHostDaemon"/>.
         /// </summary>
-        /// <param name="configuration">The global configuration.</param>
         /// <param name="deviceHosts">The available hosts.</param>
-        public DeviceHostDaemon( IConfiguration configuration, IEnumerable<IDeviceHost> deviceHosts )
+        public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts )
         {
             _run = new CancellationTokenSource();
             _signal = new TaskCompletionSource<bool>();
@@ -50,7 +49,10 @@ namespace CK.DeviceModel
 
         internal void Signal()
         {
-            _signal.TrySetResult( true );
+            var s = _signal;
+            _signal = new TaskCompletionSource<bool>();
+            // This ensures that the Loop doesn't run on this thread. 
+            Task.Run( () => s.TrySetResult( true ) );
         }
 
         async Task TheLoop()
@@ -60,25 +62,36 @@ namespace CK.DeviceModel
             {
                 h.SetDaemon( this );
             }
+            _daemonMonitor.Debug( "Daemon loop started." );
             while( !_run.IsCancellationRequested )
             {
-                DateTime now = DateTime.UtcNow;
-                int wait = Int32.MaxValue;
-                foreach( var h in _deviceHosts )
+                var signalTask = _signal.Task;
+                using( _daemonMonitor.OpenDebug( "Checking always running devices." ) )
                 {
-                    var delta = await h.CheckAlwaysRunningAsync( _daemonMonitor, now );
-                    Debug.Assert( delta > 0 );
-                    if( wait > delta ) wait = delta;
+                    DateTime now = DateTime.UtcNow;
+                    long wait = Int64.MaxValue;
+                    foreach( var h in _deviceHosts )
+                    {
+                        var delta = await h.CheckAlwaysRunningAsync( _daemonMonitor, now );
+                        Debug.Assert( delta > 0 );
+                        if( wait > delta ) wait = delta;
+                    }
+                    if( signalTask.IsCompleted )
+                    {
+                        _daemonMonitor.CloseGroup( $"Host has been signaled. Repeat." );
+                    }
+                    else if( wait != Int64.MaxValue )
+                    {
+                        int w = (int)(wait / TimeSpan.TicksPerMillisecond);
+                        _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a host's signal." );
+                        await Task.WhenAny( Task.Delay( w ), signalTask );
+                    }
+                    else
+                    {
+                        _daemonMonitor.CloseGroup( $"Waiting for a host's signal." );
+                        await signalTask;
+                    }
                 }
-                if( wait != Int32.MaxValue )
-                {
-                    await Task.WhenAny( Task.Delay( wait ), _signal.Task );
-                }
-                else
-                {
-                    await _signal.Task;
-                }
-                _signal = new TaskCompletionSource<bool>();
             }
         }
 

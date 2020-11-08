@@ -30,6 +30,6 @@ namespace CK.DeviceModel
 
         void SetDaemon( DeviceHostDaemon daemon );
 
-        ValueTask<int> CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
+        ValueTask<long> CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
     }
 }

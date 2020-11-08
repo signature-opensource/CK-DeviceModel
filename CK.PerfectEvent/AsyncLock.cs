@@ -74,7 +74,7 @@ namespace CK.Core
         /// will <see cref="Leave(IActivityMonitor)"/> this lock.
         /// <para>
         /// This returns a ValueTask (that is not IDisposable): forgetting the await in the <c>using( await _lock.LockAsync() )</c> is not possible
-        /// since this deosn't compile.
+        /// since this doesn't compile.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor that identifies the activity.</param>
