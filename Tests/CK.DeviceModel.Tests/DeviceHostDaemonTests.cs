@@ -69,7 +69,7 @@ namespace CK.DeviceModel.Tests
             await d.TestForceStopAsync( TestHelper.Monitor );
             d.IsRunning.Should().BeFalse();
 
-            await Task.Delay( 200 );
+            await Task.Delay( 100 );
             d.IsRunning.Should().BeFalse( "Since MinRetryCount = 1." );
 
             await Task.Delay( 200 );
@@ -231,6 +231,10 @@ namespace CK.DeviceModel.Tests
             TestHelper.Monitor.Debug( "*** Wait ***" );
             await Task.Delay( 210 );
             devices.Count( d => d.IsRunning ).Should().Be( 6 );
+
+            // Must destroy the cameras because they are counted!
+            await host2.DestroyDeviceAsync( TestHelper.Monitor, "D1" );
+            await host2.DestroyDeviceAsync( TestHelper.Monitor, "D*2" );
 
             await ((IHostedService)daemon).StopAsync( default );
         }
