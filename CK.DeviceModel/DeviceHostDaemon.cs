@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Primitives;
 using System;
@@ -26,10 +27,14 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Initializes a new <see cref="DeviceHostDaemon"/>.
+        /// TEMPORARY WORKAROUND HERE: the parameter should be IEnumerable[IDeviceHost] but
+        /// current StObj implementation forbids this (IEnumerable handling ignores [IsMultiple] attribute).
         /// </summary>
         /// <param name="deviceHosts">The available hosts.</param>
-        public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts )
+        public DeviceHostDaemon( IServiceProvider serviceProvider )
         {
+            var deviceHosts = serviceProvider.GetServices<IDeviceHost>();
+
             _run = new CancellationTokenSource();
             _signal = new TaskCompletionSource<bool>();
            _deviceHosts = deviceHosts.Cast<IInternalDeviceHost>().ToArray();

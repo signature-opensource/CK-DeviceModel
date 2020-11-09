@@ -50,6 +50,22 @@ namespace CK.DeviceModel.Tests
             }
         }
 
+        class FakeWorkAround : IServiceProvider
+        {
+            IDeviceHost[] _hosts;
+
+            public FakeWorkAround( params IDeviceHost[] hosts )
+            {
+                _hosts = hosts;
+            }
+
+            public object GetService( Type serviceType )
+            {
+                if( serviceType != typeof( IEnumerable<IDeviceHost> ) ) throw new NotSupportedException();
+                return _hosts;
+            }
+        }
+
         [Test]
         public async Task simple_auto_restart()
         {
@@ -57,7 +73,8 @@ namespace CK.DeviceModel.Tests
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1, MachineDuration = 200 };
             var host = new MachineHost( policy );
-            var daemon = new DeviceHostDaemon( new[] { host } );
+
+            var daemon = new DeviceHostDaemon( new FakeWorkAround( host ) );
 
             await ((IHostedService)daemon).StartAsync( default );
             var config = new MachineConfiguration() { Name = "M", Status = DeviceConfigurationStatus.AlwaysRunning };
@@ -93,7 +110,7 @@ namespace CK.DeviceModel.Tests
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 0, MachineDuration = 200 };
             var host = new MachineHost( policy );
-            var daemon = new DeviceHostDaemon( new[] { host } );
+            var daemon = new DeviceHostDaemon( new FakeWorkAround( host ) );
 
             await ((IHostedService)daemon).StartAsync( default );
             var config = new MachineConfiguration() { Name = "M", Status = DeviceConfigurationStatus.AlwaysRunning };
@@ -119,7 +136,7 @@ namespace CK.DeviceModel.Tests
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1, MachineDuration = 1000 };
             var host = new MachineHost( policy );
-            var daemon = new DeviceHostDaemon( new[] { host } );
+            var daemon = new DeviceHostDaemon( new FakeWorkAround( host ) );
 
             await ((IHostedService)daemon).StartAsync( default );
             var config = new MachineConfiguration() { Name = "M", Status = DeviceConfigurationStatus.AlwaysRunning };
@@ -195,7 +212,7 @@ namespace CK.DeviceModel.Tests
             var host1 = new MachineHost( policy );
             var host2 = new CameraHost( policy );
             var host3 = new OtherMachineHost( policy );
-            var daemon = new DeviceHostDaemon( new IDeviceHost[] { host1, host2, host3 } );
+            var daemon = new DeviceHostDaemon( new FakeWorkAround( host1, host2, host3 ) );
 
             await ((IHostedService)daemon).StartAsync( default );
 
