@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.DeviceModel.Command;
 using CK.PerfectEvent;
 using CK.Text;
 using System;
@@ -578,11 +577,12 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command )
         {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( command == null ) throw new ArgumentNullException( nameof( command ) );
+            if( !command.HostType.IsAssignableFrom( GetType() ) ) return default;
+
             if( !command.CheckValidity( monitor ) ) throw new ArgumentException( $"{command.GetType().Name}: CheckValidity failed. See logs.", nameof( command ) );
 
-            if( !command.HostType.IsAssignableFrom( GetType() ) ) return default;
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
 
             Debug.Assert( command.DeviceName != null, "CheckValidity ensured that." );
             var d = Find( command.DeviceName );
@@ -591,14 +591,11 @@ namespace CK.DeviceModel
                 monitor.Warn( $"Device named '{command.DeviceName}' not found in '{DeviceHostName}' host." );
                 return default;
             }
-            if( !(command is BasicControlDeviceCommand b) || b.Operation != BasicControlDeviceOperation.ResetControllerKey )
+            var invalidKey = d.CheckCommandControllerKey( command );
+            if( invalidKey != null )
             {
-                var key = d.ControllerKey;
-                if( key != null && command.ControllerKey != key )
-                {
-                    monitor.Warn( $"Command skipped by {d.FullName}: Expected ControllerKey is '{command.ControllerKey}' but current one is '{key}'." );
-                    return default;
-                }
+                monitor.Warn( $"Command skipped by host '{DeviceHostName}': {invalidKey}." );
+                return default;
             }
             return new RoutedDeviceCommand( command, d );
         }
