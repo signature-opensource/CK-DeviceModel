@@ -104,11 +104,11 @@ namespace CK.DeviceModel
         /// finds the target device based on <see cref="DeviceCommand.DeviceName"/> and checks the <see cref="DeviceCommand.ControllerKey"/>
         /// against the <see cref="IDevice.ControllerKey"/>.
         /// <para>
-        /// When <see cref="RoutedDeviceCommand.Success"/> is true, the command can be executed synchronously or asynchronously by
+        /// When the returned <see cref="RoutedDeviceCommand.Success"/> is true, the command can be executed synchronously or asynchronously by
         /// the <see cref="RoutedDeviceCommand"/>.
         /// </para>
         /// <para>
-        /// Note that <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
+        /// Note that <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> must be true otherwise an <see cref="ArgumentException"/> is thrown.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>

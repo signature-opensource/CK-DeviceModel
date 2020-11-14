@@ -285,7 +285,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
-        public async Task executing_commands_without_ControllerKey()
+        public async Task executing_commands_from_the_host_without_ControllerKey()
         {
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );
@@ -315,7 +315,7 @@ namespace CK.DeviceModel.Tests
             flashLastColor.Should().Be( 78 );
 
             var cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 }; ;
-            var execS = host.Handle( TestHelper.Monitor, cmdS );
+            RoutedDeviceCommand execS = host.Handle( TestHelper.Monitor, cmdS );
             execS.Success.Should().BeTrue();
             execS.IsAsync.Should().BeFalse();
             execS.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().Throw<InvalidCastException>();
@@ -329,6 +329,80 @@ namespace CK.DeviceModel.Tests
             execS = host.Handle( TestHelper.Monitor, cmdS );
             execS.Success.Should().BeFalse();
             execS.IsAsync.Should().BeNull();
+
+            await host.DestroyDeviceAsync( TestHelper.Monitor, "n°1" );
+
+            Camera.TotalCount.Should().Be( 0 );
+            Camera.TotalRunning.Should().Be( 0 );
+
+        }
+
+        [Test]
+        public async Task executing_commands_directly_on_the_device()
+        {
+            Camera.TotalCount.Should().Be( 0 );
+            Camera.TotalRunning.Should().Be( 0 );
+
+            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            var config = new CameraConfiguration()
+            {
+                Name = "n°1",
+                FlashColor = 78,
+                Status = DeviceConfigurationStatus.RunnableStarted
+            };
+            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+
+            var d = host.Find( "n°1" );
+            Debug.Assert( d != null );
+
+            int flashLastColor = 0;
+            d.Flash.Sync += (m,c,color) => flashLastColor = color;
+
+            var cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1" };
+            var cmdSync = new SetFlashColorCommand() { DeviceName = "n°1" };
+
+            cmdSync.ControllerKey = "Never mind since the device's ControllerKey is null.";
+            cmdSync.Color = 6;
+            d.ExecuteCommand( TestHelper.Monitor, cmdSync );
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash );
+            flashLastColor.Should().Be( 6 );
+
+            // Use the basic (async) command to set a ControllerKey.
+            var setControllerKey = new BasicControlDeviceCommand<CameraHost>( BasicControlDeviceOperation.ResetControllerKey )
+            {
+                ControllerKey = "I'm controlling.",
+                DeviceName = "n°1"
+            };
+            await d.ExecuteCommandAsync( TestHelper.Monitor, setControllerKey );
+
+            cmdSync.ControllerKey = "I'm not in charge. This will throw an ArgumentException.";
+            d.Invoking( _ => _.ExecuteCommand( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
+
+            cmdSync.ControllerKey = "I'm controlling.";
+            cmdSync.Color = 18;
+            d.ExecuteCommand( TestHelper.Monitor, cmdSync );
+            d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
+            cmdRaiseFlash.ControllerKey = "I'm controlling.";
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash );
+            flashLastColor.Should().Be( 18 );
+
+            cmdSync.ControllerKey = "I'm NOT controlling, but checkControllerKey: false is used.";
+            cmdSync.Color = 1;
+            d.ExecuteCommand( TestHelper.Monitor, cmdSync, checkControllerKey: false );
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash, checkControllerKey: false );
+            flashLastColor.Should().Be( 1 );
+
+            cmdSync.ControllerKey = "I'm controlling.";
+            cmdSync.DeviceName = "Not the right device name: this will throw an ArgumentException.";
+            d.Invoking( _ => _.ExecuteCommand( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
+            cmdRaiseFlash.DeviceName = "Not the right device name: this will throw an ArgumentException.";
+            d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
+
+            cmdSync.DeviceName = "Not the right device name but checkDeviceName: false is used.";
+            cmdSync.Color = 3712;
+            d.ExecuteCommand( TestHelper.Monitor, cmdSync, checkDeviceName: false );
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash, checkDeviceName: false );
+            flashLastColor.Should().Be( 3712 );
 
             await host.DestroyDeviceAsync( TestHelper.Monitor, "n°1" );
 

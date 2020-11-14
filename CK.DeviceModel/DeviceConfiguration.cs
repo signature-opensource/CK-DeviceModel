@@ -53,7 +53,7 @@ namespace CK.DeviceModel
         /// This checks that the <see cref="Name"/> is not empty and calls the protected <see cref="DoCheckValid(IActivityMonitor)"/>
         /// that can handle specialized checks.
         /// </summary>
-        /// <param name="monitor">The monitor to log error, warnigs or other.</param>
+        /// <param name="monitor">The monitor to log errors or warnings or information.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
         public bool CheckValid( IActivityMonitor monitor )
         {

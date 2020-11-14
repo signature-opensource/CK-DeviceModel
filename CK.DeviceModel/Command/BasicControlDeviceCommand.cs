@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CK.DeviceModel.Command
+namespace CK.DeviceModel
 {
     /// <summary>
     /// Non generic base for <see cref="BasicControlDeviceCommand{THost}"/> command that

@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
-using CK.DeviceModel.Command;
 using CK.PerfectEvent;
 
 namespace CK.DeviceModel
@@ -464,12 +463,73 @@ namespace CK.DeviceModel
             return _host?.AutoStopAsync( this, monitor, ignoreAlwaysRunning ) ?? Task.FromResult(true);
         }
 
-        void IInternalDevice.Execute( IActivityMonitor monitor, SyncDeviceCommand c )
+        /// <summary>
+        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>.
+        /// An <see cref="ArgumentException"/> is raised if:
+        /// <list type="bullet">
+        ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
+        ///     <item>or <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> fails;</item>
+        ///     <item>or the <see cref="DeviceCommand.DeviceName"/> doesn't match this device's name;</item>
+        ///     <item>or this <see cref="ControllerKey"/> is not null and <see cref="DeviceCommand.ControllerKey"/> differs from it.</item>
+        /// </list>
+        /// The 2 last checks can be suppressed thanks to the <paramref name="checkDeviceName"/> and <paramref name="checkControllerKey"/> parameters.
+        /// is called
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute synchronously.</param>
+        /// <param name="checkDeviceName">
+        /// By default, the <see cref="DeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
+        /// Using false here allows any command name to be executed.
+        /// </param>
+        /// <param name="checkControllerKey">
+        /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
+        /// Using false here skips this check.
+        /// </param>
+        public void ExecuteCommand( IActivityMonitor monitor, SyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
         {
-            DoHandleCommand( monitor, c );
+            CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
+            DoHandleCommand( monitor, command );
         }
 
-        Task IInternalDevice.ExecuteAsync( IActivityMonitor monitor, AsyncDeviceCommand c )
+        public Task ExecuteCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
+        {
+            CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
+            return ExecuteWithBasicCammandAsync( monitor, command );
+        }
+
+        void CheckDirectCommandParameter( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName, bool checkControllerKey )
+        {
+            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            if( command == null ) throw new ArgumentNullException( nameof( command ) );
+            if( !command.HostType.IsAssignableFrom( _host!.GetType() ) ) throw new ArgumentException( $"{command.GetType().Name}: Invalid HostType '{command.HostType.Name}'.", nameof( command ) );
+            if( !command.CheckValidity( monitor ) ) throw new ArgumentException( $"{command.GetType().Name}: CheckValidity failed. See logs.", nameof( command ) );
+            if( checkDeviceName && command.DeviceName != Name ) throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it.", nameof( command ) );
+            if( checkControllerKey )
+            {
+                var invalidKey = CheckCommandControllerKey( command );
+                if( invalidKey != null ) throw new ArgumentException( $"{command.GetType().Name}: {invalidKey}" );
+            }
+        }
+
+        internal string? CheckCommandControllerKey( DeviceCommand command )
+        {
+            // The basic ResetControllerKey command sets a new ControllerKey.
+            if( !(command is BasicControlDeviceCommand b) || b.Operation != BasicControlDeviceOperation.ResetControllerKey )
+            {
+                var key = ControllerKey;
+                if( key != null && command.ControllerKey != key )
+                {
+                    return $"Expected command ControllerKey is '{command.ControllerKey}' but current one is '{key}'.";
+                }
+            }
+            return null;
+        }
+
+        void IInternalDevice.Execute( IActivityMonitor monitor, SyncDeviceCommand c ) => DoHandleCommand( monitor, c );
+
+        Task IInternalDevice.ExecuteAsync( IActivityMonitor monitor, AsyncDeviceCommand c ) => ExecuteWithBasicCammandAsync( monitor, c );
+
+        private Task ExecuteWithBasicCammandAsync( IActivityMonitor monitor, AsyncDeviceCommand c )
         {
             if( c is BasicControlDeviceCommand b )
             {
@@ -478,6 +538,7 @@ namespace CK.DeviceModel
                     case BasicControlDeviceOperation.Start: return StartAsync( monitor );
                     case BasicControlDeviceOperation.Stop: return StopAsync( monitor );
                     case BasicControlDeviceOperation.ResetControllerKey: return SetControllerKeyAsync( monitor, b.ControllerKey );
+                    case BasicControlDeviceOperation.None: return Task.CompletedTask;
                     default: throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) );
                 }
             }
