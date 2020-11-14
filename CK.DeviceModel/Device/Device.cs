@@ -494,7 +494,7 @@ namespace CK.DeviceModel
         public Task ExecuteCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
         {
             CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
-            return ExecuteWithBasicCammandAsync( monitor, command );
+            return ExecuteWithBasicCommandAsync( monitor, command );
         }
 
         void CheckDirectCommandParameter( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName, bool checkControllerKey )
@@ -527,9 +527,9 @@ namespace CK.DeviceModel
 
         void IInternalDevice.Execute( IActivityMonitor monitor, SyncDeviceCommand c ) => DoHandleCommand( monitor, c );
 
-        Task IInternalDevice.ExecuteAsync( IActivityMonitor monitor, AsyncDeviceCommand c ) => ExecuteWithBasicCammandAsync( monitor, c );
+        Task IInternalDevice.ExecuteAsync( IActivityMonitor monitor, AsyncDeviceCommand c ) => ExecuteWithBasicCommandAsync( monitor, c );
 
-        private Task ExecuteWithBasicCammandAsync( IActivityMonitor monitor, AsyncDeviceCommand c )
+        Task ExecuteWithBasicCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand c )
         {
             if( c is BasicControlDeviceCommand b )
             {
