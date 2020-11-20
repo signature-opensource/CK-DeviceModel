@@ -73,7 +73,12 @@ namespace CK.DeviceModel
             return DoDestroyAsync( monitor );
         }
 
-        internal Task HostRaiseDestroyStatusAsync( IActivityMonitor monitor ) => SetDeviceStatusAsync( monitor, new DeviceStatus( DeviceStoppedReason.Destroyed ) );
+        internal async Task HostRaiseDestroyStatusAsync( IActivityMonitor monitor )
+        {
+            await SetDeviceStatusAsync( monitor, new DeviceStatus( DeviceStoppedReason.Destroyed ) );
+            _statusChanged.RemoveAll();
+            _controllerKeyChanged.RemoveAll();
+        }
 
         /// <summary>
         /// Gets the name. Necessarily not null or whitespace.
@@ -417,7 +422,7 @@ namespace CK.DeviceModel
         /// Implements this device's Stop behavior.
         /// This should always succeed: after having called this method (that may throw), this device is considered stopped.
         /// Note that this method is never called if this device must be <see cref="DeviceConfigurationStatus.AlwaysRunning"/>
-        /// (except with the <see cref="DeviceStoppedReason.Destroyed"/>) or it is already stopped.
+        /// (except with the <see cref="DeviceStoppedReason.Destroyed"/>) or if it is already stopped.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reason">The reason to stop.</param>
@@ -425,8 +430,8 @@ namespace CK.DeviceModel
         protected abstract Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason );
 
         /// <summary>
-        /// Extension point to cleanup device's resources if required.
-        /// This method does nothing at this level.
+        /// Implements this device's destruction behavior.
+        /// Specializations that expose events should call the <c>RemoveAll()</c> methods on all the exposed events.
         /// <para>
         /// Note that it is not possible to cancel/reject the destruction of the device: as long as it has no more configuration,
         /// a device is necessarily stopped and destroyed.
@@ -437,7 +442,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>The awaitable.</returns>
-        protected virtual Task DoDestroyAsync( IActivityMonitor monitor ) => Task.CompletedTask;
+        protected abstract Task DoDestroyAsync( IActivityMonitor monitor );
 
         /// <summary>
         /// This method can be called at any time: this device is destroyed as if no more configuration

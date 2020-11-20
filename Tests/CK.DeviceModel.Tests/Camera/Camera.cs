@@ -71,6 +71,7 @@ namespace CK.DeviceModel.Tests
         protected override Task DoDestroyAsync( IActivityMonitor monitor )
         {
             Interlocked.Decrement( ref TotalCount );
+            _flash.RemoveAll();
             return Task.CompletedTask;
         }
     }

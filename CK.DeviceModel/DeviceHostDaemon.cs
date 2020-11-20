@@ -28,7 +28,8 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new <see cref="DeviceHostDaemon"/>.
         /// TEMPORARY WORKAROUND HERE: the parameter should be IEnumerable[IDeviceHost] but
-        /// current StObj implementation forbids this (IEnumerable handling ignores [IsMultiple] attribute).
+        /// current StObj implementation forbids this (IEnumerable of [IsMultiple] on IAutoService is an error!).
+        /// This is being fixed.
         /// </summary>
         /// <param name="deviceHosts">The available hosts.</param>
         public DeviceHostDaemon( IServiceProvider serviceProvider )
