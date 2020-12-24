@@ -86,7 +86,7 @@ namespace CodeCake
             /// </summary>
             /// <returns>The set of remote NuGet feeds (in practice at most one).</returns>
             protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
-            {yield return new SignatureVSTSFeed( this, "Signature-Code","Default", null);
+            {if( GlobalInfo.BuildInfo.Version.PackageQuality <= CSemVer.PackageQuality.Stable ) yield return new SignatureVSTSFeed( this, "Signature-Code","Default", null);
 }
 
             /// <summary>
