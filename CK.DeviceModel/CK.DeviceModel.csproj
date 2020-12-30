@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.StObj.Model" Version="14.0.4--0037-develop" />
+    <PackageReference Include="CK.StObj.Model" Version="15.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="3.1.10" />
   </ItemGroup>
   <ItemGroup>
