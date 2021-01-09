@@ -508,7 +508,7 @@ namespace CK.DeviceModel
             if( command == null ) throw new ArgumentNullException( nameof( command ) );
             if( !command.HostType.IsAssignableFrom( _host!.GetType() ) ) throw new ArgumentException( $"{command.GetType().Name}: Invalid HostType '{command.HostType.Name}'.", nameof( command ) );
             if( !command.CheckValidity( monitor ) ) throw new ArgumentException( $"{command.GetType().Name}: CheckValidity failed. See logs.", nameof( command ) );
-            if( checkDeviceName && command.DeviceName != Name ) throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it.", nameof( command ) );
+            if( checkDeviceName && command.DeviceName != Name ) throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it. (For direct execution, you can use checkDeviceName: false parameter to skip this check.)", nameof( command ) );
             if( checkControllerKey )
             {
                 var invalidKey = CheckCommandControllerKey( command );
@@ -524,7 +524,7 @@ namespace CK.DeviceModel
                 var key = ControllerKey;
                 if( key != null && command.ControllerKey != key )
                 {
-                    return $"Expected command ControllerKey is '{command.ControllerKey}' but current one is '{key}'.";
+                    return $"Expected command ControllerKey is '{command.ControllerKey}' but current device's one is '{key}'. (For direct execution, you can use checkControllerKey: false parameter to skip this check.)";
                 }
             }
             return null;
