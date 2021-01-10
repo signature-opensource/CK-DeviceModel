@@ -354,6 +354,7 @@ namespace CK.DeviceModel.Configuration.Tests
                                         .ConfigureAppConfiguration( builder => builder.AddConfiguration( config.Root ) )
                                         .ConfigureServices( services =>
                                         {
+                                            services.AddSingleton( config.Root );
                                             // All this is done automatically by CKSetup.
                                             services.AddSingleton<LightControllerHost>();
                                             services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, LightControllerHost>( sp => sp.GetRequiredService<LightControllerHost>() ) );

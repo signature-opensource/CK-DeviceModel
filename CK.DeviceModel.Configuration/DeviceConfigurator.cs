@@ -32,7 +32,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="configuration">The global configuration.</param>
         /// <param name="deviceHosts">The available hosts.</param>
-        public DeviceConfigurator( IConfiguration configuration, IEnumerable<IDeviceHost> deviceHosts )
+        public DeviceConfigurator( IConfigurationRoot configuration, IEnumerable<IDeviceHost> deviceHosts )
         {
             _run = new CancellationTokenSource();
             _configuration = configuration.GetSection( "Device" );
