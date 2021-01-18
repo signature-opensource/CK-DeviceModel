@@ -201,7 +201,7 @@ namespace CK.DeviceModel
                 public IConfigurationSection GetSection( string key ) => new Empty( this, key );
             }
 
-            static readonly string SkippedLeaf = ConfigurationPath.KeyDelimiter + nameof(IDeviceHostConfiguration.Items );
+            static readonly string _skippedLeaf = ConfigurationPath.KeyDelimiter + nameof(IDeviceHostConfiguration.Items );
 
             public IConfigurationSection InnerSection = null!;
 
@@ -223,7 +223,7 @@ namespace CK.DeviceModel
 
             public IEnumerable<IConfigurationSection> GetChildren()
             {
-                return InnerSection.GetChildren().Where( c => !c.Path.EndsWith( SkippedLeaf ) );
+                return InnerSection.GetChildren().Where( c => !c.Path.EndsWith( _skippedLeaf ) );
             }
 
             public IChangeToken GetReloadToken() => InnerSection.GetReloadToken();
