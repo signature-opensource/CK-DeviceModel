@@ -27,8 +27,10 @@ namespace CK.Core
 
             if( cancellation.CanBeCanceled )
             {
-                cancellation.ThrowIfCancellationRequested();
-
+                if( cancellation.IsCancellationRequested )
+                {
+                    return task.IsCompleted;
+                }
                 var tcsCancel = new TaskCompletionSource<object?>();
                 rCancel = cancellation.Register( () => tcsCancel.SetCanceled(), useSynchronizationContext: false );
                 tCancel = tcsCancel.Task;
