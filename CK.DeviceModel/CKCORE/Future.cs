@@ -15,17 +15,11 @@ namespace CK.Core
     /// This is to be used for long running processes that are typically fully asynchronous and/or externally implemented. 
     /// </para>
     /// </summary>
-    public class Future
+    public class Future : IFuture
     {
         readonly TaskCompletionSource<CKExceptionData?> _tcs = new TaskCompletionSource<CKExceptionData?>();
 
-        /// <summary>
-        /// Asynchronously waits for this future to be resolved within a maximum amount of time (and/or as long
-        /// as the <paramref name="cancellation"/> is not signaled). 
-        /// </summary>
-        /// <param name="millisecondsTimeout">The timeout in milliseconds to wait before returning false.</param>
-        /// <param name="cancellation">Optional cancellation token.</param>
-        /// <returns>True if <see cref="IsCompleted"/> is true, false if the timeout occurred before.</returns>
+        /// <inheritdoc />
         public Task<bool> WaitAsync( int millisecondsTimeout, CancellationToken cancellation = default ) => _tcs.Task.WaitAsync( millisecondsTimeout, cancellation );
 
         /// <summary>
