@@ -20,6 +20,7 @@ namespace CK.Core.Tests
             t.IsCompleted.Should().BeFalse();
             bool gotIt = await t.WaitAsync( 200 );
             gotIt.Should().BeTrue();
+            t.IsCompletedSuccessfully.Should().BeTrue();
         }
 
         [Test]
@@ -102,14 +103,28 @@ namespace CK.Core.Tests
         [Test]
         public async Task WaitAsync_itself_can_be_canceled_via_the_CancellationToken_and_returns_false()
         {
-            using var cts = new CancellationTokenSource( 150 );
-            var tcs = new TaskCompletionSource<string>();
+            // The cancellationToken fires DURING the WaitAsync.
+            {
+                using var cts = new CancellationTokenSource( 150 );
+                var tcs = new TaskCompletionSource<string>();
 
-            DateTime now = DateTime.UtcNow;
-            bool gotIt = await tcs.Task.WaitAsync( 500, cts.Token );
-            gotIt.Should().BeFalse();
-            cts.Token.IsCancellationRequested.Should().BeTrue();
-            (DateTime.UtcNow - now).Should().BeCloseTo( TimeSpan.FromMilliseconds( 150 ) );
+                DateTime now = DateTime.UtcNow;
+                bool gotIt = await tcs.Task.WaitAsync( 500, cts.Token );
+                gotIt.Should().BeFalse();
+                cts.Token.IsCancellationRequested.Should().BeTrue();
+                (DateTime.UtcNow - now).Should().BeCloseTo( TimeSpan.FromMilliseconds( 150 ) );
+            }
+            // The cancellationToken has fired BEFORE the WaitAsync.
+            {
+                using var cts = new CancellationTokenSource();
+                cts.Cancel();
+
+                var tcs = new TaskCompletionSource<string>();
+                DateTime now = DateTime.UtcNow;
+                bool gotIt = await tcs.Task.WaitAsync( 500, cts.Token );
+                gotIt.Should().BeFalse();
+            }
+
         }
 
     }
