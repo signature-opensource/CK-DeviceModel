@@ -9,12 +9,8 @@ namespace CK.DeviceModel
     /// <summary>
     /// Internal interface that define non-generic host behaviors: Devices
     /// call these methods.
-    /// <para>
-    /// This is public because IDeviceHost is a IAutoService (also [IsMultiple]) and so it must be public...
-    /// Internal (non public) interface specializations should be allowed: this public is temporary.
-    /// </para>
     /// </summary>
-    public interface IInternalDeviceHost : IDeviceHost
+    interface IInternalDeviceHost : IDeviceHost
     {
         Task<bool> StartAsync( IDevice d, IActivityMonitor monitor );
 
