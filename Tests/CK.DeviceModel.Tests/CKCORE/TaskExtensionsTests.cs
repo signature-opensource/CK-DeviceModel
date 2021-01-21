@@ -89,7 +89,7 @@ namespace CK.Core.Tests
             DateTime now = DateTime.UtcNow;
             bool gotIt = await tcs.Task.WaitAsync( 500 );
             gotIt.Should().BeTrue();
-            (DateTime.UtcNow - now).Should().BeCloseTo( TimeSpan.FromMilliseconds( 150 ) );
+            (DateTime.UtcNow - now).Should().BeCloseTo( TimeSpan.FromMilliseconds( 150 ), precision: 50 );
 
             switch( action )
             {
@@ -112,7 +112,7 @@ namespace CK.Core.Tests
                 bool gotIt = await tcs.Task.WaitAsync( 500, cts.Token );
                 gotIt.Should().BeFalse();
                 cts.Token.IsCancellationRequested.Should().BeTrue();
-                (DateTime.UtcNow - now).Should().BeCloseTo( TimeSpan.FromMilliseconds( 150 ) );
+                (DateTime.UtcNow - now).Should().BeCloseTo( TimeSpan.FromMilliseconds( 150 ), precision: 50 );
             }
             // The cancellationToken has fired BEFORE the WaitAsync.
             {
@@ -123,6 +123,7 @@ namespace CK.Core.Tests
                 DateTime now = DateTime.UtcNow;
                 bool gotIt = await tcs.Task.WaitAsync( 500, cts.Token );
                 gotIt.Should().BeFalse();
+                (DateTime.UtcNow - now).Should().BeCloseTo( TimeSpan.Zero );
             }
 
         }
