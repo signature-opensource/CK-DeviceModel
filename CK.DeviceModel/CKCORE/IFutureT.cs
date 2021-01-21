@@ -7,7 +7,7 @@ namespace CK.Core
     /// Implementation of a <see cref="Future"/> with a <see cref="Value"/>.
     /// </summary>
     /// <typeparam name="T">The result type.</typeparam>
-    public interface IFuture<T>
+    public interface IFuture<T> : IFuture
     {
         /// <summary>
         /// Gets whether <see cref="IsCompleted"/> is true and a <see cref="Value"/> is available.
