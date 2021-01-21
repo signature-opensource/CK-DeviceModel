@@ -22,33 +22,25 @@ namespace CK.Core
         /// <inheritdoc />
         public Task<bool> WaitAsync( int millisecondsTimeout, CancellationToken cancellation = default ) => _tcs.Task.WaitAsync( millisecondsTimeout, cancellation );
 
-        /// <summary>
-        /// Gets whether the <see cref="Value"/> or the <see cref="Error"/> is available.
-        /// </summary>
+        /// <inheritdoc />
         public bool IsCompleted => _tcs.Task.IsCompletedSuccessfully;
 
-        /// <summary>
-        /// Gets the error if an error occurred.
-        /// This is null as long as <see cref="IsCompleted"/> is false or if <see cref="Success"/> is true.
-        /// </summary>
+        /// <inheritdoc />
         public CKExceptionData? Error => _tcs.Task.IsCompletedSuccessfully
                                             ? _tcs.Task.Result
                                             : null;
 
-        /// <summary>
-        /// Gets whether <see cref="IsCompleted"/> is true and an <see cref="Error"/> occurred.
-        /// </summary>
+        /// <inheritdoc />
         [MemberNotNullWhen( true, nameof( Error ) )]
         public bool HasError => Error != null;
 
-        /// <summary>
-        /// Gets whether the result is not yet available (null when <see cref="IsCompleted"/> is false),
-        /// whether an error occurred (false when <see cref="HasError"/> is true),
-        /// or whether the command has been sucessfully executed: <see cref="HasValue"/> is true.
-        /// </summary>
+        /// <inheritdoc />
         public bool? Success => _tcs.Task.IsCompletedSuccessfully
                                     ? _tcs.Task.Result == null
                                     : null;
+
+        /// <inheritdoc />
+        public Task AsTask() => _tcs.Task;
 
         /// <summary>
         /// Sets the successfut result.

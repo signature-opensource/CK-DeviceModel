@@ -48,6 +48,9 @@ namespace CK.Core
                                     ? _tcs.Task.Result is T
                                     : null;
 
+        /// <inheritdoc />
+        public Task AsTask() => _tcs.Task;
+
         /// <summary>
         /// Sets the successfut result.
         /// Can be called only once and only if <see cref="SetError(CKExceptionData)"/> has not been called.

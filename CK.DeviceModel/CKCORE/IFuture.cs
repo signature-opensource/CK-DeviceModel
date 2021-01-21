@@ -6,7 +6,7 @@ namespace CK.Core
 {
     /// <summary>
     /// A future is a little bit like a Task except that it is not directly awaitable: you can <see cref="WaitAsync(int, CancellationToken)"/> a future
-    /// with a given timeout and a cancellation token, but cannot await or set a continuation directly on it.
+    /// with a given timeout and a cancellation token, but cannot await or set a continuation directly on it directly (you may use <see cref="AsTask()"/> however).
     /// <para>
     /// This is to be used for long running processes that are typically fully asynchronous and/or externally implemented. 
     /// </para>
@@ -45,5 +45,13 @@ namespace CK.Core
         /// <param name="cancellation">Optional cancellation token.</param>
         /// <returns>True if <see cref="IsCompleted"/> is true, false if the timeout occurred before.</returns>
         Task<bool> WaitAsync( int millisecondsTimeout, CancellationToken cancellation = default );
+
+        /// <summary>
+        /// Gets a task that can be awaited or be continued until this Future is on success or on error.
+        /// This should be used with care since a Future describes a long running process: awaiting for it
+        /// should be done when a resolution is known to happen shortly. 
+        /// </summary>
+        /// <returns>A task is resolved when this Future is available.</returns>
+        Task AsTask();
     }
 }
