@@ -495,6 +495,18 @@ namespace CK.DeviceModel
             DoHandleCommand( monitor, command );
         }
 
+        /// <summary>
+        /// Like <see cref="ExecuteCommand"/> except that <see cref="DeviceCommand.DeviceName"/> is not checked against <see cref="Name"/>
+        /// and <see cref="DeviceCommand.ControllerKey"/> is not match against <see cref="ControllerKey"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute synchronously.</param>
+        public void UnsafeExecuteCommand( IActivityMonitor monitor, SyncDeviceCommand command )
+        {
+            CheckDirectCommandParameter( monitor, command, false, false );
+            DoHandleCommand( monitor, command );
+        }
+
         /// <inheritdoc cref="ExecuteCommand"/>
         public Task ExecuteCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
         {
