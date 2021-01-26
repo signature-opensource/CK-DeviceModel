@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
 using CK.PerfectEvent;
+using CK.Text;
 
 namespace CK.DeviceModel
 {
@@ -63,6 +64,8 @@ namespace CK.DeviceModel
             Debug.Assert( _host == null );
             _host = host;
             FullName = host.DeviceHostName + '/' + Name;
+            DeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
+            DeviceFolderPath = DeviceFolderPath.Combine( "CK/DeviceModel" + FullName );
         }
 
         internal Task HostDestroyAsync( IActivityMonitor monitor )
@@ -89,6 +92,20 @@ namespace CK.DeviceModel
         /// Gets the full name of this device: it is "<see cref="IDeviceHost.DeviceHostName"/>/<see cref="Name"/>".
         /// </summary>
         public string FullName { get; private set; }
+
+        /// <summary>
+        /// Gets a fully rooted path in the application local folders that
+        /// is "CK/DeviceModel/<see cref="IDeviceHost.DeviceHostName"/>/<see cref="Name"/>".
+        /// <para>
+        /// This path is independent of the current application: it is based on the device
+        /// type (the host) and instance (this name).
+        /// </para>
+        /// <para>
+        /// This folder is NOT created: it is up to the device, if it needs it to call <see cref="System.IO.Directory.CreateDirectory(string)"/>
+        /// (and may handle the <see cref="System.IO.Directory.Delete(string)"/> from <see cref="DoDestroyAsync"/>).
+        /// </para>
+        /// </summary>
+        public NormalizedPath DeviceFolderPath { get; private set; }
 
         /// <inheritdoc />
         public string? ControllerKey => _controllerKey;
