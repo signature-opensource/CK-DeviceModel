@@ -74,7 +74,7 @@ namespace CK.DeviceModel
             Name = config.Name;
             FullName = info.Host.DeviceHostName + '/' + Name;
             DeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
-            DeviceFolderPath = DeviceFolderPath.Combine( "CK/DeviceModel" + FullName );
+            DeviceFolderPath = DeviceFolderPath.Combine( "CK/DeviceModel/" + FullName );
 
             _configStatus = config.Status;
             _controllerKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
