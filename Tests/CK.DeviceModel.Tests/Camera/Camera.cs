@@ -16,11 +16,11 @@ namespace CK.DeviceModel.Tests
         CameraConfiguration _configRef;
         readonly PerfectEventSender<Camera,int> _flash;
 
-        public Camera( IActivityMonitor monitor, CameraConfiguration config )
-            : base( monitor, config )
+        public Camera( IActivityMonitor monitor, CreateInfo info )
+            : base( monitor, info )
         {
             Interlocked.Increment( ref TotalCount );
-            _configRef = config;
+            _configRef = info.Configuration;
             _flash = new PerfectEventSender<Camera,int>();
         }
 

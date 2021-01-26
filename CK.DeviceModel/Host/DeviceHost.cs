@@ -293,7 +293,6 @@ namespace CK.DeviceModel
                                 else
                                 {
                                     r = DeviceApplyConfigurationResult.CreateSucceeded;
-                                    d.HostSetHost( this );
                                     newDevices.Add( c.Name, new ConfiguredDevice<T, TConfiguration>( d, c ) );
                                     // A new device has been added to the newDevices.
                                     somethingChanged = true;
@@ -531,7 +530,17 @@ namespace CK.DeviceModel
         /// <returns>The new device instance.</returns>
         protected virtual T InstantiateDevice( Type tDevice, IActivityMonitor monitor, TConfiguration config )
         {
-            return (T)Activator.CreateInstance( tDevice, new object[] { monitor, config } );
+            return (T)Activator.CreateInstance( tDevice, new object[] { monitor, CreateCreateInfo( config ) } );
+        }
+
+        /// <summary>
+        /// Helper that creates a <see cref="Device{TConfiguration}.CreateInfo"/> token.
+        /// </summary>
+        /// <param name="config">The device's configuration.</param>
+        /// <returns>The create information.</returns>
+        protected Device<TConfiguration>.CreateInfo CreateCreateInfo( TConfiguration config )
+        {
+            return new Device<TConfiguration>.CreateInfo( config, this );
         }
 
         /// <summary>

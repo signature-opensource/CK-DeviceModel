@@ -15,11 +15,11 @@ namespace CK.DeviceModel.Tests
         // this configuration is an independent clone that is accessible only to the Device.
         OtherMachineConfiguration _configRef;
 
-        public OtherMachine( IActivityMonitor monitor, OtherMachineConfiguration config )
-            : base( monitor, config )
+        public OtherMachine( IActivityMonitor monitor, CreateInfo info )
+            : base( monitor, info )
         {
             Interlocked.Increment( ref TotalCount );
-            _configRef = config;
+            _configRef = info.Configuration;
         }
 
         public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );

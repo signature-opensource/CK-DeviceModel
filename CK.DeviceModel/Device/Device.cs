@@ -33,6 +33,26 @@ namespace CK.DeviceModel
         public PerfectEvent<IDevice, string?> ControllerKeyChanged => _controllerKeyChanged.PerfectEvent;
 
         /// <summary>
+        /// Factory information (opaque token).
+        /// </summary>
+        public readonly struct CreateInfo
+        {
+            /// <summary>
+            /// Gets the configuration.
+            /// Never null and <see cref="TConfiguration.CheckValid(IActivityMonitor)"/> is necessarily true.
+            /// </summary>
+            public readonly TConfiguration Configuration;
+
+            internal readonly IInternalDeviceHost Host;
+
+            internal CreateInfo( TConfiguration c, IInternalDeviceHost h )
+            {
+                Configuration = c;
+                Host = h;
+            }
+        }
+
+        /// <summary>
         /// Initializes a new device bound to a configuration.
         /// Concrete device must expose a constructor with the exact same signature: initial configuration is handled by
         /// this constructor, warnings or errors must be logged and exception can be thrown if anything goes wrong. 
@@ -40,32 +60,27 @@ namespace CK.DeviceModel
         /// <param name="monitor">
         /// The monitor to use for the initialization phase. A reference to this monitor must not be kept.
         /// </param>
-        /// <param name="config">
-        /// The initial configuration to use. It must be <see cref="DeviceConfiguration.CheckValid"/> otherwise
+        /// <param name="info">
+        /// Contains the initial configuration to use. It must be <see cref="DeviceConfiguration.CheckValid"/> otherwise
         /// an <see cref="ArgumentException"/> is thrown.
         /// </param>
-        protected Device( IActivityMonitor monitor, TConfiguration config )
+        protected Device( IActivityMonitor monitor, CreateInfo info )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            if( config == null ) throw new ArgumentNullException( nameof( config ) );
-            if( !config.CheckValid( monitor ) ) throw new ArgumentException( "Configuration must be valid.", nameof( config ) );
+            TConfiguration config = info.Configuration;
+            Debug.Assert( config != null && config.CheckValid( monitor ), "config != null && config.CheckValid( monitor )" );
 
-            _statusChanged = new PerfectEventSender<IDevice>();
-            _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
+            _host = info.Host;
             Name = config.Name;
+            FullName = info.Host.DeviceHostName + '/' + Name;
+            DeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
+            DeviceFolderPath = DeviceFolderPath.Combine( "CK/DeviceModel" + FullName );
+
             _configStatus = config.Status;
             _controllerKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
             _controllerKeyFromConfiguration = _controllerKey != null;
-            FullName = null!;
-        }
-
-        internal void HostSetHost( IInternalDeviceHost host )
-        {
-            Debug.Assert( _host == null );
-            _host = host;
-            FullName = host.DeviceHostName + '/' + Name;
-            DeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
-            DeviceFolderPath = DeviceFolderPath.Combine( "CK/DeviceModel" + FullName );
+            _statusChanged = new PerfectEventSender<IDevice>();
+            _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
         }
 
         internal Task HostDestroyAsync( IActivityMonitor monitor )
@@ -90,6 +105,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets the full name of this device: it is "<see cref="IDeviceHost.DeviceHostName"/>/<see cref="Name"/>".
+        /// When <see cref="IsDestroyed"/> is true, " (Detached)" is added to it. 
         /// </summary>
         public string FullName { get; private set; }
 
@@ -101,11 +117,11 @@ namespace CK.DeviceModel
         /// type (the host) and instance (this name).
         /// </para>
         /// <para>
-        /// This folder is NOT created: it is up to the device, if it needs it to call <see cref="System.IO.Directory.CreateDirectory(string)"/>
-        /// (and may handle the <see cref="System.IO.Directory.Delete(string)"/> from <see cref="DoDestroyAsync"/>).
+        /// This folder is NOT created: it is up to the device, if it needs it, to call <see cref="System.IO.Directory.CreateDirectory(string)"/>
+        /// (and up to it also to call the <see cref="System.IO.Directory.Delete(string)"/> from <see cref="DoDestroyAsync"/>).
         /// </para>
         /// </summary>
-        public NormalizedPath DeviceFolderPath { get; private set; }
+        public NormalizedPath DeviceFolderPath { get; }
 
         /// <inheritdoc />
         public string? ControllerKey => _controllerKey;

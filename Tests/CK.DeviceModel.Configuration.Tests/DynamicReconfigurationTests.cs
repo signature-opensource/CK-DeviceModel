@@ -35,8 +35,8 @@ namespace CK.DeviceModel.Configuration.Tests
             public static int TotalCount;
             public static int TotalRunning;
 
-            public Camera( IActivityMonitor monitor, CameraConfiguration config )
-                : base( monitor, config )
+            public Camera( IActivityMonitor monitor, CreateInfo info )
+                : base( monitor, info )
             {
                 Interlocked.Increment( ref TotalCount );
             }
@@ -93,8 +93,8 @@ namespace CK.DeviceModel.Configuration.Tests
             public static int TotalCount;
             public static int TotalRunning;
 
-            public LightController( IActivityMonitor monitor, LightControllerConfiguration config )
-                : base( monitor, config )
+            public LightController( IActivityMonitor monitor, CreateInfo info )
+                : base( monitor, info )
             {
                 Interlocked.Increment( ref TotalCount );
             }
