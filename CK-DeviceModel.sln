@@ -22,8 +22,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Common\Shared.props = Common\Shared.props
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.PerfectEvent", "CK.PerfectEvent\CK.PerfectEvent.csproj", "{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel.Configuration", "CK.DeviceModel.Configuration\CK.DeviceModel.Configuration.csproj", "{ECD3ABA8-FDB4-4B73-A2DF-F82945664D90}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel.Configuration.Tests", "Tests\CK.DeviceModel.Configuration.Tests\CK.DeviceModel.Configuration.Tests.csproj", "{AA48665E-D3EE-4E3B-BEAE-6E94FF92189A}"
@@ -46,10 +44,6 @@ Global
 		{722D5670-E000-4C3D-AED9-113028524CD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{722D5670-E000-4C3D-AED9-113028524CD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{722D5670-E000-4C3D-AED9-113028524CD3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BDE3E3CA-2A05-4DBA-9DF2-FFD7F79E0809}.Release|Any CPU.Build.0 = Release|Any CPU
 		{ECD3ABA8-FDB4-4B73-A2DF-F82945664D90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{ECD3ABA8-FDB4-4B73-A2DF-F82945664D90}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ECD3ABA8-FDB4-4B73-A2DF-F82945664D90}.Release|Any CPU.ActiveCfg = Release|Any CPU
