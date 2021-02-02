@@ -364,13 +364,21 @@ namespace CK.DeviceModel
                     _lock.Leave( monitor );
                     if( somethingChanged )
                     {
-                        await _devicesChanged.SafeRaiseAsync( monitor, this ).ConfigureAwait( false );
+                        await SafeRaiseDevicesChanged( monitor ).ConfigureAwait( false );
                     }
                     if( postLockActions != null )
                     {
                         foreach( var a in postLockActions ) await a().ConfigureAwait( false );
                     }
                 }
+            }
+        }
+
+        async Task SafeRaiseDevicesChanged( IActivityMonitor monitor )
+        {
+            using( monitor.OpenTrace( $"Device Host '{DeviceHostName}' is raising DevicesChanged event." ) )
+            {
+                await _devicesChanged.SafeRaiseAsync( monitor, this ).ConfigureAwait( false );
             }
         }
 
@@ -399,7 +407,7 @@ namespace CK.DeviceModel
                 _lock.Leave( monitor );
                 if( somethingChanged )
                 {
-                    await _devicesChanged.SafeRaiseAsync( monitor, this ).ConfigureAwait( false );
+                    await SafeRaiseDevicesChanged( monitor ).ConfigureAwait( false );
                 }
             }
         }
@@ -654,9 +662,8 @@ namespace CK.DeviceModel
                 _lock.Leave( monitor );
                 if( raiseChanged )
                 {
-                    await _devicesChanged.SafeRaiseAsync( monitor, this ).ConfigureAwait( false );
+                    await SafeRaiseDevicesChanged( monitor ).ConfigureAwait( false );
                 }
-
             }
             else
             {

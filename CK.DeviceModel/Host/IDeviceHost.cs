@@ -15,7 +15,7 @@ namespace CK.DeviceModel
     {
         /// <summary>
         /// Gets the host name that SHOULD identify this host instance unambiguously in a running context.
-        /// (this sould be used as the configuration key name for instance).
+        /// (this should be used as the configuration key name for instance).
         /// </summary>
         string DeviceHostName { get; }
 

@@ -57,7 +57,7 @@ namespace CK.DeviceModel
         void IDeviceHostConfiguration.Add( DeviceConfiguration c ) => Items.Add( (TConfiguration)c );
 
         /// <summary>
-        /// Checks the validity of this configuration: all <see cref="DeviceConfiguration.Name"/> must be non empy or white space, be
+        /// Checks the validity of this configuration: all <see cref="DeviceConfiguration.Name"/> must be non empty or white space, be
         /// unique among the different configurations, and optionally, at least one configuration must exist.
         /// This calls <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> for each configuration.
         /// </summary>
