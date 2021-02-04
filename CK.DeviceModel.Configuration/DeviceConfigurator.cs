@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Handles the "Device" configuration section (it it exists) by configuring all the <see cref="IDeviceHost"/> available in the DI Container
+    /// Handles the "Device" configuration section (if it exists) by configuring all the <see cref="IDeviceHost"/> available in the DI Container
     /// and supports the "restarter daemon" that allows devices with <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration
     /// to be monitored and automatically restarted when stopped (see <see cref="IDeviceAlwaysRunningPolicy"/>).
     /// </summary>
@@ -236,6 +236,7 @@ namespace CK.DeviceModel
 
         Task IHostedService.StopAsync( CancellationToken cancellationToken )
         {
+            Debug.Assert( _changeMonitor != null );
             _run.Cancel();
             _changeSubscription?.Dispose();
             _changeMonitor.MonitorEnd();

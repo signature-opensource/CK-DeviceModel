@@ -100,6 +100,7 @@ namespace CK.DeviceModel
         {
             if( _deviceHosts.Length > 0 )
             {
+                Debug.Assert( _daemonMonitor != null );
                 _run.Cancel();
                 _daemonMonitor.MonitorEnd();
             }

@@ -122,7 +122,7 @@ namespace CK.DeviceModel
         /// Note that these objects are a copy of the ones that are used by the actual devices.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
-        /// <param name="predicate">Optional predicate to filter the snapshoted result.</param>
+        /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
         /// <returns>The snapshot of the configured devices.</returns>
         public IReadOnlyList<ConfiguredDevice<T, TConfiguration>> GetConfiguredDevices( Func<T, TConfiguration, bool>? predicate = null )
         {
@@ -491,7 +491,7 @@ namespace CK.DeviceModel
             }
             catch( Exception ex )
             {
-                monitor.Error( $"While trying to instanciate a device from {config.GetType().Name}.", ex );
+                monitor.Error( $"While trying to instantiate a device from {config.GetType().Name}.", ex );
                 return null;
             }
         }

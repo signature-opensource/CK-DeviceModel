@@ -68,9 +68,9 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Optional extension point to check for validity.
-        /// Always returs true by default.
+        /// Always returns true by default.
         /// </summary>
-        /// <param name="monitor">The monitor to log error, warnigs or other.</param>
+        /// <param name="monitor">The monitor to log error, warnings or other.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
         protected virtual bool DoCheckValid( IActivityMonitor monitor ) => true;
 

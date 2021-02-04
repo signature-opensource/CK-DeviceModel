@@ -88,7 +88,7 @@ namespace CK.DeviceModel
         /// Note that these objects are a copy of the ones that are used by the actual devices.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
-        /// <param name="predicate">Optional predicate to filter the snapshoted result.</param>
+        /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
         /// <returns>The snapshot of the configured devices.</returns>
         IReadOnlyList<(IDevice, DeviceConfiguration)> GetConfiguredDevices( Func<IDevice, DeviceConfiguration, bool>? predicate = null );
 
