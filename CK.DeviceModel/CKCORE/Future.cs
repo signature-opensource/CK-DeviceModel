@@ -9,11 +9,11 @@ using System.Threading.Tasks;
 namespace CK.Core
 {
     /// <summary>
-    /// A future is a little bit like a Task except that it is not directly awaitable: you can <see cref="WaitAsync(int, CancellationToken)"/> a future
-    /// with a given timeout and a cancellation token, but cannot await or set a continuation directly on it.
-    /// <para>
-    /// This is to be used for long running processes that are typically fully asynchronous and/or externally implemented. 
-    /// </para>
+    /// Implementation of <see cref="IFuture"/>.
+    /// This should be used only on the implementation side: the IFuture interface must
+    /// be exposed so that it can be easily replaced (using name hiding,
+    /// see https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/new-modifier) to
+    /// extend a base class.
     /// </summary>
     public class Future : IFuture
     {
@@ -43,7 +43,7 @@ namespace CK.Core
         public Task AsTask() => _tcs.Task;
 
         /// <summary>
-        /// Sets the successfut result.
+        /// Sets the successful result.
         /// Can be called only once and only if <see cref="SetError(CKExceptionData)"/> has not been called.
         /// </summary>
         /// <param name="result">The final, successful, result.</param>

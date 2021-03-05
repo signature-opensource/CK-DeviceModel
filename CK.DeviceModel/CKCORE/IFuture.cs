@@ -33,7 +33,7 @@ namespace CK.Core
         /// <summary>
         /// Gets whether the result is not yet available (null when <see cref="IsCompleted"/> is false),
         /// whether an error occurred (false when <see cref="HasError"/> is true),
-        /// or whether the command has been sucessfully executed.
+        /// or whether the command has been successfully executed.
         /// </summary>
         bool? Success { get; }
 
@@ -51,7 +51,7 @@ namespace CK.Core
         /// This should be used with care since a Future describes a long running process: awaiting for it
         /// should be done when a resolution is known to happen shortly. 
         /// </summary>
-        /// <returns>A task is resolved when this Future is available.</returns>
+        /// <returns>A task that is resolved when this Future is available.</returns>
         Task AsTask();
     }
 }

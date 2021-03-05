@@ -10,6 +10,11 @@ namespace CK.Core
 {
     /// <summary>
     /// Implementation of a <see cref="Future"/> with a <see cref="Value"/>.
+    /// <para>
+    /// Just like the Future implementation, this should not be exposed directly
+    /// only the <see cref="IFuture{T}"/> should be exposed to benefit from its covariance
+    /// with <typeparamref name="T"/>.
+    /// </para>
     /// </summary>
     /// <typeparam name="T">The result type.</typeparam>
     public class Future<T> : IFuture, IFuture<T>
@@ -52,7 +57,7 @@ namespace CK.Core
         public Task AsTask() => _tcs.Task;
 
         /// <summary>
-        /// Sets the successfut result.
+        /// Sets the successful result.
         /// Can be called only once and only if <see cref="SetError(CKExceptionData)"/> has not been called.
         /// </summary>
         /// <param name="result">The final, successful, result.</param>
