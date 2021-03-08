@@ -101,20 +101,14 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Determines whether the <see cref="DeviceCommand.HostType"/> is compatible with the actual type of this host,
-        /// finds the target device based on <see cref="DeviceCommand.DeviceName"/> and checks the <see cref="DeviceCommand.ControllerKey"/>
-        /// against the <see cref="IDevice.ControllerKey"/>.
-        /// <para>
-        /// When the returned <see cref="RoutedDeviceCommand.Success"/> is true, the command can be executed synchronously or asynchronously by
-        /// the <see cref="RoutedDeviceCommand"/>.
-        /// </para>
-        /// <para>
-        /// Note that <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> must be true otherwise an <see cref="ArgumentException"/> is thrown.
-        /// </para>
+        /// finds the target device based on <see cref="DeviceCommand.DeviceName"/>, checks the <see cref="DeviceCommand.ControllerKey"/>
+        /// against the <see cref="IDevice.ControllerKey"/> and calls <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> before
+        /// submitting the command to the device.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to route.</param>
-        /// <returns>The routing result.</returns>
-        RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command );
+        /// <param name="command">The command to validate, route and execute.</param>
+        /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
+        Task<DeviceHostCommandResult> ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command );
 
     }
 }

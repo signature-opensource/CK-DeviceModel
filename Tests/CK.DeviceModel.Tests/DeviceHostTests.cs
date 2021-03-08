@@ -305,30 +305,32 @@ namespace CK.DeviceModel.Tests
             int flashLastColor = 0;
             d.Flash.Sync += (m,c,color) => flashLastColor = color;
 
-            var cmdAsync = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
-            var execA = host.Handle( TestHelper.Monitor, cmdAsync );
-            execA.Success.Should().BeTrue();
-            execA.IsAsync.Should().BeTrue();
-            execA.Invoking( x => x.Execute( TestHelper.Monitor ) ).Should().Throw<InvalidCastException>();
-            execA.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().NotThrow();
+            var cmdF = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
+            var execF = await host.ExecuteCommandAsync( TestHelper.Monitor, cmdF );
+            execF.Should().Be( DeviceHostCommandResult.Success );
 
             flashLastColor.Should().Be( 78 );
 
             var cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 }; ;
-            RoutedDeviceCommand execS = host.Handle( TestHelper.Monitor, cmdS );
-            execS.Success.Should().BeTrue();
-            execS.IsAsync.Should().BeFalse();
-            execS.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().Throw<InvalidCastException>();
-            execS.Invoking( x => x.Execute( TestHelper.Monitor ) ).Should().NotThrow();
+            var execS = await host.ExecuteCommandAsync( TestHelper.Monitor, cmdS );
+            execS.Should().Be( DeviceHostCommandResult.Success );
 
             flashLastColor.Should().Be( 78 );
-            execA.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().NotThrow();
+            execF = await host.ExecuteCommandAsync( TestHelper.Monitor, cmdF );
             flashLastColor.Should().Be( 3712 );
 
             cmdS.DeviceName = "Not the 1";
-            execS = host.Handle( TestHelper.Monitor, cmdS );
-            execS.Success.Should().BeFalse();
-            execS.IsAsync.Should().BeNull();
+            execS = await host.ExecuteCommandAsync( TestHelper.Monitor, cmdS );
+            execS.Should().Be( DeviceHostCommandResult.DeviceNameNotFound );
+
+            await d.SetControllerKeyAsync( TestHelper.Monitor, null, "The controlling key." );
+            cmdS.DeviceName = "n°1";
+            execS = await host.ExecuteCommandAsync( TestHelper.Monitor, cmdS );
+            execS.Should().Be( DeviceHostCommandResult.ControllerKeyMismatch );
+
+            cmdS.ControllerKey = "The controlling key.";
+            execS = await host.ExecuteCommandAsync( TestHelper.Monitor, cmdS );
+            execS.Should().Be( DeviceHostCommandResult.Success );
 
             await host.DestroyDeviceAsync( TestHelper.Monitor, "n°1" );
 
@@ -363,11 +365,11 @@ namespace CK.DeviceModel.Tests
 
             cmdSync.ControllerKey = "Never mind since the device's ControllerKey is null.";
             cmdSync.Color = 6;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync );
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdSync );
             await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash );
             flashLastColor.Should().Be( 6 );
 
-            // Use the basic (async) command to set a ControllerKey.
+            // Use the basic command to set a ControllerKey.
             var setControllerKey = new BasicControlDeviceCommand<CameraHost>( BasicControlDeviceOperation.ResetControllerKey )
             {
                 ControllerKey = "I'm controlling.",
@@ -376,11 +378,11 @@ namespace CK.DeviceModel.Tests
             await d.ExecuteCommandAsync( TestHelper.Monitor, setControllerKey );
 
             cmdSync.ControllerKey = "I'm not in charge. This will throw an ArgumentException.";
-            d.Invoking( _ => _.ExecuteCommand( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
+            d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
 
             cmdSync.ControllerKey = "I'm controlling.";
             cmdSync.Color = 18;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync );
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdSync );
             d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
             cmdRaiseFlash.ControllerKey = "I'm controlling.";
             await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash );
@@ -388,19 +390,19 @@ namespace CK.DeviceModel.Tests
 
             cmdSync.ControllerKey = "I'm NOT controlling, but checkControllerKey: false is used.";
             cmdSync.Color = 1;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync, checkControllerKey: false );
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdSync, checkControllerKey: false );
             await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash, checkControllerKey: false );
             flashLastColor.Should().Be( 1 );
 
             cmdSync.ControllerKey = "I'm controlling.";
             cmdSync.DeviceName = "Not the right device name: this will throw an ArgumentException.";
-            d.Invoking( _ => _.ExecuteCommand( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
+            d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
             cmdRaiseFlash.DeviceName = "Not the right device name: this will throw an ArgumentException.";
             d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
 
             cmdSync.DeviceName = "Not the right device name but checkDeviceName: false is used.";
             cmdSync.Color = 3712;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync, checkDeviceName: false );
+            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdSync, checkDeviceName: false );
             await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash, checkDeviceName: false );
             flashLastColor.Should().Be( 3712 );
 

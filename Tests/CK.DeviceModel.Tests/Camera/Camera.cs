@@ -49,24 +49,20 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
+        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommand command )
         {
             if( command is FlashCommand )
             {
                 return _flash.RaiseAsync( monitor, this, _configRef.FlashColor );
             }
-            return base.DoHandleCommandAsync( monitor, command );
-        }
-
-        protected override void DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
-        {
             if( command is SetFlashColorCommand f )
             {
                 _configRef.FlashColor = f.Color;
-                return;
+                return Task.CompletedTask;
             }
-            base.DoHandleCommand( monitor, command );
+            return base.DoHandleCommandAsync( monitor, command );
         }
+
 
         protected override Task DoDestroyAsync( IActivityMonitor monitor )
         {

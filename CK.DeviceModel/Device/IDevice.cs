@@ -78,7 +78,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.
-        /// When null, the <see cref="DeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>
+        /// When null, the <see cref="DeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>
         /// checks that the command's controller key is the same as this one otherwise the command is not handled.
         /// </summary>
         string? ControllerKey { get; }
@@ -116,7 +116,7 @@ namespace CK.DeviceModel
         PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
         /// <summary>
-        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>.
+        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>.
         /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
         ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
@@ -136,7 +136,7 @@ namespace CK.DeviceModel
         /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
         /// Using false here skips this check.
         /// </param>
-        Task ExecuteCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true );
+        Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true );
 
     }
 

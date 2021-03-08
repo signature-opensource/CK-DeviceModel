@@ -11,7 +11,7 @@ namespace CK.DeviceModel
     /// <remarks>
     /// This class cannot be specialized. The only concrete type of this command is <see cref="BasicControlDeviceCommand{THost}"/>.
     /// </remarks>
-    public abstract class BasicControlDeviceCommand : AsyncDeviceCommand
+    public abstract class BasicControlDeviceCommand : DeviceCommand
     {
         private protected BasicControlDeviceCommand() { }
 

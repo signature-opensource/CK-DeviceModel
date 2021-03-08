@@ -27,8 +27,9 @@ namespace CK.DeviceModel
     {
         readonly AsyncLock _lock;
         readonly PerfectEventSender<IDeviceHost> _devicesChanged;
+
         // Compile cached lambda.
-        Func<THostConfiguration> _hostConfigFactory;
+        readonly Func<THostConfiguration> _hostConfigFactory;
 
         // This is the whole state of this Host. It is updated atomically (by setting a
         // new dictionary instance).
@@ -591,30 +592,39 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device, TConfiguration configuration ) => Task.CompletedTask;
 
+
         /// <inheritdoc />
-        public RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command )
+        public async Task<DeviceHostCommandResult> ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( command == null ) throw new ArgumentNullException( nameof( command ) );
-            if( !command.HostType.IsAssignableFrom( GetType() ) ) return default;
+            if( !command.HostType.IsAssignableFrom( GetType() ) ) return DeviceHostCommandResult.InvalidHostType;
 
-            if( !command.CheckValidity( monitor ) ) throw new ArgumentException( $"{command.GetType().Name}: CheckValidity failed. See logs.", nameof( command ) );
-
-
+            if( !command.CheckValidity( monitor ) ) return DeviceHostCommandResult.CommandCheckValidityFailed;
+            
             Debug.Assert( command.DeviceName != null, "CheckValidity ensured that." );
             var d = Find( command.DeviceName );
             if( d == null )
             {
                 monitor.Warn( $"Device named '{command.DeviceName}' not found in '{DeviceHostName}' host." );
-                return default;
+                return DeviceHostCommandResult.DeviceNameNotFound;
             }
             var invalidKey = d.CheckCommandControllerKey( command );
             if( invalidKey != null )
             {
                 monitor.Warn( $"Command skipped by host '{DeviceHostName}': {invalidKey}." );
-                return default;
+                return DeviceHostCommandResult.ControllerKeyMismatch;
             }
-            return new RoutedDeviceCommand( command, d );
+            try
+            {
+                await d.ExecuteCommandAsync( monitor, command );
+                return DeviceHostCommandResult.Success;
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While executing command.", ex );
+                return DeviceHostCommandResult.UnhandledCommandError;
+            }
         }
 
         enum DeviceAction

@@ -15,7 +15,7 @@ namespace CK.DeviceModel
     /// Abstract base class for a device.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract partial class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration
+    public abstract partial class Device<TConfiguration> : IDevice where TConfiguration : DeviceConfiguration
     {
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
@@ -506,7 +506,7 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>.
+        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>.
         /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
         ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
@@ -526,29 +526,11 @@ namespace CK.DeviceModel
         /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
         /// Using false here skips this check.
         /// </param>
-        public void ExecuteCommand( IActivityMonitor monitor, SyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
+        /// <remarks></remarks>
+        public Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
         {
             CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
-            DoHandleCommand( monitor, command );
-        }
-
-        /// <summary>
-        /// Like <see cref="ExecuteCommand"/> except that <see cref="DeviceCommand.DeviceName"/> is not checked against <see cref="Name"/>
-        /// and <see cref="DeviceCommand.ControllerKey"/> is not checked against <see cref="ControllerKey"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute.</param>
-        public void UnsafeExecuteCommand( IActivityMonitor monitor, SyncDeviceCommand command )
-        {
-            CheckDirectCommandParameter( monitor, command, false, false );
-            DoHandleCommand( monitor, command );
-        }
-
-        /// <inheritdoc cref="ExecuteCommand"/>
-        public Task ExecuteCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
-        {
-            CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
-            return ExecuteWithBasicCommandAsync( monitor, command );
+            return DoHandleCommandAsync( monitor, command );
         }
 
         void CheckDirectCommandParameter( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName, bool checkControllerKey )
@@ -568,7 +550,7 @@ namespace CK.DeviceModel
         internal string? CheckCommandControllerKey( DeviceCommand command )
         {
             // The basic ResetControllerKey command sets a new ControllerKey.
-            if( !(command is BasicControlDeviceCommand b) || b.Operation != BasicControlDeviceOperation.ResetControllerKey )
+            if( command is not BasicControlDeviceCommand b || b.Operation != BasicControlDeviceOperation.ResetControllerKey )
             {
                 var key = ControllerKey;
                 if( key != null && command.ControllerKey != key )
@@ -579,22 +561,6 @@ namespace CK.DeviceModel
             return null;
         }
 
-        void IInternalDevice.Execute( IActivityMonitor monitor, SyncDeviceCommand c ) => DoHandleCommand( monitor, c );
-
-        Task IInternalDevice.ExecuteAsync( IActivityMonitor monitor, AsyncDeviceCommand c ) => ExecuteWithBasicCommandAsync( monitor, c );
-
-        Task ExecuteWithBasicCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand c )
-        {
-            if( c is BasicControlDeviceCommand b )
-            {
-                return ExecuteBasicControlDeviceCommandAsync( monitor, b );
-            }
-            else
-            {
-                return DoHandleCommandAsync( monitor, c );
-            }
-        }
-
         /// <summary>
         /// Executes the corresponding <see cref="BasicControlDeviceCommand.Operation"/>.
         /// </summary>
@@ -603,45 +569,37 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         protected Task ExecuteBasicControlDeviceCommandAsync( IActivityMonitor monitor, BasicControlDeviceCommand b )
         {
-            switch( b.Operation )
+            return b.Operation switch
             {
-                case BasicControlDeviceOperation.Start: return StartAsync( monitor );
-                case BasicControlDeviceOperation.Stop: return StopAsync( monitor );
-                case BasicControlDeviceOperation.ResetControllerKey: return SetControllerKeyAsync( monitor, b.ControllerKey );
-                case BasicControlDeviceOperation.None: return Task.CompletedTask;
-                default: throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) );
-            }
+                BasicControlDeviceOperation.Start => StartAsync( monitor ),
+                BasicControlDeviceOperation.Stop => StopAsync( monitor ),
+                BasicControlDeviceOperation.ResetControllerKey => SetControllerKeyAsync( monitor, b.ControllerKey ),
+                BasicControlDeviceOperation.None => Task.CompletedTask,
+                _ => throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) ),
+            };
         }
 
         /// <summary>
-        /// Must handle <see cref="AsyncDeviceCommand"/> command objects that are actually targeted to this device
-        /// (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="DeviceCommand.ControllerKey"/>
-        /// is either null or match the current <see cref="ControllerKey"/>).
+        /// Calls <see cref="ExecuteBasicControlDeviceCommandAsync"/> if the <paramref name="command"/> is a <see cref="BasicControlDeviceCommand"/>
+        /// otherwise, since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
         /// <para>
-        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
+        /// The <paramref name="command"/> object that is targeted to this device (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/>
+        /// and <see cref="DeviceCommand.ControllerKey"/> is either null or match the current <see cref="ControllerKey"/>).
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to handle.</param>
         /// <returns>The awaitable.</returns>
-        protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
+        protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommand command )
         {
-            throw new ArgumentException( $"Unhandled asynchronous command {command.GetType().Name}.", nameof(command) );
-        }
-
-        /// <summary>
-        /// Must handle <see cref="SyncDeviceCommand"/> command objects that are actually targeted to this device
-        /// (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/> and <see cref="DeviceCommand.ControllerKey"/>
-        /// is either null or match the current <see cref="ControllerKey"/>).
-        /// <para>
-        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
-        /// </para>
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to handle.</param>
-        protected virtual void DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
-        {
-            throw new ArgumentException( $"Unhandled synchronous command {command.GetType().Name}.", nameof( command ) );
+            if( command is BasicControlDeviceCommand b )
+            {
+                return ExecuteBasicControlDeviceCommandAsync( monitor, b );
+            }
+            else
+            {
+                throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
+            }
         }
 
         /// <summary>

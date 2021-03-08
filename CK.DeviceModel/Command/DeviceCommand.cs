@@ -8,7 +8,7 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Non generic base command class that exposes the host that must handle it.
-    /// This class cannot be directly specialized: the generic <see cref="SyncDeviceCommand{THost}"/>
+    /// This class cannot be directly specialized: the generic <see cref="DeviceCommand{THost}"/>
     /// must be used.
     /// </summary>
     public abstract class DeviceCommand
@@ -22,17 +22,17 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets or sets the target device name.
-        /// <see cref="IDeviceHost.Handle(Core.IActivityMonitor, DeviceCommand)"/> requires this name to be the one of the device (see <see cref="IDevice.Name"/>)
+        /// <see cref="IDeviceHost.ExecuteCommandAsync(Core.IActivityMonitor, DeviceCommand)"/> requires this name to be the one of the device (see <see cref="IDevice.Name"/>)
         /// otherwise the command is ignored.
         /// <para>
-        /// Note that when this command is submitted to <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>, this
+        /// Note that when this command is submitted to <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>, this
         /// name must not be null nor empty (and, more generally, <see cref="CheckValidity(IActivityMonitor)"/> must return true).
         /// </para>
         /// </summary>
         public string DeviceName { get; set; }
 
         /// <summary>
-        /// Gets or sets the required controller key. See <see cref="IDevice.ControllerKey"/> and <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>.
+        /// Gets or sets the required controller key. See <see cref="IDevice.ControllerKey"/> and <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>.
         /// <para>
         /// Note that if the target <see cref="IDevice.ControllerKey"/> is null, all commands are accepted.
         /// </para>
