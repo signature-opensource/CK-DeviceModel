@@ -5,7 +5,7 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Abstract base class for standard commands that a device can handle synchronously.
+    /// Abstract base class for commands without any result that a device can handle.
     /// </summary>
     public abstract class SyncDeviceCommand<THost> : SyncDeviceCommand where THost : IDeviceHost
     {

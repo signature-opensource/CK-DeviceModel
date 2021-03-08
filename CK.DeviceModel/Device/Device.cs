@@ -8,14 +8,14 @@ using System.Threading.Tasks;
 using CK.Core;
 using CK.PerfectEvent;
 using CK.Text;
-
+using System.Threading.Channels;
 namespace CK.DeviceModel
 {
     /// <summary>
     /// Abstract base class for a device.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration
+    public abstract partial class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration
     {
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
@@ -73,8 +73,8 @@ namespace CK.DeviceModel
             _host = info.Host;
             Name = config.Name;
             FullName = info.Host.DeviceHostName + '/' + Name;
-            DeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
-            DeviceFolderPath = DeviceFolderPath.Combine( "CK/DeviceModel/" + FullName );
+            SystemDeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
+            SystemDeviceFolderPath = SystemDeviceFolderPath.Combine( "CK/DeviceModel/" + FullName );
 
             _configStatus = config.Status;
             _controllerKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
@@ -121,7 +121,7 @@ namespace CK.DeviceModel
         /// (and up to it also to call the <see cref="System.IO.Directory.Delete(string)"/> from <see cref="DoDestroyAsync"/>).
         /// </para>
         /// </summary>
-        public NormalizedPath DeviceFolderPath { get; }
+        public NormalizedPath SystemDeviceFolderPath { get; }
 
         /// <inheritdoc />
         public string? ControllerKey => _controllerKey;
@@ -227,7 +227,7 @@ namespace CK.DeviceModel
             if( _isRunning && config.Status == DeviceConfigurationStatus.Disabled )
             {
                 // The _configStatus is set to DeviceConfigurationStatus.Disabled by HostStopAsync that also 
-                // raised the StatusChanged: if the nothing else has changed, we have no more event to raise.
+                // raised the StatusChanged: if nothing else has changed, we have no more event to raise.
                 // However we want the returned DeviceApplyConfigurationResult to the caller to not be "None"!
                 // This is why this awful specialCaseOfDisabled is here: to ultimately correct the returned result.
                 await HostStopAsync( monitor, DeviceStoppedReason.StoppedByDisabledConfiguration );
@@ -490,8 +490,12 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// This method can be called at any time to stop this device, optionally ignoring the <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.
+        /// <para>
         /// Note that the <see cref="ConfigurationStatus"/> is left unchanged: the state of the system is what it should be: a device
         /// that has been configured to be always running is actually stopped.
+        /// It is up to the <see cref="DeviceHostDaemon"/> to apply the <see cref="IDeviceAlwaysRunningPolicy"/> so that the device can be
+        /// started again.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="ignoreAlwaysRunning">True to stop even if <see cref="ConfigurationStatus"/> states that this device must always run.</param>
@@ -503,7 +507,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>.
-        /// An <see cref="ArgumentException"/> is raised if:
+        /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
         ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
         ///     <item>or <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> fails;</item>
@@ -513,7 +517,7 @@ namespace CK.DeviceModel
         /// The 2 last checks can be suppressed thanks to the <paramref name="checkDeviceName"/> and <paramref name="checkControllerKey"/> parameters.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute synchronously.</param>
+        /// <param name="command">The command to execute.</param>
         /// <param name="checkDeviceName">
         /// By default, the <see cref="DeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
         /// Using false here allows any command name to be executed.
@@ -530,10 +534,10 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Like <see cref="ExecuteCommand"/> except that <see cref="DeviceCommand.DeviceName"/> is not checked against <see cref="Name"/>
-        /// and <see cref="DeviceCommand.ControllerKey"/> is not match against <see cref="ControllerKey"/>.
+        /// and <see cref="DeviceCommand.ControllerKey"/> is not checked against <see cref="ControllerKey"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute synchronously.</param>
+        /// <param name="command">The command to execute.</param>
         public void UnsafeExecuteCommand( IActivityMonitor monitor, SyncDeviceCommand command )
         {
             CheckDirectCommandParameter( monitor, command, false, false );
@@ -583,18 +587,29 @@ namespace CK.DeviceModel
         {
             if( c is BasicControlDeviceCommand b )
             {
-                switch( b.Operation )
-                {
-                    case BasicControlDeviceOperation.Start: return StartAsync( monitor );
-                    case BasicControlDeviceOperation.Stop: return StopAsync( monitor );
-                    case BasicControlDeviceOperation.ResetControllerKey: return SetControllerKeyAsync( monitor, b.ControllerKey );
-                    case BasicControlDeviceOperation.None: return Task.CompletedTask;
-                    default: throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) );
-                }
+                return ExecuteBasicControlDeviceCommandAsync( monitor, b );
             }
             else
             {
                 return DoHandleCommandAsync( monitor, c );
+            }
+        }
+
+        /// <summary>
+        /// Executes the corresponding <see cref="BasicControlDeviceCommand.Operation"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="b">The basic device command.</param>
+        /// <returns>The awaitable.</returns>
+        protected Task ExecuteBasicControlDeviceCommandAsync( IActivityMonitor monitor, BasicControlDeviceCommand b )
+        {
+            switch( b.Operation )
+            {
+                case BasicControlDeviceOperation.Start: return StartAsync( monitor );
+                case BasicControlDeviceOperation.Stop: return StopAsync( monitor );
+                case BasicControlDeviceOperation.ResetControllerKey: return SetControllerKeyAsync( monitor, b.ControllerKey );
+                case BasicControlDeviceOperation.None: return Task.CompletedTask;
+                default: throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) );
             }
         }
 

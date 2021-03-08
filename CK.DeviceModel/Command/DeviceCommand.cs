@@ -7,7 +7,9 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Non generic interface that exposes the host that handles any <see cref="SyncDeviceCommand"/> or <see cref="AsyncDeviceCommand"/>.
+    /// Non generic base command class that exposes the host that must handle it.
+    /// This class cannot be directly specialized: the generic <see cref="SyncDeviceCommand{THost}"/>
+    /// must be used.
     /// </summary>
     public abstract class DeviceCommand
     {

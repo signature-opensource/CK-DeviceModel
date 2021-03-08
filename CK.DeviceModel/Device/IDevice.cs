@@ -115,6 +115,29 @@ namespace CK.DeviceModel
         /// </summary>
         PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
+        /// <summary>
+        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>.
+        /// By default, an <see cref="ArgumentException"/> is raised if:
+        /// <list type="bullet">
+        ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
+        ///     <item>or <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> fails;</item>
+        ///     <item>or the <see cref="DeviceCommand.DeviceName"/> doesn't match this device's name;</item>
+        ///     <item>or this <see cref="ControllerKey"/> is not null and <see cref="DeviceCommand.ControllerKey"/> differs from it.</item>
+        /// </list>
+        /// The 2 last checks can be suppressed thanks to the <paramref name="checkDeviceName"/> and <paramref name="checkControllerKey"/> parameters.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="checkDeviceName">
+        /// By default, the <see cref="DeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
+        /// Using false here allows any command name to be executed.
+        /// </param>
+        /// <param name="checkControllerKey">
+        /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
+        /// Using false here skips this check.
+        /// </param>
+        Task ExecuteCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true );
+
     }
 
 }
