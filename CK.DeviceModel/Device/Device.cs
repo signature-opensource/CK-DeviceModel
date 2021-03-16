@@ -15,16 +15,17 @@ namespace CK.DeviceModel
     /// Abstract base class for a device.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract partial class Device<TConfiguration> : IDevice where TConfiguration : DeviceConfiguration
+    public abstract class Device<TConfiguration> : IDevice where TConfiguration : DeviceConfiguration
     {
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
         string? _controllerKey;
         DeviceStatus _status;
-        bool _controllerKeyFromConfiguration;
-        bool _isRunning;
         readonly PerfectEventSender<IDevice> _statusChanged;
         readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
+        readonly CancellationTokenSource _destroyToken;
+        bool _controllerKeyFromConfiguration;
+        bool _isRunning;
 
         /// <inheritdoc />
         public PerfectEvent<IDevice> StatusChanged => _statusChanged.PerfectEvent;
@@ -81,13 +82,15 @@ namespace CK.DeviceModel
             _controllerKeyFromConfiguration = _controllerKey != null;
             _statusChanged = new PerfectEventSender<IDevice>();
             _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
+            _destroyToken = new CancellationTokenSource();
         }
 
-        internal Task HostDestroyAsync( IActivityMonitor monitor )
+        internal virtual Task HostDestroyAsync( IActivityMonitor monitor )
         {
             Debug.Assert( _host != null && !_isRunning );
+            _destroyToken.Cancel();
             _host = null;
-            FullName += " (Detached)";
+            FullName += " (Destroyed)";
             return DoDestroyAsync( monitor );
         }
 
@@ -105,7 +108,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets the full name of this device: it is "<see cref="IDeviceHost.DeviceHostName"/>/<see cref="Name"/>".
-        /// When <see cref="IsDestroyed"/> is true, " (Detached)" is added to it. 
+        /// When <see cref="IsDestroyed"/> is true, " (Destroyed)" is added to it. 
         /// </summary>
         public string FullName { get; private set; }
 
@@ -122,6 +125,11 @@ namespace CK.DeviceModel
         /// </para>
         /// </summary>
         public NormalizedPath SystemDeviceFolderPath { get; }
+
+        /// <summary>
+        /// Gets a cancellation token that is canceled when this device is destroyed.
+        /// </summary>
+        public CancellationToken DestroyToken => _destroyToken.Token;
 
         /// <inheritdoc />
         public string? ControllerKey => _controllerKey;
@@ -200,7 +208,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets whether this device has been destroyed.
         /// </summary>
-        public bool IsDestroyed => _host == null;
+        public bool IsDestroyed => _destroyToken.IsCancellationRequested;
 
         /// <inheritdoc />
         public DeviceStatus Status => _status;
@@ -505,33 +513,25 @@ namespace CK.DeviceModel
             return _host?.AutoStopAsync( this, monitor, ignoreAlwaysRunning ) ?? Task.FromResult(true);
         }
 
-        /// <summary>
-        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>.
-        /// By default, an <see cref="ArgumentException"/> is raised if:
-        /// <list type="bullet">
-        ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
-        ///     <item>or <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> fails;</item>
-        ///     <item>or the <see cref="DeviceCommand.DeviceName"/> doesn't match this device's name;</item>
-        ///     <item>or this <see cref="ControllerKey"/> is not null and <see cref="DeviceCommand.ControllerKey"/> differs from it.</item>
-        /// </list>
-        /// The 2 last checks can be suppressed thanks to the <paramref name="checkDeviceName"/> and <paramref name="checkControllerKey"/> parameters.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute.</param>
-        /// <param name="checkDeviceName">
-        /// By default, the <see cref="DeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
-        /// Using false here allows any command name to be executed.
-        /// </param>
-        /// <param name="checkControllerKey">
-        /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
-        /// Using false here skips this check.
-        /// </param>
-        /// <remarks></remarks>
-        public Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true )
+        /// <inheritdoc />
+        public Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
         {
             CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
-            return DoHandleCommandAsync( monitor, command );
+            return DoHandleCommandAsync( monitor, command, token );
         }
+
+        /// <inheritdoc />
+        public Task<TResult> ExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
+        {
+            CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
+            return DoHandleCommandAsync( monitor, command, token );
+        }
+
+        /// <inheritdoc />
+        public Task UnsafeExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token = default ) => ExecuteCommandAsync( monitor, command, false, false, token );
+
+        /// <inheritdoc />
+        public Task<TResult> UnsafeExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token = default ) => ExecuteCommandAsync( monitor, command, false, false, token );
 
         void CheckDirectCommandParameter( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName, bool checkControllerKey )
         {
@@ -589,8 +589,9 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to handle.</param>
+        /// <param name="token">Cancellation token.</param>
         /// <returns>The awaitable.</returns>
-        protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommand command )
+        protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token )
         {
             if( command is BasicControlDeviceCommand b )
             {
@@ -600,6 +601,22 @@ namespace CK.DeviceModel
             {
                 throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
             }
+        }
+
+        /// <summary>
+        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
+        /// <para>
+        /// The <paramref name="command"/> object that is targeted to this device (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/>
+        /// and <see cref="DeviceCommand.ControllerKey"/> is either null or match the current <see cref="ControllerKey"/>).
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to handle.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>The command's result.</returns>
+        protected virtual Task<TResult> DoHandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token )
+        {
+            throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
         }
 
         /// <summary>

@@ -8,8 +8,9 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Non generic base command class that exposes the host that must handle it.
-    /// This class cannot be directly specialized: the generic <see cref="DeviceCommand{THost}"/>
-    /// must be used.
+    /// This class cannot be directly specialized: the generic <see cref="HostedDeviceCommand{THost}"/>
+    /// must be used, or the <see cref="HostedDeviceCommand{THost,TResult}"/> when the command generates
+    /// a result.
     /// </summary>
     public abstract class DeviceCommand
     {

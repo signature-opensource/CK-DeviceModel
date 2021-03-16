@@ -116,7 +116,7 @@ namespace CK.DeviceModel
         PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
         /// <summary>
-        /// Supports direct execution of a device command instead of being routed by <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>.
+        /// Supports direct execution on this device instead of being routed by <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>.
         /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
         ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
@@ -136,7 +136,46 @@ namespace CK.DeviceModel
         /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
         /// Using false here skips this check.
         /// </param>
-        Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true );
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>The awaitable.</returns>
+        Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
+
+        /// <summary>
+        /// Same as <see cref="ExecuteCommandAsync(IActivityMonitor, DeviceCommand, bool, bool)"/> but for commands that generates a result.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="checkDeviceName">
+        /// By default, the <see cref="DeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
+        /// Using false here allows any command name to be executed.
+        /// </param>
+        /// <param name="checkControllerKey">
+        /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
+        /// Using false here skips this check.
+        /// </param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>The command's result.</returns>
+        Task<TResult> ExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
+
+        /// <summary>
+        /// Same as <see cref="ExecuteCommandAsync(IActivityMonitor, DeviceCommand, bool, bool, CancellationToken)"/> except that only the host type
+        /// is checked and <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> is called. <see cref="Name"/> or <see cref="ControllerKey"/> are ignored.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>The awaitable.</returns>
+        Task UnsafeExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token = default );
+
+        /// <summary>
+        /// Same as <see cref="ExecuteCommandAsync(IActivityMonitor, DeviceCommand{TResult}, bool, bool, CancellationToken)"/> except that only the host type
+        /// is checked and <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> is called. <see cref="Name"/> or <see cref="ControllerKey"/> are ignored.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>The awaitable.</returns>
+        Task<TResult> UnsafeExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token = default );
 
     }
 

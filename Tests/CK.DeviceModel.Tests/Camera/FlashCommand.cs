@@ -4,7 +4,7 @@ using System.Text;
 
 namespace CK.DeviceModel.Tests
 {
-    public class FlashCommand : DeviceCommand<CameraHost>
+    public class FlashCommand : HostedDeviceCommand<CameraHost>
     {
     }
 }
