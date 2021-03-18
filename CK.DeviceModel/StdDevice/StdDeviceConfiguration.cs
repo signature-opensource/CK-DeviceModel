@@ -7,7 +7,7 @@ namespace CK.DeviceModel
     /// <summary>
     /// Configuration for <see cref="StdDevice{TConfiguration}"/>.
     /// </summary>
-    public class StdDeviceConfiguration : DeviceConfiguration
+    public abstract class StdDeviceConfiguration : DeviceConfiguration
     {
         /// <summary>
         /// Initializes a new device configuration with an empty name and a <see cref="DeviceConfigurationStatus.Disabled"/> status.

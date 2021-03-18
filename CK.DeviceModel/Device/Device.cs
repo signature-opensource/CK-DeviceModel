@@ -575,7 +575,7 @@ namespace CK.DeviceModel
                 BasicControlDeviceOperation.Stop => StopAsync( monitor ),
                 BasicControlDeviceOperation.ResetControllerKey => SetControllerKeyAsync( monitor, b.ControllerKey ),
                 BasicControlDeviceOperation.None => Task.CompletedTask,
-                _ => throw new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) ),
+                _ => Task.FromException( new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) ) ),
             };
         }
 
@@ -597,10 +597,7 @@ namespace CK.DeviceModel
             {
                 return ExecuteBasicControlDeviceCommandAsync( monitor, b );
             }
-            else
-            {
-                throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
-            }
+            return Task.FromException( new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) ) );
         }
 
         /// <summary>
@@ -616,7 +613,7 @@ namespace CK.DeviceModel
         /// <returns>The command's result.</returns>
         protected virtual Task<TResult> DoHandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token )
         {
-            throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
+            return Task.FromException<TResult>( new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) ) );
         }
 
         /// <summary>

@@ -15,8 +15,8 @@ namespace CK.DeviceModel
     /// <typeparam name="TConfiguration"></typeparam>
     public abstract partial class StdDevice<TConfiguration> : Device<TConfiguration> where TConfiguration : StdDeviceConfiguration
     {
-        readonly Channel<QueuedCommand> _commandQueue;
-        readonly Queue<QueuedCommand> _deferredCommands;
+        readonly Channel<CompletionCommandBase> _commandQueue;
+        readonly Queue<CompletionCommandBase> _deferredCommands;
 
         readonly StoppedBehavior _stoppedBehavior;
 
@@ -24,12 +24,12 @@ namespace CK.DeviceModel
         /// <summary>
         /// Base class for commands that have no result and don't need to be awaited.
         /// </summary>
-        class QueuedCommand
+        public class CompletionCommandBase
         {
             public readonly CancellationToken Token;
             readonly DeviceCommand _command;
 
-            public QueuedCommand( DeviceCommand c, CancellationToken t )
+            internal CompletionCommandBase( DeviceCommand c, CancellationToken t )
             {
                 _command = c;
                 Token = t;
@@ -37,17 +37,18 @@ namespace CK.DeviceModel
 
             public DeviceCommand Command => _command;
 
-            public virtual Task ExecuteAsync( StdDevice<TConfiguration> device, IActivityMonitor monitor ) => device.HandleCommandAsync( monitor, _command, Token );
-
             public virtual void SetException( Exception ex ) { }
 
             public virtual void SetCancelled() { }
+
+            internal virtual Task ExecuteAsync( StdDevice<TConfiguration> device, IActivityMonitor monitor ) => device.HandleCommandAsync( monitor, _command, Token );
+
         }
 
         /// <summary>
         /// Commands that have no result but need to be awaited.
         /// </summary>
-        class WaitableCommand : QueuedCommand
+        public class WaitableCommand : CompletionCommandBase
         {
             readonly TaskCompletionSource<bool> TCS;
 
@@ -57,7 +58,7 @@ namespace CK.DeviceModel
                 TCS = tcs;
             }
 
-            public override Task ExecuteAsync( StdDevice<TConfiguration> device, IActivityMonitor monitor )
+            internal override Task ExecuteAsync( StdDevice<TConfiguration> device, IActivityMonitor monitor )
             {
                 return device.HandleCommandAsync( monitor, Command, Token ).ContinueWith( Continuation, TaskContinuationOptions.ExecuteSynchronously );
             }
@@ -71,6 +72,7 @@ namespace CK.DeviceModel
                     default: TCS.SetResult( true ); break;
                 }
             }
+            public void SetComplete() => TCS.SetResult( true );
 
             public override void SetException( Exception ex ) => TCS.SetException( ex );
 
@@ -79,13 +81,13 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Commands that have no result but need to be awaited.
+        /// Commands that have a result and need to be awaited.
         /// </summary>
-        class WaitableCommand<TResult> : QueuedCommand
+        public class CompletionCommand<TResult> : CompletionCommandBase
         {
             readonly TaskCompletionSource<TResult> TCS;
 
-            public WaitableCommand( DeviceCommand<TResult> c, CancellationToken t, TaskCompletionSource<TResult> tcs )
+            public CompletionCommand( DeviceCommand<TResult> c, CancellationToken t, TaskCompletionSource<TResult> tcs )
                 : base( c, t )
             {
                 TCS = tcs;
@@ -93,7 +95,7 @@ namespace CK.DeviceModel
 
             protected new DeviceCommand<TResult> Command => (DeviceCommand<TResult>)base.Command;
 
-            public override Task ExecuteAsync( StdDevice<TConfiguration> device, IActivityMonitor monitor )
+            internal override Task ExecuteAsync( StdDevice<TConfiguration> device, IActivityMonitor monitor )
             {
                 return device.HandleCommandAsync( monitor, Command, Token ).ContinueWith( Continuation, TaskContinuationOptions.ExecuteSynchronously );
             }
@@ -134,8 +136,8 @@ namespace CK.DeviceModel
         protected StdDevice( IActivityMonitor monitor, CreateInfo info, StoppedBehavior defaultStoppedBehavior = StoppedBehavior.SetNotRunningException )
             : base( monitor, info )
         {
-            _commandQueue = Channel.CreateUnbounded<QueuedCommand>( new UnboundedChannelOptions() { SingleReader = true } );
-            _deferredCommands = new Queue<QueuedCommand>();
+            _commandQueue = Channel.CreateUnbounded<CompletionCommandBase>( new UnboundedChannelOptions() { SingleReader = true } );
+            _deferredCommands = new Queue<CompletionCommandBase>();
             _stoppedBehavior = defaultStoppedBehavior;
             _ = Task.Run( RunLoop );
         }
@@ -167,12 +169,12 @@ namespace CK.DeviceModel
         protected sealed override Task<TResult> DoHandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token )
         {
             var cts = new TaskCompletionSource<TResult>();
-            var error = DoEnqueue( new WaitableCommand<TResult>( command, token, cts ) );
+            var error = DoEnqueue( new CompletionCommand<TResult>( command, token, cts ) );
             if( error != null ) cts.SetException( error );
             return cts.Task;
         }
 
-        Exception? DoEnqueue( StdDevice<TConfiguration>.QueuedCommand c )
+        Exception? DoEnqueue( StdDevice<TConfiguration>.CompletionCommandBase c )
         {
             if( !_commandQueue.Writer.TryWrite( c ) )
             {
@@ -187,7 +189,7 @@ namespace CK.DeviceModel
             bool isRunning = false;
             for( ; ; )
             {
-                QueuedCommand cmd = null!;
+                CompletionCommandBase cmd = null!;
                 try
                 {
                     cmd = await _commandQueue.Reader.ReadAsync( DestroyToken );
@@ -274,7 +276,7 @@ namespace CK.DeviceModel
             }
             monitor.MonitorEnd();
 
-            void SetNotRunningException( StdDevice<TConfiguration>.QueuedCommand cmd )
+            void SetNotRunningException( StdDevice<TConfiguration>.CompletionCommandBase cmd )
             {
                 cmd.SetException( new CKException( $"Unable to execute command '{cmd.Command.GetType().Name}' on device '{FullName}', its status is {Status}." ) );
             }
@@ -298,7 +300,7 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device is destroyed.</returns>
         public bool SendCommand( IActivityMonitor monitor, DeviceCommand command, CancellationToken token = default )
         {
-            var error = DoEnqueue( new QueuedCommand( command, token ) );
+            var error = DoEnqueue( new CompletionCommandBase( command, token ) );
             if( error != null )
             {
                 monitor.Error( error.Message );
@@ -310,22 +312,34 @@ namespace CK.DeviceModel
         /// <summary>
         /// Must implement command handling without any result. Calls to this method and to <see cref="HandleCommandAsync{TResult}(IActivityMonitor, DeviceCommand{TResult}, CancellationToken)"/>
         /// are executed from the command loop managed by this <see cref="StdDevice{TConfiguration}"/>: calls are serialized, there should be no concurrency issue to handle.
+        /// <para>
+        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
         /// <param name="token">The token's cancellation toke.</param>
         /// <returns>The awaitable.</returns>
-        protected abstract Task HandleCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token );
+        protected virtual Task HandleCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token )
+        {
+            throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
+        }
 
         /// <summary>
         /// Must implement command handling for commands with result. Calls to this method and to <see cref="HandleCommandAsync(IActivityMonitor, DeviceCommand, CancellationToken)"/>
         /// are executed from the command loop managed by this <see cref="StdDevice{TConfiguration}"/>: calls are serialized, there should be no concurrency issue to handle.
+        /// <para>
+        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
         /// <param name="token">The token's cancellation toke.</param>
         /// <returns>The command's result.</returns>
-        protected abstract Task<TResult> HandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token );
+        protected virtual Task<TResult> HandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token )
+        {
+            throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
+        }
 
         /// <summary>
         /// Extension point that is called for each command that must be executed while this device is stopped.
