@@ -23,7 +23,12 @@ namespace CK.DeviceModel
         /// <summary>
         /// The device started because of a call to the public <see cref="IDevice.StartAsync(Core.IActivityMonitor)"/>.
         /// </summary>
-        StartedCall,
+        StartCall,
+
+        /// <summary>
+        /// The device started because of a call to the protected <see cref="Device{TConfiguration}.AutoStartAsync(Core.IActivityMonitor)"/>..
+        /// </summary>
+        AutoStart,
 
     }
 

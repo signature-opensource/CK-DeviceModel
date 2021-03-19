@@ -3,6 +3,7 @@ using CK.PerfectEvent;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
@@ -100,26 +101,19 @@ namespace CK.DeviceModel
         PerfectEvent<IDeviceHost> DevicesChanged { get; }
 
         /// <summary>
-        /// Determines whether the <see cref="DeviceCommand.HostType"/> is compatible with the actual type of this host,
-        /// finds the target device based on <see cref="DeviceCommand.DeviceName"/>, checks the <see cref="DeviceCommand.ControllerKey"/>
-        /// against the <see cref="IDevice.ControllerKey"/> and calls <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> before
-        /// submitting the command to the device.
+        /// Sends the provided command to the device it targets.
+        /// <para>
+        /// Determines whether the <see cref="DeviceCommandBase.HostType"/> is compatible with the actual type of this host,
+        /// finds the target device based on <see cref="DeviceCommandBase.DeviceName"/>, checks the <see cref="DeviceCommandBase.ControllerKey"/>
+        /// against the <see cref="IDevice.ControllerKey"/> and calls <see cref="DeviceCommandBase.CheckValidity(IActivityMonitor)"/> before
+        /// sending the command to the device.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to validate, route and execute.</param>
+        /// <param name="token">Optional cancellation token.</param>
         /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
-        Task<DeviceHostCommandResult> ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command );
-
-        /// <summary>
-        /// Determines whether the <see cref="DeviceCommand.HostType"/> is compatible with the actual type of this host,
-        /// finds the target device based on <see cref="DeviceCommand.DeviceName"/>, checks the <see cref="DeviceCommand.ControllerKey"/>
-        /// against the <see cref="IDevice.ControllerKey"/> and calls <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> before
-        /// submitting the command to the device.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to validate, route and execute.</param>
-        /// <returns>The <see cref="DeviceHostCommandResult"/> result status and the result itself (default value on error).</returns>
-        Task<(DeviceHostCommandResult Status, TResult? Result)> ExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command );
+        public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default );
 
     }
 }

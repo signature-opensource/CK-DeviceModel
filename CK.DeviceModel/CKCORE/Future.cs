@@ -17,7 +17,7 @@ namespace CK.Core
     /// </summary>
     public class Future : IFuture
     {
-        readonly TaskCompletionSource<CKExceptionData?> _tcs = new TaskCompletionSource<CKExceptionData?>();
+        readonly TaskCompletionSource<CKExceptionData?> _tcs = new();
 
         /// <inheritdoc />
         public Task<bool> WaitAsync( int millisecondsTimeout, CancellationToken cancellation = default ) => _tcs.Task.WaitAsync( millisecondsTimeout, cancellation );

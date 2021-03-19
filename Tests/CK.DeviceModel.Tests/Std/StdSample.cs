@@ -74,18 +74,10 @@ namespace CK.DeviceModel.Tests.Std
             return base.HandleCommandAsync( monitor, command, token );
         }
 
-        protected override async Task<TResult> HandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token )
-        {
-            if( command is StupidCommandWithResult s )
-            {
-                return (TResult)(object)(await ExecuteAsync( s ));
-            }
-            return base.HandleCommandAsync( monitor, command, token );
-        }
 
-        Task<int> ExecuteAsync( StupidCommandWithResult r )
+        Task<int> ExecuteAsync( StupidCommandWithResult c )
         {
-            return Task.FromResult( s.Power * 2 );
+            return Task.FromResult( c.Power * 2 );
         }
     }
 }

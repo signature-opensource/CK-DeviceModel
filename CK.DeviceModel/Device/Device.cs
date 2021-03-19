@@ -15,7 +15,7 @@ namespace CK.DeviceModel
     /// Abstract base class for a device.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract class Device<TConfiguration> : IDevice where TConfiguration : DeviceConfiguration
+    public abstract partial class Device<TConfiguration> : IDevice where TConfiguration : DeviceConfiguration
     {
         IInternalDeviceHost? _host;
         DeviceConfigurationStatus _configStatus;
@@ -24,6 +24,14 @@ namespace CK.DeviceModel
         readonly PerfectEventSender<IDevice> _statusChanged;
         readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
         readonly CancellationTokenSource _destroyToken;
+        /// <summary>
+        /// This lock uses LockRecursionPolicy.SupportsRecursion.
+        /// We could have used NoRecursion by using the DeviceStopped/StartReason enumerations and
+        /// avoid to take it when Auto calls are made but the AsyncLock support of recursion
+        /// only involves a comparison of the monitor output and a counter increment/decrement,
+        /// and allowing recursion is both simpler and more secure.
+        /// </summary>
+        readonly AsyncLock _commandExecutionLock;
         bool _controllerKeyFromConfiguration;
         bool _isRunning;
 
@@ -83,20 +91,28 @@ namespace CK.DeviceModel
             _statusChanged = new PerfectEventSender<IDevice>();
             _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
             _destroyToken = new CancellationTokenSource();
+            _commandExecutionLock = new AsyncLock( LockRecursionPolicy.SupportsRecursion, FullName );
+            _commandQueue = Channel.CreateUnbounded<(DeviceCommandBase Command, CancellationToken Token)>( new UnboundedChannelOptions() { SingleReader = true } );
+            _deferredCommands = new Queue<(DeviceCommandBase Command, CancellationToken Token)>();
+            _defaultStoppedBehavior = info.Configuration.DefaultStoppedBehavior;
+            _ = Task.Run( CommandRunLoop );
         }
 
-        internal virtual Task HostDestroyAsync( IActivityMonitor monitor )
+        internal async Task HostDestroyAsync( IActivityMonitor monitor )
         {
             Debug.Assert( _host != null && !_isRunning );
             _destroyToken.Cancel();
-            _host = null;
-            FullName += " (Destroyed)";
-            return DoDestroyAsync( monitor );
+            using( await _commandExecutionLock.LockAsync( monitor ) )
+            {
+                _host = null;
+                FullName += " (Destroyed)";
+                await DoDestroyAsync( monitor );
+            }
         }
 
-        internal async Task HostRaiseDestroyStatusAsync( IActivityMonitor monitor )
+        internal async Task HostRaiseDestroyStatusAsync( IActivityMonitor monitor, bool autoDestroy )
         {
-            await SetDeviceStatusAsync( monitor, new DeviceStatus( DeviceStoppedReason.Destroyed ) );
+            await SetDeviceStatusAsync( monitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ) );
             _statusChanged.RemoveAll();
             _controllerKeyChanged.RemoveAll();
         }
@@ -247,6 +263,7 @@ namespace CK.DeviceModel
             {
                 _configStatus = config.Status;
             }
+            _defaultStoppedBehavior = config.DefaultStoppedBehavior;
             var configKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
             _controllerKeyFromConfiguration = configKey != null;
             bool controllerKeyChanged = _controllerKeyFromConfiguration && configKey != _controllerKey;
@@ -258,7 +275,10 @@ namespace CK.DeviceModel
             DeviceReconfiguredResult reconfigResult;
             try
             {
-                reconfigResult = await DoReconfigureAsync( monitor, config );
+                using( await _commandExecutionLock.LockAsync( monitor ) )
+                {
+                    reconfigResult = await DoReconfigureAsync( monitor, config );
+                }
                 if( reconfigResult == DeviceReconfiguredResult.None && (configStatusChanged || controllerKeyChanged) )
                 {
                     reconfigResult = DeviceReconfiguredResult.UpdateSucceeded;
@@ -362,9 +382,12 @@ namespace CK.DeviceModel
                 Debug.Assert( _isRunning == false );
                 try
                 {
-                    if( await DoStartAsync( monitor, reason ) )
+                    using( await _commandExecutionLock.LockAsync( monitor ) )
                     {
-                        _isRunning = true;
+                        if( await DoStartAsync( monitor, reason ) )
+                        {
+                            _isRunning = true;
+                        }
                     }
                 }
                 catch( Exception ex )
@@ -437,15 +460,15 @@ namespace CK.DeviceModel
                 // From now on, Stop always succeeds, even if an error occurred.
                 try
                 {
-                    await DoStopAsync( monitor, reason );
+                    using( await _commandExecutionLock.LockAsync( monitor ) )
+                    {
+                        _isRunning = false;
+                        await DoStopAsync( monitor, reason );
+                    }
                 }
                 catch( Exception ex )
                 {
                     monitor.Error( $"While stopping {FullName} ({reason}).", ex );
-                }
-                finally
-                {
-                    _isRunning = false;
                 }
                 if( reason != DeviceStoppedReason.Destroyed )
                 {
@@ -491,9 +514,21 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>The awaitable.</returns>
-        protected Task AutoDestroyAsync( IActivityMonitor monitor )
+        protected async Task AutoDestroyAsync( IActivityMonitor monitor )
         {
-            return _host?.AutoDestroyAsync( this, monitor ) ?? Task.CompletedTask;
+            if( _host == null ) return;
+            // If this is called from a piece of code that is not in the command
+            // execution context, adapt the lock here.
+            bool hasNoLock = !_commandExecutionLock.IsEnteredBy( monitor );
+            if( hasNoLock ) await _commandExecutionLock.EnterAsync( monitor );
+            try
+            {
+                await _host.AutoDestroyAsync( this, monitor );
+            }
+            finally
+            {
+                if( hasNoLock ) _commandExecutionLock.Leave( monitor );
+            }
         }
 
         /// <summary>
@@ -511,109 +546,6 @@ namespace CK.DeviceModel
         protected Task<bool> AutoStopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false )
         {
             return _host?.AutoStopAsync( this, monitor, ignoreAlwaysRunning ) ?? Task.FromResult(true);
-        }
-
-        /// <inheritdoc />
-        public Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
-        {
-            CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
-            return DoHandleCommandAsync( monitor, command, token );
-        }
-
-        /// <inheritdoc />
-        public Task<TResult> ExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
-        {
-            CheckDirectCommandParameter( monitor, command, checkDeviceName, checkControllerKey );
-            return DoHandleCommandAsync( monitor, command, token );
-        }
-
-        /// <inheritdoc />
-        public Task UnsafeExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token = default ) => ExecuteCommandAsync( monitor, command, false, false, token );
-
-        /// <inheritdoc />
-        public Task<TResult> UnsafeExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token = default ) => ExecuteCommandAsync( monitor, command, false, false, token );
-
-        void CheckDirectCommandParameter( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName, bool checkControllerKey )
-        {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            if( command == null ) throw new ArgumentNullException( nameof( command ) );
-            if( !command.HostType.IsAssignableFrom( _host!.GetType() ) ) throw new ArgumentException( $"{command.GetType().Name}: Invalid HostType '{command.HostType.Name}'.", nameof( command ) );
-            if( !command.CheckValidity( monitor ) ) throw new ArgumentException( $"{command.GetType().Name}: CheckValidity failed. See logs.", nameof( command ) );
-            if( checkDeviceName && command.DeviceName != Name ) throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it. (For direct execution, you can use checkDeviceName: false parameter to skip this check.)", nameof( command ) );
-            if( checkControllerKey )
-            {
-                var invalidKey = CheckCommandControllerKey( command );
-                if( invalidKey != null ) throw new ArgumentException( $"{command.GetType().Name}: {invalidKey}" );
-            }
-        }
-
-        internal string? CheckCommandControllerKey( DeviceCommand command )
-        {
-            // The basic ResetControllerKey command sets a new ControllerKey.
-            if( command is not BasicControlDeviceCommand b || b.Operation != BasicControlDeviceOperation.ResetControllerKey )
-            {
-                var key = ControllerKey;
-                if( key != null && command.ControllerKey != key )
-                {
-                    return $"Expected command ControllerKey is '{command.ControllerKey}' but current device's one is '{key}'. (For direct execution, you can use checkControllerKey: false parameter to skip this check.)";
-                }
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Executes the corresponding <see cref="BasicControlDeviceCommand.Operation"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="b">The basic device command.</param>
-        /// <returns>The awaitable.</returns>
-        protected Task ExecuteBasicControlDeviceCommandAsync( IActivityMonitor monitor, BasicControlDeviceCommand b )
-        {
-            return b.Operation switch
-            {
-                BasicControlDeviceOperation.Start => StartAsync( monitor ),
-                BasicControlDeviceOperation.Stop => StopAsync( monitor ),
-                BasicControlDeviceOperation.ResetControllerKey => SetControllerKeyAsync( monitor, b.ControllerKey ),
-                BasicControlDeviceOperation.None => Task.CompletedTask,
-                _ => Task.FromException( new ArgumentOutOfRangeException( nameof( BasicControlDeviceCommand.Operation ) ) ),
-            };
-        }
-
-        /// <summary>
-        /// Calls <see cref="ExecuteBasicControlDeviceCommandAsync"/> if the <paramref name="command"/> is a <see cref="BasicControlDeviceCommand"/>
-        /// otherwise, since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
-        /// <para>
-        /// The <paramref name="command"/> object that is targeted to this device (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/>
-        /// and <see cref="DeviceCommand.ControllerKey"/> is either null or match the current <see cref="ControllerKey"/>).
-        /// </para>
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to handle.</param>
-        /// <param name="token">Cancellation token.</param>
-        /// <returns>The awaitable.</returns>
-        protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token )
-        {
-            if( command is BasicControlDeviceCommand b )
-            {
-                return ExecuteBasicControlDeviceCommandAsync( monitor, b );
-            }
-            return Task.FromException( new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) ) );
-        }
-
-        /// <summary>
-        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
-        /// <para>
-        /// The <paramref name="command"/> object that is targeted to this device (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/>
-        /// and <see cref="DeviceCommand.ControllerKey"/> is either null or match the current <see cref="ControllerKey"/>).
-        /// </para>
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to handle.</param>
-        /// <param name="token">Cancellation token.</param>
-        /// <returns>The command's result.</returns>
-        protected virtual Task<TResult> DoHandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token )
-        {
-            return Task.FromException<TResult>( new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) ) );
         }
 
         /// <summary>

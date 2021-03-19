@@ -205,7 +205,7 @@ namespace CK.DeviceModel.Tests
             lastSyncEvent.Value.HasStarted.Should().BeTrue();
             lastSyncEvent.Value.HasBeenReconfigured.Should().BeFalse();
             lastSyncEvent.Value.HasStopped.Should().BeFalse();
-            lastSyncEvent.Value.StartedReason.Should().Be( DeviceStartedReason.StartedCall );
+            lastSyncEvent.Value.StartedReason.Should().Be( DeviceStartedReason.StartCall );
 
             // AutoDestroying.
             lastSyncEvent = null;

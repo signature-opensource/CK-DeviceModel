@@ -32,9 +32,14 @@ namespace CK.DeviceModel
         AutoStoppedForceCall,
 
         /// <summary>
-        /// The device has stopped because it has been destroyed.
+        /// The device has stopped because it is being destroyed.
         /// </summary>
-        Destroyed
+        Destroyed,
+
+        /// <summary>
+        /// The device has stopped because of a call to the protected <see cref="Device{TConfiguration}.AutoDestroyAsync(Core.IActivityMonitor)"/>.
+        /// </summary>
+        AutoDestroyed
     }
 }
 

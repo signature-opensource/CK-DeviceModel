@@ -19,7 +19,7 @@ namespace CK.Core
     /// <typeparam name="T">The result type.</typeparam>
     public class Future<T> : IFuture, IFuture<T>
     {
-        readonly TaskCompletionSource<object?> _tcs = new TaskCompletionSource<object?>();
+        readonly TaskCompletionSource<object?> _tcs = new();
 
         /// <inheritdoc />
         public Task<bool> WaitAsync( int millisecondsTimeout, CancellationToken cancellation = default ) => _tcs.Task.WaitAsync( millisecondsTimeout, cancellation );

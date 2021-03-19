@@ -116,12 +116,12 @@ namespace CK.DeviceModel
         PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
         /// <summary>
-        /// Supports direct execution on this device instead of being routed by <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>.
+        /// Sends a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, DeviceCommandBase, CancellationToken)"/>.
         /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
-        ///     <item><see cref="DeviceCommand.HostType"/> is not compatible with this device's host type;</item>
-        ///     <item>or <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> fails;</item>
-        ///     <item>or the <see cref="DeviceCommand.DeviceName"/> doesn't match this device's name;</item>
+        ///     <item><see cref="DeviceCommandBase.HostType"/> is not compatible with this device's host type;</item>
+        ///     <item>or <see cref="DeviceCommandBase.CheckValidity(IActivityMonitor)"/> fails;</item>
+        ///     <item>or the <see cref="DeviceCommandBase.DeviceName"/> doesn't match this device's name;</item>
         ///     <item>or this <see cref="ControllerKey"/> is not null and <see cref="DeviceCommand.ControllerKey"/> differs from it.</item>
         /// </list>
         /// The 2 last checks can be suppressed thanks to the <paramref name="checkDeviceName"/> and <paramref name="checkControllerKey"/> parameters.
@@ -129,54 +129,26 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
         /// <param name="checkDeviceName">
-        /// By default, the <see cref="DeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
+        /// By default, the <see cref="DeviceCommandBase.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
         /// Using false here allows any command name to be executed.
         /// </param>
         /// <param name="checkControllerKey">
-        /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
+        /// By default, the <see cref="DeviceCommandBase.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
         /// Using false here skips this check.
         /// </param>
         /// <param name="token">Optional cancellation token.</param>
-        /// <returns>The awaitable.</returns>
-        Task ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
+        bool SendCommand( IActivityMonitor monitor, DeviceCommandBase command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
 
         /// <summary>
-        /// Same as <see cref="ExecuteCommandAsync(IActivityMonitor, DeviceCommand, bool, bool)"/> but for commands that generates a result.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute.</param>
-        /// <param name="checkDeviceName">
-        /// By default, the <see cref="DeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
-        /// Using false here allows any command name to be executed.
-        /// </param>
-        /// <param name="checkControllerKey">
-        /// By default, the <see cref="DeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
-        /// Using false here skips this check.
-        /// </param>
-        /// <param name="token">Optional cancellation token.</param>
-        /// <returns>The command's result.</returns>
-        Task<TResult> ExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
-
-        /// <summary>
-        /// Same as <see cref="ExecuteCommandAsync(IActivityMonitor, DeviceCommand, bool, bool, CancellationToken)"/> except that only the host type
-        /// is checked and <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> is called. <see cref="Name"/> or <see cref="ControllerKey"/> are ignored.
+        /// Same as <see cref="SendCommand"/> except that only the host type
+        /// is checked and <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> is called.
+        /// <see cref="Name"/> or <see cref="ControllerKey"/> are ignored.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>The awaitable.</returns>
-        Task UnsafeExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token = default );
-
-        /// <summary>
-        /// Same as <see cref="ExecuteCommandAsync(IActivityMonitor, DeviceCommand{TResult}, bool, bool, CancellationToken)"/> except that only the host type
-        /// is checked and <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> is called. <see cref="Name"/> or <see cref="ControllerKey"/> are ignored.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute.</param>
-        /// <param name="token">Optional cancellation token.</param>
-        /// <returns>The awaitable.</returns>
-        Task<TResult> UnsafeExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token = default );
-
+        Task UnsafSendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default );
     }
 
 }

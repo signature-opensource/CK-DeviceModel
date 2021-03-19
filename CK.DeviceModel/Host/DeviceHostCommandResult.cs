@@ -3,12 +3,12 @@ using CK.Core;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Defines the outcome of the <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/> method.
+    /// Defines the outcome of the <see cref="DeviceHost.SendCommand(IActivityMonitor, DeviceCommandBase, CancellationToken)"/> method.
     /// </summary>
     public enum DeviceHostCommandResult
     {
         /// <summary>
-        /// The command has been successfully executed.
+        /// The command has been successfully sent.
         /// </summary>
         Success,
 
@@ -33,9 +33,10 @@ namespace CK.DeviceModel
         ControllerKeyMismatch,
 
         /// <summary>
-        /// The command execution raised an exception that has been logged.
+        /// The <see cref="Device{TConfiguration}.SendCommand(IActivityMonitor, DeviceCommandBase, System.Threading.CancellationToken)"/>
+        /// method returned false (the device has been destroyed).
         /// </summary>
-        UnhandledCommandError
+        DeviceDestroyed
     }
 
 }

@@ -25,6 +25,9 @@ namespace CK.DeviceModel
         where THostConfiguration : DeviceHostConfiguration<TConfiguration>
         where TConfiguration : DeviceConfiguration
     {
+        /// <summary>
+        /// This lock uses the NoRecursion policy. 
+        /// </summary>
         readonly AsyncLock _lock;
         readonly PerfectEventSender<IDeviceHost> _devicesChanged;
 
@@ -350,7 +353,7 @@ namespace CK.DeviceModel
                             {
                                 var e = newDevices[noMore];
                                 newDevices.Remove( noMore );
-                                await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
+                                await DestroyDeviceAsync( monitor, e, false ).ConfigureAwait( false );
                                 somethingChanged = true;
                             }
                         }
@@ -397,7 +400,7 @@ namespace CK.DeviceModel
                     {
                         var newDevices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
                         newDevices.Remove( e.Device.Name );
-                        await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
+                        await DestroyDeviceAsync( monitor, e, false ).ConfigureAwait( false );
                         somethingChanged = true;
                         _devices = newDevices;
                     }
@@ -423,7 +426,7 @@ namespace CK.DeviceModel
                 {
                     foreach( var e in _devices.Values )
                     {
-                        await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
+                        await DestroyDeviceAsync( monitor, e, false ).ConfigureAwait( false );
                     }
                     _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
                 }
@@ -434,24 +437,24 @@ namespace CK.DeviceModel
             }
         }
 
-        async Task DestroyDeviceAsync( IActivityMonitor monitor, ConfiguredDevice<T,TConfiguration> e )
+        async Task DestroyDeviceAsync( IActivityMonitor monitor, ConfiguredDevice<T,TConfiguration> e, bool autoDestroy )
         {
             using( monitor.OpenInfo( $"Destroying device '{e.Device.FullName}'." ) )
             {
                 if( e.Device.IsRunning )
                 {
-                    await e.Device.HostStopAsync( monitor, DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
+                    await e.Device.HostStopAsync( monitor, autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
                     Debug.Assert( !e.Device.IsRunning );
                 }
                 try
                 {
-                    await e.Device.HostDestroyAsync( monitor ).ConfigureAwait( false );
+                    await e.Device.HostDestroyAsync( monitor, autoDestroy ).ConfigureAwait( false );
                 }
                 catch( Exception ex )
                 {
                     monitor.Warn( $"'{e.Device.FullName}'.OnDestroyAsync error. This is ignored.", ex );
                 }
-                await e.Device.HostRaiseDestroyStatusAsync( monitor ).ConfigureAwait( false );
+                await e.Device.HostRaiseDestroyStatusAsync( monitor, autoDestroy ).ConfigureAwait( false );
                 try
                 {
                     await OnDeviceDestroyedAsync( monitor, e.Device, e.Configuration ).ConfigureAwait( false );
@@ -592,8 +595,20 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device, TConfiguration configuration ) => Task.CompletedTask;
 
-
         /// <inheritdoc />
+        public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default )
+        {
+            var (status, device) = RouteCommand( monitor, command );
+            if( status != DeviceHostCommandResult.Success ) return (DeviceHostCommandResult)status;
+            Debug.Assert( device != null );
+            if( !device.SendCommand( monitor, command, token ) )
+            {
+                return DeviceHostCommandResult.DeviceDestroyed;
+            }
+            return DeviceHostCommandResult.Success;
+        }
+
+
         public async Task<DeviceHostCommandResult> ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command )
         {
             var (status, device) = RouteCommand( monitor, command );
@@ -686,14 +701,14 @@ namespace CK.DeviceModel
                 bool raiseChanged = false;
                 switch( a )
                 {
-                    case DeviceAction.Start: success = e.Device.IsRunning || await e.Device.HostStartAsync( monitor, DeviceStartedReason.StartedCall ).ConfigureAwait( false ); break;
+                    case DeviceAction.Start: success = e.Device.IsRunning || await e.Device.HostStartAsync( monitor, DeviceStartedReason.StartCall ).ConfigureAwait( false ); break;
                     case DeviceAction.Stop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.StoppedCall ).ConfigureAwait( false ); break;
                     case DeviceAction.AutoStop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedCall ).ConfigureAwait( false ); break;
                     case DeviceAction.AutoStopForce: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedForceCall ).ConfigureAwait( false ); break;
                     case DeviceAction.AutoDestroy:
                         {
                             var newDevices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
-                            await DestroyDeviceAsync( monitor, e ).ConfigureAwait( false );
+                            await DestroyDeviceAsync( monitor, e, true ).ConfigureAwait( false );
                             newDevices.Remove( d.Name );
                             success = raiseChanged = true;
                             _devices = newDevices;
