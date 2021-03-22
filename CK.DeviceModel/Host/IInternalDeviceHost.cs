@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Internal interface that define non-generic host behaviors: Devices
+    /// Internal interface that define non-generic host behaviors: Devices and DeviceHostDaemon
     /// call these methods.
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        Task<bool> StartAsync( IDevice d, IActivityMonitor monitor );
+        Task<bool> StartAsync( IDevice d, IActivityMonitor monitor, bool autoStart );
 
         Task<bool> StopAsync( IDevice d, IActivityMonitor monitor );
 

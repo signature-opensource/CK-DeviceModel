@@ -50,8 +50,9 @@ namespace CK.DeviceModel.Tests
             }
         }
 
-        [Test]
-        public async Task simple_auto_restart()
+        //[TestCase( "UseAutoDestroy" )]
+        [TestCase( "UseHostDestroy" )]
+        public async Task simple_auto_restart( string mode )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( "simple_auto_restart" );
 
@@ -67,7 +68,10 @@ namespace CK.DeviceModel.Tests
             var d = host["M"];
             Debug.Assert( d != null );
             d.IsRunning.Should().BeTrue();
-            await d.TestForceStopAsync( TestHelper.Monitor );
+            var cmd = new ForceAutoStopCommand<MachineHost>() { DeviceName = "M" };
+            d.SendCommand( TestHelper.Monitor, cmd );
+            await cmd.Result;
+            cmd.Result.Value.Should().BeTrue();
             d.IsRunning.Should().BeFalse();
 
             await Task.Delay( 100 );
@@ -76,7 +80,16 @@ namespace CK.DeviceModel.Tests
             await Task.Delay( 200 );
             d.IsRunning.Should().BeTrue( "Machine started again." );
 
-            await d.TestAutoDestroyAsync( TestHelper.Monitor );
+            if( mode == "UseAutoDestroy" )
+            {
+                var destroy = new AutoDestroyCommand<MachineHost>() { DeviceName = "M" };
+                d.SendCommand( TestHelper.Monitor, destroy );
+                await destroy.Result;
+            }
+            else
+            {
+                await host.DestroyDeviceAsync( TestHelper.Monitor, "M" );
+            }
             d.IsRunning.Should().BeFalse();
             d.IsDestroyed.Should().BeTrue();
 
@@ -103,7 +116,10 @@ namespace CK.DeviceModel.Tests
             var d = host["M"];
             Debug.Assert( d != null );
             d.IsRunning.Should().BeTrue();
-            await d.TestForceStopAsync( TestHelper.Monitor );
+
+            var cmd = new ForceAutoStopCommand<MachineHost>() { DeviceName = "M" };
+            d.SendCommand( TestHelper.Monitor, cmd );
+            await cmd.Result;
             d.IsRunning.Should().BeFalse();
 
             await Task.Delay( 20 );
@@ -141,10 +157,10 @@ namespace CK.DeviceModel.Tests
             var d4 = host["M*4"];
             Debug.Assert( d4 != null );
 
-            await d1.TestForceStopAsync( TestHelper.Monitor );
-            await d2.TestForceStopAsync( TestHelper.Monitor );
-            await d3.TestForceStopAsync( TestHelper.Monitor );
-            await d4.TestForceStopAsync( TestHelper.Monitor );
+            await d1.SendForceAutoStop( TestHelper.Monitor );
+            await d2.SendForceAutoStop( TestHelper.Monitor );
+            await d3.SendForceAutoStop( TestHelper.Monitor );
+            await d4.SendForceAutoStop( TestHelper.Monitor );
 
             d1.IsRunning.Should().BeFalse();
             d2.IsRunning.Should().BeFalse();
@@ -221,8 +237,10 @@ namespace CK.DeviceModel.Tests
                                     .Select( x => (ITestDevice)x.Item1 )
                                     .ToArray();
 
-            foreach( var d in devices ) await d.TestForceStopAsync( TestHelper.Monitor );
-
+            foreach( var d in devices )
+            {
+                await d.SendForceAutoStop( TestHelper.Monitor );
+            }
             TestHelper.Monitor.Trace( "*** Wait ***" );
             await Task.Delay( 210 );
             TestHelper.Monitor.Trace( "*** EndWait ***" );

@@ -34,7 +34,8 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets whether this device has been destroyed.
         /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
-        /// based on this "instant" status should be avoided.
+        /// based on this "instant" status should be avoided (except if it is true: it never transitions
+        /// from true to false).
         /// </summary>
         bool IsDestroyed { get; }
 
@@ -78,7 +79,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.
-        /// When null, the <see cref="DeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.ExecuteCommandAsync(IActivityMonitor, DeviceCommand)"/>
+        /// When null, the <see cref="DeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.SendCommand(IActivityMonitor, DeviceCommandBase, CancellationToken)"/>
         /// checks that the command's controller key is the same as this one otherwise the command is not handled.
         /// </summary>
         string? ControllerKey { get; }
@@ -137,6 +138,7 @@ namespace CK.DeviceModel
         /// Using false here skips this check.
         /// </param>
         /// <param name="token">Optional cancellation token.</param>
+        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         bool SendCommand( IActivityMonitor monitor, DeviceCommandBase command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
 
         /// <summary>
@@ -147,8 +149,8 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
         /// <param name="token">Optional cancellation token.</param>
-        /// <returns>The awaitable.</returns>
-        Task UnsafSendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default );
+        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
+        bool UnsafeSendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default );
     }
 
 }

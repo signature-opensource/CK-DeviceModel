@@ -6,6 +6,7 @@ using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests
 {
+
     public class Machine : Device<MachineConfiguration>, ITestDevice
     {
         public static int TotalCount;
@@ -13,7 +14,7 @@ namespace CK.DeviceModel.Tests
 
         // A device can keep a reference to the current configuration:
         // this configuration is an independent clone that is accessible only to the Device.
-        MachineConfiguration _configRef;
+        readonly MachineConfiguration _configRef;
 
         public Machine( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
@@ -22,9 +23,19 @@ namespace CK.DeviceModel.Tests
             _configRef = info.Configuration;
         }
 
-        public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
+        public CommandCompletion SendAutoDestroy( IActivityMonitor monitor )
+        {
+            var cmd = new AutoDestroyCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
+            SendCommand( monitor, cmd );
+            return cmd.Result;
+        }
 
-        public Task TestForceStopAsync( IActivityMonitor monitor ) => AutoStopAsync( monitor, ignoreAlwaysRunning: true );
+        public CommandCompletion<bool> SendForceAutoStop( IActivityMonitor monitor )
+        {
+            var cmd = new ForceAutoStopCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
+            SendCommand( monitor, cmd );
+            return cmd.Result;
+        }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, MachineConfiguration config )
         {
@@ -47,6 +58,23 @@ namespace CK.DeviceModel.Tests
         {
             Interlocked.Decrement( ref TotalCount );
             return Task.CompletedTask;
+        }
+
+        protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token )
+        {
+            if( command is ForceAutoStopCommand<MachineHost> autoStop )
+            {
+                autoStop.Result.SetSuccess( await AutoStopAsync( monitor, true ) );
+            }
+            else if( command is AutoDestroyCommand<MachineHost> autoDestroy )
+            {
+                await AutoDestroyAsync( monitor );
+                autoDestroy.Result.SetSuccess();
+            }
+            else
+            {
+                await base.DoHandleCommandAsync( monitor, command, token );
+            }
         }
     }
 

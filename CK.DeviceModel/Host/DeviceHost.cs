@@ -443,12 +443,26 @@ namespace CK.DeviceModel
             {
                 if( e.Device.IsRunning )
                 {
-                    await e.Device.HostStopAsync( monitor, autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
+                    if( autoDestroy )
+                    {
+                        await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoDestroyed ).ConfigureAwait( false );
+                    }
+                    else
+                    {
+                        await e.Device.HostStopForDestroyOnCommandLoopAsync().ConfigureAwait( false );
+                    }
                     Debug.Assert( !e.Device.IsRunning );
                 }
                 try
                 {
-                    await e.Device.HostDestroyAsync( monitor, autoDestroy ).ConfigureAwait( false );
+                    if( autoDestroy )
+                    {
+                        await e.Device.HostDestroyAsync( monitor, autoDestroy ).ConfigureAwait( false );
+                    }
+                    else
+                    {
+                        await e.Device.HostDestroyOnCommandLoopAsync().ConfigureAwait( false );
+                    }
                 }
                 catch( Exception ex )
                 {
@@ -599,9 +613,9 @@ namespace CK.DeviceModel
         public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default )
         {
             var (status, device) = RouteCommand( monitor, command );
-            if( status != DeviceHostCommandResult.Success ) return (DeviceHostCommandResult)status;
+            if( status != DeviceHostCommandResult.Success ) return status;
             Debug.Assert( device != null );
-            if( !device.SendCommand( monitor, command, token ) )
+            if( !device.SendRoutedCommand( command, token ) )
             {
                 return DeviceHostCommandResult.DeviceDestroyed;
             }
@@ -609,53 +623,18 @@ namespace CK.DeviceModel
         }
 
 
-        public async Task<DeviceHostCommandResult> ExecuteCommandAsync( IActivityMonitor monitor, DeviceCommand command )
-        {
-            var (status, device) = RouteCommand( monitor, command );
-            if( status != DeviceHostCommandResult.Success ) return status;
-            Debug.Assert( device != null );
-            try
-            {
-                await device.ExecuteCommandAsync( monitor, command );
-                return status;
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( $"While executing command.", ex );
-                return DeviceHostCommandResult.UnhandledCommandError;
-            }
-        }
-
-        /// <inheritdoc />
-        public async Task<(DeviceHostCommandResult Status, TResult? Result)> ExecuteCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command )
-        {
-            var (status, device) = RouteCommand( monitor, command );
-            if( status != DeviceHostCommandResult.Success ) return (status, default);
-            Debug.Assert( device != null );
-            try
-            {
-                var result = await device.ExecuteCommandAsync( monitor, command );
-                return (status, result);
-            }
-            catch( Exception ex )
-            {
-                monitor.Error( $"While executing command.", ex );
-                return (DeviceHostCommandResult.UnhandledCommandError, default);
-            }
-        }
-
         /// <summary>
         /// Helper that checks and routes a command to its device.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command.</param>
         /// <returns>The status and the device if found.</returns>
-        protected (DeviceHostCommandResult,T?) RouteCommand( IActivityMonitor monitor, DeviceCommand command )
+        protected (DeviceHostCommandResult,T?) RouteCommand( IActivityMonitor monitor, DeviceCommandBase command )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( command == null ) throw new ArgumentNullException( nameof( command ) );
             if( !command.HostType.IsAssignableFrom( GetType() ) ) return (DeviceHostCommandResult.InvalidHostType, null);
-
+            if( command.GetCompletionResult().IsCompleted ) return (DeviceHostCommandResult.CommandAlreadyUsed, null);
             if( !command.CheckValidity( monitor ) ) return (DeviceHostCommandResult.CommandCheckValidityFailed, null );
 
             Debug.Assert( command.DeviceName != null, "CheckValidity ensured that." );
@@ -679,11 +658,12 @@ namespace CK.DeviceModel
             Start,
             Stop,
             AutoStop,
+            AutoStart,
             AutoStopForce,
             AutoDestroy
         }
 
-        Task<bool> IInternalDeviceHost.StartAsync( IDevice d, IActivityMonitor monitor ) => DeviceActionAsync( d, monitor, DeviceAction.Start );
+        Task<bool> IInternalDeviceHost.StartAsync( IDevice d, IActivityMonitor monitor, bool autoStart ) => DeviceActionAsync( d, monitor, autoStart ? DeviceAction.AutoStart : DeviceAction.Start );
 
         Task<bool> IInternalDeviceHost.StopAsync( IDevice d, IActivityMonitor monitor ) => DeviceActionAsync( d, monitor, DeviceAction.Stop );
 
@@ -703,6 +683,7 @@ namespace CK.DeviceModel
                 {
                     case DeviceAction.Start: success = e.Device.IsRunning || await e.Device.HostStartAsync( monitor, DeviceStartedReason.StartCall ).ConfigureAwait( false ); break;
                     case DeviceAction.Stop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.StoppedCall ).ConfigureAwait( false ); break;
+                    case DeviceAction.AutoStart: success = e.Device.IsRunning || await e.Device.HostStartAsync( monitor, DeviceStartedReason.AutoStart ).ConfigureAwait( false ); break;
                     case DeviceAction.AutoStop: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedCall ).ConfigureAwait( false ); break;
                     case DeviceAction.AutoStopForce: success = !e.Device.IsRunning || await e.Device.HostStopAsync( monitor, DeviceStoppedReason.AutoStoppedForceCall ).ConfigureAwait( false ); break;
                     case DeviceAction.AutoDestroy:

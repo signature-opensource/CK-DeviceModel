@@ -26,9 +26,19 @@ namespace CK.DeviceModel.Tests
 
         public PerfectEvent<Camera,int> Flash => _flash.PerfectEvent;
 
-        public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
+        public CommandCompletion SendAutoDestroy( IActivityMonitor monitor )
+        {
+            var cmd = new AutoDestroyCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
+            SendCommand( monitor, cmd );
+            return cmd.Result;
+        }
 
-        public Task TestForceStopAsync( IActivityMonitor monitor ) => AutoStopAsync( monitor, ignoreAlwaysRunning: true );
+        public CommandCompletion<bool> SendForceAutoStop( IActivityMonitor monitor )
+        {
+            var cmd = new ForceAutoStopCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
+            SendCommand( monitor, cmd );
+            return cmd.Result;
+        }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
         {
@@ -49,7 +59,7 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommand command )
+        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token )
         {
             if( command is FlashCommand )
             {
@@ -60,7 +70,7 @@ namespace CK.DeviceModel.Tests
                 _configRef.FlashColor = f.Color;
                 return Task.CompletedTask;
             }
-            return base.DoHandleCommandAsync( monitor, command );
+            return base.DoHandleCommandAsync( monitor, command, token );
         }
 
 

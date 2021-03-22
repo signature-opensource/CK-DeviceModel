@@ -45,6 +45,8 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         public TaskAwaiter GetAwaiter() => ((Task)_tcs.Task).GetAwaiter();
 
+        ICriticalNotifyCompletion ICommandCompletion.GetAwaiter() => GetAwaiter();
+
         /// <summary>
         /// Sets the successful result.
         /// Can be called only once and only if <see cref="SetError(Exception)"/> nor <see cref="SetCanceled()"/> have been called yet.
@@ -71,5 +73,5 @@ namespace CK.DeviceModel
             _tcs.SetResult( _operationCanceledException );
         }
 
-    }
+   }
 }

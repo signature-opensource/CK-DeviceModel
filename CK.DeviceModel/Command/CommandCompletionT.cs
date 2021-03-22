@@ -60,7 +60,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Enables this <see cref="CommandCompletion{TResult}"/> to support await operator.
         /// </summary>
-        public readonly struct Awaiter : ICriticalNotifyCompletion, INotifyCompletion
+        public readonly struct Awaiter : ICriticalNotifyCompletion
         {
             readonly TaskAwaiter<object?> _a;
 
@@ -89,6 +89,8 @@ namespace CK.DeviceModel
         /// </summary>
         /// <returns>The awaitable.</returns>
         public Awaiter GetAwaiter() => new Awaiter( _tcs.Task.GetAwaiter() );
+
+        ICriticalNotifyCompletion ICommandCompletion.GetAwaiter() => GetAwaiter();
 
         /// <summary>
         /// Sets the successful result.

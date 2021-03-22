@@ -18,6 +18,12 @@ namespace CK.DeviceModel
         InvalidHostType,
 
         /// <summary>
+        /// The <see cref="DeviceCommandBase.GetCompletionResult"/> has already been completed.
+        /// Commands cannot be reused.
+        /// </summary>
+        CommandAlreadyUsed,
+
+        /// <summary>
         /// The <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> failed.
         /// </summary>
         CommandCheckValidityFailed,

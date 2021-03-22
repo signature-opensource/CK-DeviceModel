@@ -26,7 +26,7 @@ namespace CK.DeviceModel
 
         void IInternalDeviceHost.OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor )
         {
-            Debug.Assert( _lock.IsEnteredBy( monitor ) );
+            // Here _lock is entered by an external monitor, or by the device's _commandMonitor.
             using( monitor.OpenDebug( $"OnAlwaysRunningCheck for device '{d}'." ) )
             {
                 int idx = _alwayRunningStopped.IndexOf( e => e.Device == d );

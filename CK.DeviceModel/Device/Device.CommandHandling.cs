@@ -10,7 +10,7 @@ namespace CK.DeviceModel
 {
     public abstract partial class Device<TConfiguration>
     {
-        readonly Channel<(DeviceCommandBase Command,CancellationToken Token)> _commandQueue;
+        readonly Channel<(DeviceCommandBase Command, CancellationToken Token)> _commandQueue;
         readonly Queue<(DeviceCommandBase Command, CancellationToken Token)> _deferredCommands;
 
         DeviceCommandStoppedBehavior _defaultStoppedBehavior;
@@ -34,13 +34,19 @@ namespace CK.DeviceModel
             return _commandQueue.Writer.TryWrite( (command, token) );
         }
 
+        internal bool SendRoutedCommand( DeviceCommandBase command, CancellationToken token ) => _commandQueue.Writer.TryWrite( (command, token) );
+
         void CheckDirectCommandParameter( IActivityMonitor monitor, DeviceCommandBase command, bool checkDeviceName, bool checkControllerKey )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( command == null ) throw new ArgumentNullException( nameof( command ) );
             if( !command.HostType.IsAssignableFrom( _host!.GetType() ) ) throw new ArgumentException( $"{command.GetType().Name}: Invalid HostType '{command.HostType.Name}'.", nameof( command ) );
+            if( command.GetCompletionResult().IsCompleted )
+            {
+                throw new ArgumentException( $"{command.GetType().Name} has already a Result. Command cannot be reused.", nameof( command ) );
+            }
             if( !command.CheckValidity( monitor ) ) throw new ArgumentException( $"{command.GetType().Name}: CheckValidity failed. See logs.", nameof( command ) );
-            if( checkDeviceName && command.DeviceName != Name ) throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it. (For direct execution, you can use checkDeviceName: false parameter to skip this check.)", nameof( command ) );
+            if( checkDeviceName && command.DeviceName != Name ) throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it. (For direct execution, you can use checkDeviceName: false parameter to skip this check or use UnsafeSendCommand.)", nameof( command ) );
             if( checkControllerKey )
             {
                 var invalidKey = CheckCommandControllerKey( command );
@@ -56,7 +62,7 @@ namespace CK.DeviceModel
                 var key = ControllerKey;
                 if( key != null && command.ControllerKey != key )
                 {
-                    return $"Expected command ControllerKey is '{command.ControllerKey}' but current device's one is '{key}'. (For direct execution, you can use checkControllerKey: false parameter to skip this check.)";
+                    return $"Expected command ControllerKey is '{command.ControllerKey}' but current device's one is '{key}'. (For direct execution, you can use checkControllerKey: false parameter to skip this check or use UnsafeSendCommand.)";
                 }
             }
             return null;
@@ -90,9 +96,24 @@ namespace CK.DeviceModel
         /// <returns>True to stop this device, false to let this device run.</returns>
         protected virtual Task<bool> OnCommandErrorAsync( ActivityMonitor monitor, DeviceCommandBase command, Exception ex ) => Task.FromResult( true );
 
+        /// <summary>
+        /// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
+        /// <para>
+        /// The <paramref name="command"/> object that is targeted to this device (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/>
+        /// and <see cref="DeviceCommand.ControllerKey"/> is either null or match the current <see cref="ControllerKey"/>).
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to handle.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>The awaitable.</returns>
+        protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token )
+        {
+            return Task.FromException( new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) ) );
+        }
+
         async Task CommandRunLoop()
         {
-            var monitor = new ActivityMonitor( $"Command loop for device {FullName}." );
             bool isRunning = false;
             for(; ; )
             {
@@ -100,6 +121,38 @@ namespace CK.DeviceModel
                 try
                 {
                     (cmd,token) = await _commandQueue.Reader.ReadAsync( DestroyToken );
+                    while( _onLoopCommands.Reader.TryRead( out var onLoop ) )
+                    {
+                        if( onLoop.Starter is Func<Task<bool>> starterB && onLoop.TCS is TaskCompletionSource<bool> tcsB )
+                        {
+                            await starterB().ContinueWith( t =>
+                            {
+                                switch( t.Status )
+                                {
+                                    case TaskStatus.Canceled: tcsB.SetCanceled(); break;
+                                    case TaskStatus.RanToCompletion: tcsB.SetResult( t.Result ); break;
+                                    case TaskStatus.Faulted: tcsB.SetException( t.Exception ); break;
+                                }
+                            } );
+                        }
+                        else if( onLoop.Starter is Func<Task<DeviceReconfiguredResult>> starterR && onLoop.TCS is TaskCompletionSource<DeviceReconfiguredResult> tcsR )
+                        {
+                            await starterR().ContinueWith( t =>
+                            {
+                                switch( t.Status )
+                                {
+                                    case TaskStatus.Canceled: tcsR.SetCanceled(); break;
+                                    case TaskStatus.RanToCompletion: tcsR.SetResult( t.Result ); break;
+                                    case TaskStatus.Faulted: tcsR.SetException( t.Exception ); break;
+                                }
+                            } );
+                        }
+                        else
+                        {
+                            _commandMonitor.Fatal( "Unknown onLoop internal types." );
+                        }
+                    }
+                    if( cmd == _commandAwaker ) continue;
                     if( token.IsCancellationRequested )
                     {
                         cmd.GetCompletionResult().SetCanceled();
@@ -108,7 +161,7 @@ namespace CK.DeviceModel
                     {
                         try
                         {
-                            await ExecuteBasicControlDeviceCommandAsync( monitor, b );
+                            await ExecuteBasicControlDeviceCommandAsync( _commandMonitor, b );
                             b.Result.SetSuccess();
                         }
                         catch( Exception ex )
@@ -118,29 +171,19 @@ namespace CK.DeviceModel
                     }
                     else
                     {
-                        if( !isRunning && IsRunning )
+                        if( !isRunning && IsRunning && _deferredCommands.Count > 0 )
                         {
-                            if( _deferredCommands.Count > 0 )
+                            using( _commandMonitor.OpenDebug( $"Device started: executing {_deferredCommands.Count} deferred commands." ) )
                             {
-                                using( monitor.OpenDebug( $"Device started: executing {_deferredCommands.Count} deferred commands." ) )
+                                while( IsRunning && _deferredCommands.TryDequeue( out var ct ) )
                                 {
-                                    while( _deferredCommands.TryPeek( out var ct ) )
+                                    if( ct.Token.IsCancellationRequested )
                                     {
-                                        if( ct.Token.IsCancellationRequested )
-                                        {
-                                            ct.Command.GetCompletionResult().SetCanceled();
-                                            _deferredCommands.Dequeue();
-                                        }
-                                        else
-                                        {
-                                            using( var runLock = GetRunningLock() )
-                                            {
-                                                if( IsRunning )
-                                                {
-                                                    await DoHandleCommandAsync( monitor, ct.Command, ct.Token );
-                                                if( !isRunning ) break;
-                                            }
-                                        }
+                                        ct.Command.GetCompletionResult().SetCanceled();
+                                    }
+                                    else
+                                    {
+                                        await DoHandleCommandAsync( _commandMonitor, ct.Command, ct.Token );
                                     }
                                 }
                             }
@@ -149,7 +192,7 @@ namespace CK.DeviceModel
                         isRunning = IsRunning;
                         if( !isRunning )
                         {
-                            switch( await OnStoppedDeviceCommandAsync( monitor, cmd ) )
+                            switch( await OnStoppedDeviceCommandAsync( _commandMonitor, cmd ) )
                             {
                                 case null:
                                     mustExecute = false;
@@ -170,7 +213,7 @@ namespace CK.DeviceModel
                         }
                         if( mustExecute )
                         {
-                            await DoHandleCommandAsync( monitor, cmd, token );
+                            await DoHandleCommandAsync( _commandMonitor, cmd, token );
                         }
                     }
                     if( IsDestroyed )
@@ -182,33 +225,32 @@ namespace CK.DeviceModel
                 {
                     // If we are being destroyed, simply breaks the loop.
                     if( ex is OperationCanceledException && DestroyToken.IsCancellationRequested ) break;
-                    using( monitor.OpenError( $"Unhandled error in '{FullName}'.", ex ) )
+                    using( _commandMonitor.OpenError( $"Unhandled error in '{FullName}'.", ex ) )
                     {
                         bool mustStop = true;
                         try
                         {
-                            mustStop = await OnCommandErrorAsync( monitor, cmd, ex );
+                            mustStop = await OnCommandErrorAsync( _commandMonitor, cmd, ex );
                         }
                         catch( Exception ex2 )
                         {
-                            monitor.Fatal( $"Device '{FullName}' OnCommandErrorAsync raised an error.", ex2 );
+                            _commandMonitor.Fatal( $"Device '{FullName}' OnCommandErrorAsync raised an error.", ex2 );
                         }
                         if( mustStop )
                         {
-                            await AutoStopAsync( monitor, ignoreAlwaysRunning: true );
+                            await AutoStopAsync( _commandMonitor, ignoreAlwaysRunning: true );
                         }
                     }
                 }
             }
             _commandQueue.Writer.Complete();
-            monitor.Info( $"Ending device loop, flushing command queue by signaling a DeviceStoppedException." );
+            _commandMonitor.Info( $"Ending device loop, flushing command queue by signaling a DeviceStoppedException." );
             while( _commandQueue.Reader.TryRead( out var cmd ) )
             {
                 cmd.Command.GetCompletionResult().SetError( new DeviceStoppedException( this, cmd.Command ) );
             }
-            monitor.MonitorEnd();
+            _commandMonitor.MonitorEnd();
         }
-
 
         Task ExecuteBasicControlDeviceCommandAsync( IActivityMonitor monitor, BasicControlDeviceCommand b )
         {

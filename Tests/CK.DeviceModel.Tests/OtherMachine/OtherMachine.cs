@@ -13,7 +13,7 @@ namespace CK.DeviceModel.Tests
 
         // A device can keep a reference to the current configuration:
         // this configuration is an independent clone that is accessible only to the Device.
-        OtherMachineConfiguration _configRef;
+        readonly OtherMachineConfiguration _configRef;
 
         public OtherMachine( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
@@ -22,9 +22,19 @@ namespace CK.DeviceModel.Tests
             _configRef = info.Configuration;
         }
 
-        public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
+        public CommandCompletion SendAutoDestroy( IActivityMonitor monitor )
+        {
+            var cmd = new AutoDestroyCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
+            SendCommand( monitor, cmd );
+            return cmd.Result;
+        }
 
-        public Task TestForceStopAsync( IActivityMonitor monitor ) => AutoStopAsync( monitor, ignoreAlwaysRunning: true );
+        public CommandCompletion<bool> SendForceAutoStop( IActivityMonitor monitor )
+        {
+            var cmd = new ForceAutoStopCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
+            SendCommand( monitor, cmd );
+            return cmd.Result;
+        }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, OtherMachineConfiguration config )
         {

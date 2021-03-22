@@ -5,7 +5,7 @@ namespace CK.DeviceModel.Tests
 {
     public interface ITestDevice : IDevice
     {
-        Task TestAutoDestroyAsync( IActivityMonitor monitor );
-        Task TestForceStopAsync( IActivityMonitor monitor );
+        CommandCompletion SendAutoDestroy( IActivityMonitor monitor );
+        CommandCompletion<bool> SendForceAutoStop( IActivityMonitor monitor );
     }
 }

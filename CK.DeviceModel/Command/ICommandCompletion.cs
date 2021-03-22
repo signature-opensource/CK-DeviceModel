@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -7,6 +8,7 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Unifies <see cref="CommandCompletion"/> and <see cref="CommandCompletion{TResult}"/>.
+    /// Note that thanks to the <see cref="GetAwaiter()"/>, this is awaitable.
     /// </summary>
     public interface ICommandCompletion
     {
@@ -55,5 +57,11 @@ namespace CK.DeviceModel
         /// <param name="cancellation">Optional cancellation token.</param>
         /// <returns>True if <see cref="IsCompleted"/> is true, false if the timeout occurred before.</returns>
         Task<bool> WaitAsync( int millisecondsTimeout, CancellationToken cancellation = default );
+
+        /// <summary>
+        /// Enables this <see cref="ICommandCompletion"/> to be awaited.
+        /// </summary>
+        /// <returns>An awaiter for this command completion.</returns>
+        ICriticalNotifyCompletion GetAwaiter();
     }
 }
