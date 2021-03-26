@@ -49,8 +49,6 @@ namespace CK.DeviceModel
         /// <summary>
         /// Raised whenever a reconfiguration, a start or a stop happens: either the <see cref="IDevice.ConfigurationStatus"/>
         /// or <see cref="IDevice.Status"/> has changed.
-        /// Reentrancy is forbidden: while handling this event, calling <see cref="StopAsync"/>, <see cref="StartAsync"/> or <see cref="IDeviceHost.ApplyConfigurationAsync"/>
-        /// will throw a <see cref="LockRecursionException"/>.
         /// </summary>
         PerfectEvent<IDevice> StatusChanged { get; }
 
@@ -62,20 +60,35 @@ namespace CK.DeviceModel
         DeviceConfigurationStatus ConfigurationStatus { get; }
 
         /// <summary>
-        /// Attempts to stop this device if it is running.
-        /// The only reason a device cannot be stopped (and this method to return false) is because <see cref="ConfigurationStatus"/>
-        /// is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>True if the device has been stopped, false if it is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.</returns>
-        Task<bool> StopAsync( IActivityMonitor monitor );
-
-        /// <summary>
         /// Attempts to start this device.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
+        /// <param name="token">Optional cancellation token.</param>
         /// <returns>True on success, false if this device cannot start.</returns>
         Task<bool> StartAsync( IActivityMonitor monitor );
+
+        /// <summary>
+        /// Attempts to stop this device if it is running.
+        /// The only reason a device cannot be stopped (and this method to return false) is because <see cref="ConfigurationStatus"/>
+        /// is <see cref="DeviceConfigurationStatus.AlwaysRunning"/> and <paramref name="ignoreAlwaysRunning"/> is false.
+        /// </summary>
+        /// <remarks>
+        /// When the device is forced to stop (<paramref name="ignoreAlwaysRunning"/> is true), note that the <see cref="ConfigurationStatus"/> is left
+        /// unchanged: the state of the system is what it should be: a device that has been configured to be always running is actually stopped.
+        /// It is up to the <see cref="DeviceHostDaemon"/> to apply the <see cref="IDeviceAlwaysRunningPolicy"/> so that the device can be
+        /// started again.
+        /// </remarks>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="ignoreAlwaysRunning">True to stop even if <see cref="ConfigurationStatus"/> states that this device must always run.</param>
+        /// <returns>Always true except if <paramref name="ignoreAlwaysRunning"/> is false and the configuration is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.</returns>
+        Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false );
+
+        /// <summary>
+        /// Destroys this device.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>The awaitable.</returns>
+        Task DestroyAsync( IActivityMonitor monitor );
 
         /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.
@@ -110,22 +123,23 @@ namespace CK.DeviceModel
         /// <summary>
         /// Raised whenever the <see cref="ControllerKey"/> changed, either because of a reconfiguration or
         /// because of a call to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or <see cref="SetControllerKeyAsync(IActivityMonitor, string?, string?)"/>.
-        /// <para>
-        /// When handling such event it is possible to call methods on this device since the async lock has been released.
-        /// </para>
         /// </summary>
         PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
         /// <summary>
-        /// Sends a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, DeviceCommandBase, CancellationToken)"/>.
+        /// Sends a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, DeviceCommandBase, bool, CancellationToken)"/>.
         /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
         ///     <item><see cref="DeviceCommandBase.HostType"/> is not compatible with this device's host type;</item>
         ///     <item>or <see cref="DeviceCommandBase.CheckValidity(IActivityMonitor)"/> fails;</item>
         ///     <item>or the <see cref="DeviceCommandBase.DeviceName"/> doesn't match this device's name;</item>
-        ///     <item>or this <see cref="ControllerKey"/> is not null and <see cref="DeviceCommand.ControllerKey"/> differs from it.</item>
         /// </list>
-        /// The 2 last checks can be suppressed thanks to the <paramref name="checkDeviceName"/> and <paramref name="checkControllerKey"/> parameters.
+        /// The last check can be suppressed thanks to the <paramref name="checkDeviceName"/>.
+        /// <para>
+        /// The <see cref="ControllerKey"/> check is done at the time when the command is executed: if the check fails, an <see cref="InvalidControllerKeyException"/>
+        /// will be set on the <see cref="DeviceCommand.Completion"/> or <see cref="DeviceCommand{TResult}.Completion"/>. The <paramref name="checkControllerKey"/> parameter
+        /// can be used to skip this check.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
@@ -151,6 +165,46 @@ namespace CK.DeviceModel
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         bool UnsafeSendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default );
+
+        /// <summary>
+        /// Same as <see cref="SendCommand(IActivityMonitor, DeviceCommandBase, bool, bool, CancellationToken)"/> except that the command
+        /// is executed immediately.
+        /// <para>
+        /// Note that any <see cref="DeviceCommandBase.StoppedBehavior"/> that may wait for the next start is ignored in this mode (deferring an
+        /// "immediate" command doesn't make a lot of sense). This applies to <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/>
+        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetDeviceStoppedException"/> and
+        /// <see cref="DeviceCommandStoppedBehavior.AlwaysWaitForNextStart"/> (a <see cref="UnavailableDeviceException"/> is set).
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="checkDeviceName">
+        /// By default, the <see cref="DeviceCommandBase.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
+        /// Using false here allows any command name to be executed.
+        /// </param>
+        /// <param name="checkControllerKey">
+        /// By default, the <see cref="DeviceCommandBase.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
+        /// Using false here skips this check.
+        /// </param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
+        bool SendCommandImmediate( IActivityMonitor monitor, DeviceCommandBase command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
+
+        /// <summary>
+        /// Same as <see cref="UnsafeSendCommand(IActivityMonitor, DeviceCommandBase, CancellationToken)"/> except that the command
+        /// is executed immediately.
+        /// <para>
+        /// Note that any <see cref="DeviceCommandBase.StoppedBehavior"/> that may wait for the next start is ignored in this mode (deferring an
+        /// "immediate" command doesn't make a lot of sense). This applies to <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/>
+        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetDeviceStoppedException"/> and
+        /// <see cref="DeviceCommandStoppedBehavior.AlwaysWaitForNextStart"/> (a <see cref="UnavailableDeviceException"/> is set).
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to execute.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
+        bool UnsafeSendCommandImmediate( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default );
     }
 
 }

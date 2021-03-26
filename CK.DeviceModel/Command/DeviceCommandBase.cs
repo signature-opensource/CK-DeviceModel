@@ -3,10 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
-
     /// <summary>
     /// Non generic base command class that exposes the host that must handle it.
     /// This class cannot be directly specialized: the generic <see cref="HostedDeviceCommand{THost}"/>
@@ -21,6 +21,16 @@ namespace CK.DeviceModel
         /// Gets the type of the host for the command.
         /// </summary>
         public abstract Type HostType { get; }
+
+        /// <summary>
+        /// Returns <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/> since most of the commands
+        /// should not be executed while the device is stopped.
+        /// <para>
+        /// Some commands may override this, or the device can alter this behavior thanks to its
+        /// <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, DeviceCommandBase)"/> protected method.
+        /// </para>
+        /// </summary>
+        protected internal virtual DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel;
 
         /// <summary>
         /// Gets or sets the target device name.
@@ -57,8 +67,18 @@ namespace CK.DeviceModel
                 monitor.Error( $"Command '{GetType().Name}': DeviceName must not be null." );
                 return false;
             }
+            if( InternalCompletion.IsCompleted )
+            {
+                monitor.Error( $"{GetType().Name} has already a Result. Command cannot be reused." );
+
+            }
             return DoCheckValidity( monitor );
         }
+
+        /// <summary>
+        /// Waiting for covariant return type in .Net 5: this could be public virtual.
+        /// </summary>
+        internal abstract ICommandCompletionSource InternalCompletion { get; }
 
         /// <summary>
         /// Extension point to <see cref="CheckValidity(IActivityMonitor)"/>. Called only after basic checks successfully passed.
@@ -66,23 +86,6 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True for a valid configuration, false otherwise.</returns>
         protected virtual bool DoCheckValidity( IActivityMonitor monitor ) => true;
-
-        /// <summary>
-        /// Gets the common completion interface that generalizes <see cref="DeviceCommand.Result"/> and <see cref="DeviceCommand{TResult}.Result"/>.
-        /// This method will be removed in .Net 5 since covariant return support will allow an abstract property Result instead.
-        /// </summary>
-        /// <returns></returns>
-        public abstract ICommandCompletion GetCompletionResult();
-
-        /// <summary>
-        /// 
-        /// Waiting for the covariant return support of .Net 5.
-        /// 
-        /// Gets the common completion interface that generalizes <see cref="DeviceCommand.Result"/> and <see cref="DeviceCommand{TResult}.Result"/>.
-        /// </summary>
-        //public abstract ICommandCompletion Result { get; }
-
-
 
     }
 }

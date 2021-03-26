@@ -18,12 +18,6 @@ namespace CK.DeviceModel
         InvalidHostType,
 
         /// <summary>
-        /// The <see cref="DeviceCommandBase.GetCompletionResult"/> has already been completed.
-        /// Commands cannot be reused.
-        /// </summary>
-        CommandAlreadyUsed,
-
-        /// <summary>
         /// The <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> failed.
         /// </summary>
         CommandCheckValidityFailed,
@@ -32,11 +26,6 @@ namespace CK.DeviceModel
         /// The <see cref="DeviceCommand.DeviceName"/> target doesn't exist.
         /// </summary>
         DeviceNameNotFound,
-
-        /// <summary>
-        /// The <see cref="DeviceCommand.ControllerKey"/> is not the expected one.
-        /// </summary>
-        ControllerKeyMismatch,
 
         /// <summary>
         /// The <see cref="Device{TConfiguration}.SendCommand(IActivityMonitor, DeviceCommandBase, System.Threading.CancellationToken)"/>

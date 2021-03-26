@@ -23,20 +23,6 @@ namespace CK.DeviceModel.Tests
             _configRef = info.Configuration;
         }
 
-        public CommandCompletion SendAutoDestroy( IActivityMonitor monitor )
-        {
-            var cmd = new AutoDestroyCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
-            SendCommand( monitor, cmd );
-            return cmd.Result;
-        }
-
-        public CommandCompletion<bool> SendForceAutoStop( IActivityMonitor monitor )
-        {
-            var cmd = new ForceAutoStopCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
-            SendCommand( monitor, cmd );
-            return cmd.Result;
-        }
-
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, MachineConfiguration config )
         {
             return Task.FromResult( DeviceReconfiguredResult.None );
@@ -64,12 +50,12 @@ namespace CK.DeviceModel.Tests
         {
             if( command is ForceAutoStopCommand<MachineHost> autoStop )
             {
-                autoStop.Result.SetSuccess( await AutoStopAsync( monitor, true ) );
+                autoStop.Result.SetResult( await StopAsync( monitor, true ) );
             }
             else if( command is AutoDestroyCommand<MachineHost> autoDestroy )
             {
                 await AutoDestroyAsync( monitor );
-                autoDestroy.Result.SetSuccess();
+                autoDestroy.Result.SetResult();
             }
             else
             {

@@ -6,34 +6,50 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Defines the action that must be taken for commands that are handled when the device is stopped.
-    /// The default behavior of a device can be configured thanks to <see cref="DeviceConfiguration.DefaultStoppedBehavior"/>
+    /// The default behavior of a command is provided by the <see cref="DeviceCommandBase.StoppedBehavior"/> protected property, 
     /// but this default behavior may be altered for any command by overriding the <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, DeviceCommandBase)"/>
-    /// protected method.
+    /// protected method if the command's behavior is not <see cref="RunAnyway"/>.
+    /// <para>
+    /// The default <see cref="DeviceCommandBase.StoppedBehavior"/> is <see cref="WaitForNextStartWhenAlwaysRunningOrCancel"/>.
+    /// </para>
     /// </summary>
     public enum DeviceCommandStoppedBehavior
     {
         /// <summary>
-        /// A <see cref="DeviceStoppedException"/> is set on the <see cref="DeviceCommand.Result"/> or <see cref="DeviceCommand{TResult}.Result"/>.
+        /// The command is stored in an internal queue if the <see cref="IDevice.ConfigurationStatus"/> is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>
+        /// and as soon as the device is started, the command is executed, or the command is canceled.
+        /// <para>
+        /// This is the default.
+        /// </para>
+        /// </summary>
+        WaitForNextStartWhenAlwaysRunningOrCancel,
+
+        /// <summary>
+        /// Same as <see cref="WaitForNextStartWhenAlwaysRunningOrCancel"/> except that an <see cref="UnavailableDeviceException"/> is set
+        /// instead of canceling the command.
+        /// </summary>
+        WaitForNextStartWhenAlwaysRunningOrSetDeviceStoppedException,
+
+        /// <summary>
+        /// The command will be executed regardless of the stopped status.
+        /// </summary>
+        RunAnyway,
+
+        /// <summary>
+        /// A <see cref="UnavailableDeviceException"/> is set on the <see cref="DeviceCommand.Completion"/> or <see cref="DeviceCommand{TResult}.Completion"/>.
         /// </summary>
         SetDeviceStoppedException,
 
         /// <summary>
-        /// A <see cref="OperationCanceledException"/> is set on the <see cref="DeviceCommand.Result"/> or <see cref="DeviceCommand{TResult}.Result"/>.
+        /// <see cref="ICommandCompletionSource.SetCanceled()"/> is called on the <see cref="DeviceCommand.Completion"/> or <see cref="DeviceCommand{TResult}.Completion"/>.
         /// </summary>
-        Cancelled,
+        Cancel,
 
         /// <summary>
-        /// The command will be executed (<see cref="HandleCommandAsync(IActivityMonitor, DeviceCommandBase, CancellationToken)"/>
-        /// will be called) regardless of the stopped status.
+        /// The command is always stored in an internal queue when the device is stopped, waiting for its next start.
+        /// This may be dangerous if the device is often stopped: the queue may grow too big.
         /// </summary>
-        Handle,
-
-        /// <summary>
-        /// The command is stored in an internal queue and as soon as the device is started, the command
-        /// is executed. This enables commands to be resilient to temporary (unexpected) stops of the device and should be typically
-        /// used in conjunction with <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.
-        /// </summary>
-        WaitForNextStart
+        AlwaysWaitForNextStart
     }
 
 }

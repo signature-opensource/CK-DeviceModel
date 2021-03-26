@@ -73,7 +73,7 @@ namespace CK.DeviceModel
                     long wait = Int64.MaxValue;
                     foreach( var h in _deviceHosts )
                     {
-                        var delta = await h.CheckAlwaysRunningAsync( _daemonMonitor, now );
+                        var delta = await h.DaemonCheckAlwaysRunningAsync( _daemonMonitor, now );
                         Debug.Assert( delta > 0 );
                         if( wait > delta ) wait = delta;
                     }

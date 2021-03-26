@@ -26,18 +26,18 @@ namespace CK.DeviceModel.Tests
 
         public PerfectEvent<Camera,int> Flash => _flash.PerfectEvent;
 
-        public CommandCompletion SendAutoDestroy( IActivityMonitor monitor )
+        public Task SendAutoDestroyAsync( IActivityMonitor monitor )
         {
             var cmd = new AutoDestroyCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
             SendCommand( monitor, cmd );
-            return cmd.Result;
+            return cmd.Result.Task;
         }
 
-        public CommandCompletion<bool> SendForceAutoStop( IActivityMonitor monitor )
+        public Task<bool> SendForceAutoStopAsync( IActivityMonitor monitor )
         {
             var cmd = new ForceAutoStopCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
             SendCommand( monitor, cmd );
-            return cmd.Result;
+            return cmd.Result.Task;
         }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )

@@ -59,15 +59,7 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>
         /// <returns>the result of the device configuration.</returns>
-        Task<DeviceApplyConfigurationResult> ApplyDeviceConfigurationAsync( IActivityMonitor monitor, DeviceConfiguration configuration );
-
-        /// <summary>
-        /// Attempts to destroy a device.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="deviceName">The device name.</param>
-        /// <returns>The awaitable.</returns>
-        Task DestroyDeviceAsync( IActivityMonitor monitor, string deviceName );
+        Task<DeviceApplyConfigurationResult> EnsureDeviceAsync( IActivityMonitor monitor, DeviceConfiguration configuration );
 
         /// <summary>
         /// Gets a device by its name.
@@ -104,16 +96,20 @@ namespace CK.DeviceModel
         /// Sends the provided command to the device it targets.
         /// <para>
         /// Determines whether the <see cref="DeviceCommandBase.HostType"/> is compatible with the actual type of this host,
-        /// finds the target device based on <see cref="DeviceCommandBase.DeviceName"/>, checks the <see cref="DeviceCommandBase.ControllerKey"/>
-        /// against the <see cref="IDevice.ControllerKey"/> and calls <see cref="DeviceCommandBase.CheckValidity(IActivityMonitor)"/> before
-        /// sending the command to the device.
+        /// finds the target device based on <see cref="DeviceCommandBase.DeviceName"/> and calls
+        /// <see cref="DeviceCommandBase.CheckValidity(IActivityMonitor)"/> before sending the command to the device.
+        /// </para>
+        /// <para>
+        /// The <see cref="ControllerKey"/> check is done at the time when the command is executed: if the check fails, an <see cref="InvalidControllerKeyException"/>
+        /// will be set on the <see cref="DeviceCommand.Completion"/> or <see cref="DeviceCommand{TResult}.Completion"/>. The <paramref name="checkControllerKey"/> parameter
+        /// can be used to skip this check.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to validate, route and execute.</param>
+        /// <param name="command">The command to validate, route and send.</param>
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
-        public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token = default );
+        public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, DeviceCommandBase command, bool checkControllerKey = true, CancellationToken token = default );
 
     }
 }

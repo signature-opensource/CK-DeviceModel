@@ -70,8 +70,7 @@ namespace CK.DeviceModel.Tests
             d.IsRunning.Should().BeTrue();
             var cmd = new ForceAutoStopCommand<MachineHost>() { DeviceName = "M" };
             d.SendCommand( TestHelper.Monitor, cmd );
-            await cmd.Result;
-            cmd.Result.Value.Should().BeTrue();
+            (await cmd.Result.Task).Should().BeTrue();
             d.IsRunning.Should().BeFalse();
 
             await Task.Delay( 100 );
@@ -84,7 +83,7 @@ namespace CK.DeviceModel.Tests
             {
                 var destroy = new AutoDestroyCommand<MachineHost>() { DeviceName = "M" };
                 d.SendCommand( TestHelper.Monitor, destroy );
-                await destroy.Result;
+                await destroy.Result.Task;
             }
             else
             {
@@ -119,7 +118,7 @@ namespace CK.DeviceModel.Tests
 
             var cmd = new ForceAutoStopCommand<MachineHost>() { DeviceName = "M" };
             d.SendCommand( TestHelper.Monitor, cmd );
-            await cmd.Result;
+            (await cmd.Result.Task).Should().BeTrue();
             d.IsRunning.Should().BeFalse();
 
             await Task.Delay( 20 );
@@ -239,7 +238,7 @@ namespace CK.DeviceModel.Tests
 
             foreach( var d in devices )
             {
-                await d.SendForceAutoStop( TestHelper.Monitor );
+                await d.SendForceAutoStopAsync( TestHelper.Monitor );
             }
             TestHelper.Monitor.Trace( "*** Wait ***" );
             await Task.Delay( 210 );

@@ -32,7 +32,7 @@ namespace CK.DeviceModel
         public DeviceHostConfiguration( DeviceHostConfiguration<TConfiguration> source )
         {
             IsPartialConfiguration = source.IsPartialConfiguration;
-            Items = source.Items.Select( c => (TConfiguration)c.Clone() ).ToList();
+            Items = source.Items.Select( c => c.Clone() ).ToList();
         }
 
         /// <summary>

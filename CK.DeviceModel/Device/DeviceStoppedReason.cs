@@ -16,18 +16,23 @@ namespace CK.DeviceModel
         StoppedByDisabledConfiguration,
 
         /// <summary>
-        /// The device stopped because of a call to the public <see cref="IDevice.StopAsync(Core.IActivityMonitor)"/>.
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/>.
         /// </summary>
         StoppedCall,
 
         /// <summary>
-        /// The device stopped because of a call to the protected <see cref="Device{TConfiguration}.AutoStopAsync(Core.IActivityMonitor, bool)"/>.
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/>, ignoring the <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.
+        /// </summary>
+        StoppedForceCall,
+
+        /// <summary>
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/> while it is handling a command.
         /// </summary>
         AutoStoppedCall,
 
         /// <summary>
-        /// The device stopped because of a call to the protected <see cref="Device{TConfiguration}.AutoStopAsync(Core.IActivityMonitor, bool)"/>
-        /// with ignoreAlwaysRunning parameter set to true.
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/>, ignoring the <see cref="DeviceConfigurationStatus.AlwaysRunning"/>,
+        /// while it is handling a command.
         /// </summary>
         AutoStoppedForceCall,
 

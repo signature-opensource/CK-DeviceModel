@@ -307,18 +307,18 @@ namespace CK.DeviceModel.Tests
 
             var cmdF = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
             host.SendCommand( TestHelper.Monitor, cmdF ).Should().Be( DeviceHostCommandResult.Success );
-            await cmdF.Result;
+            await cmdF.Result.Task;
 
             flashLastColor.Should().Be( 78 );
 
             var cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 };
             host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
-            await cmdS.Result;
+            await cmdS.Result.Task;
 
             flashLastColor.Should().Be( 78 );
             cmdF = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
             host.SendCommand( TestHelper.Monitor, cmdF ).Should().Be( DeviceHostCommandResult.Success );
-            await cmdF.Result;
+            await cmdF.Result.Task;
 
             flashLastColor.Should().Be( 3712 );
 
@@ -373,7 +373,7 @@ namespace CK.DeviceModel.Tests
             flashLastColor.Should().Be( 6 );
 
             // Use the basic command to set a ControllerKey.
-            var setControllerKey = new BasicControlDeviceCommand<CameraHost>( BasicControlDeviceOperation.ResetControllerKey )
+            var setControllerKey = new HostedSetControllerKeyDeviceCommand<CameraHost>()
             {
                 ControllerKey = "I'm controlling.",
                 DeviceName = "n°1"

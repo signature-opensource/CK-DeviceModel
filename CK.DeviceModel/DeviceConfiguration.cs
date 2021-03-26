@@ -48,12 +48,6 @@ namespace CK.DeviceModel
         /// </summary>
         public string? ControllerKey { get; set; }
 
-
-        /// <summary>
-        /// Gets or sets 
-        /// </summary>
-        public DeviceCommandStoppedBehavior DefaultStoppedBehavior { get; set; }
-
         /// <summary>
         /// Checks whether this configuration is valid.
         /// This checks that the <see cref="Name"/> is not empty and calls the protected <see cref="DoCheckValid(IActivityMonitor)"/>

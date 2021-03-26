@@ -12,20 +12,24 @@ namespace CK.DeviceModel
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        Task<bool> StartAsync( IDevice d, IActivityMonitor monitor, bool autoStart );
+        DeviceCommand<DeviceApplyConfigurationResult> CreateReconfigureCommand( string name );
 
-        Task<bool> StopAsync( IDevice d, IActivityMonitor monitor );
+        StartDeviceCommand CreateStartCommand( string name );
 
-        Task<bool> AutoStopAsync( IDevice d, IActivityMonitor monitor, bool ignoreAlwaysRunning );
+        StopDeviceCommand CreateStopCommand( string name, bool ignoreAlwaysRunning );
 
-        Task<bool> SetControllerKeyAsync( IDevice d, IActivityMonitor monitor, bool checkCurrent, string? current, string? key );
+        DestroyDeviceCommand CreateDestroyCommand( string name );
 
-        Task AutoDestroyAsync( IDevice d, IActivityMonitor monitor );
+        SetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
+
+        Task OnDeviceConfiguredAsync( IActivityMonitor commandMonitor, IDevice device, DeviceApplyConfigurationResult applyResult, DeviceConfiguration externalConfig );
+
+        Task OnDeviceDestroyedAsync( IActivityMonitor commandMonitor, IDevice device );
 
         void OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor );
 
         void SetDaemon( DeviceHostDaemon daemon );
 
-        ValueTask<long> CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
+        ValueTask<long> DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
     }
 }

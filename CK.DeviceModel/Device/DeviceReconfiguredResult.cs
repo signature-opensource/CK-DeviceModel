@@ -19,6 +19,7 @@ namespace CK.DeviceModel
         /// </summary>
         UpdateSucceeded = DeviceApplyConfigurationResult.UpdateSucceeded,
 
+
         /// <summary>
         /// The reconfiguration failed.
         /// </summary>

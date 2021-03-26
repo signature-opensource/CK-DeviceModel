@@ -1,6 +1,8 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
@@ -13,16 +15,24 @@ namespace CK.DeviceModel
     {
         private protected DeviceCommand()
         {
-            Result = new CommandCompletion<TResult>();
+            Completion = new CommandCompletionSource<TResult>();
+        }
+
+        private protected DeviceCommand( TResult errorOrCancelResult )
+        {
+            Completion = new CommandCompletionSource<TResult>( errorOrCancelResult );
+        }
+
+        private protected DeviceCommand( Func<Exception, TResult>? transformError, bool ignoreCanceled, TResult cancelResult )
+        {
+            Completion = new CommandCompletionSource<TResult>( transformError, ignoreCanceled, cancelResult );
         }
 
         /// <summary>
-        /// Gets the <see cref="CommandCompletion"/> for this command.
+        /// Gets the <see cref="CommandCompletionSource"/> for this command.
         /// </summary>
-        public CommandCompletion<TResult> Result { get; }
+        public CommandCompletionSource<TResult> Completion { get; }
 
-        /// <inheritdoc/>
-        public override ICommandCompletion GetCompletionResult() => Result;
-
+        internal override ICommandCompletionSource InternalCompletion => Completion;
     }
 }

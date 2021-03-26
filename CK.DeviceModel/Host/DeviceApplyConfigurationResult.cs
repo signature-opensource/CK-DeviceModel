@@ -55,9 +55,30 @@ namespace CK.DeviceModel
         UpdateSucceededButStartFailed,
 
         /// <summary>
-        /// The host has considered that the whole configuration was invalid.
+        /// The configuration was invalid.
         /// </summary>
-        InvalidHostConfiguration
+        InvalidConfiguration,
+
+        /// <summary>
+        /// The device has been destroyed.
+        /// </summary>
+        DeviceDestroyed,
+
+        /// <summary>
+        /// The configuration has been canceled.
+        /// </summary>
+        ConfigurationCanceled,
+
+        /// <summary>
+        /// The <see cref="IDevice.ControllerKey"/> doesn't match the <see cref="DeviceCommandBase.ControllerKey"/>.
+        /// </summary>
+        InvalidControllerKey,
+
+        /// <summary>
+        /// An unexpected error occurred.
+        /// </summary>
+        UnexpectedError
+
     }
 
 }
