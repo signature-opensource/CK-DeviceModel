@@ -6,11 +6,11 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Defines the action that must be taken for commands that are handled when the device is stopped.
-    /// The default behavior of a command is provided by the <see cref="DeviceCommandBase.StoppedBehavior"/> protected property, 
-    /// but this default behavior may be altered for any command by overriding the <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, DeviceCommandBase)"/>
+    /// The default behavior of a command is provided by the <see cref="BaseDeviceCommand.StoppedBehavior"/> protected property, 
+    /// but this default behavior may be altered for any command by overriding the <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, BaseDeviceCommand)"/>
     /// protected method if the command's behavior is not <see cref="RunAnyway"/>.
     /// <para>
-    /// The default <see cref="DeviceCommandBase.StoppedBehavior"/> is <see cref="WaitForNextStartWhenAlwaysRunningOrCancel"/>.
+    /// The default <see cref="BaseDeviceCommand.StoppedBehavior"/> is <see cref="WaitForNextStartWhenAlwaysRunningOrCancel"/>.
     /// </para>
     /// </summary>
     public enum DeviceCommandStoppedBehavior
@@ -36,12 +36,12 @@ namespace CK.DeviceModel
         RunAnyway,
 
         /// <summary>
-        /// A <see cref="UnavailableDeviceException"/> is set on the <see cref="DeviceCommand.Completion"/> or <see cref="DeviceCommand{TResult}.Completion"/>.
+        /// A <see cref="UnavailableDeviceException"/> is set on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
         /// </summary>
         SetDeviceStoppedException,
 
         /// <summary>
-        /// <see cref="ICommandCompletionSource.SetCanceled()"/> is called on the <see cref="DeviceCommand.Completion"/> or <see cref="DeviceCommand{TResult}.Completion"/>.
+        /// <see cref="ICommandCompletionSource.SetCanceled()"/> is called on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
         /// </summary>
         Cancel,
 

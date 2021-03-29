@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1" MembersFormat="FullSignature">
+  <Class Name="CK.DeviceModel.ReconfigureDeviceCommand&lt;THost, TConfiguration&gt;">
+    <Position X="0.5" Y="8.5" Width="4" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>Command\Basic\ReconfigureDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.BaseReconfigureDeviceCommand&lt;TConfiguration&gt;">
+    <Position X="0.5" Y="6.75" Width="4" />
+    <Members>
+      <Method Name="BaseReconfigureDeviceCommand" Hidden="true" />
+      <Method Name="DoCheckValidity" Hidden="true" />
+      <Property Name="ExternalConfig" Hidden="true" />
+      <Method Name="OnError" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>EAAAAAAAAACAAAAAAAAAAAAAEAgAAAAAgAAAAAAAAAA=</HashCode>
+      <FileName>Command\Basic\BaseReconfigureDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.StartDeviceCommand&lt;THost&gt;">
+    <Position X="5" Y="5.25" Width="4" />
+    <Members>
+      <Method Name="StartDeviceCommand" Hidden="true" />
+    </Members>
+    <Compartments>
+      <Compartment Name="Methods" Collapsed="true" />
+    </Compartments>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>Command\Basic\StartDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.BaseStartDeviceCommand">
+    <Position X="5" Y="3.75" Width="4" />
+    <Members>
+      <Method Name="BaseStartDeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Command\Basic\BaseStartDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.BaseStopDeviceCommand">
+    <Position X="5" Y="0.5" Width="4" />
+    <Members>
+      <Method Name="BaseStopDeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAA=</HashCode>
+      <FileName>Command\Basic\BaseStopDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.StopDeviceCommand&lt;THost&gt;">
+    <Position X="5" Y="2.25" Width="4" />
+    <Members>
+      <Method Name="StopDeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>Command\Basic\StopDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.BaseDestroyDeviceCommand">
+    <Position X="0.5" Y="3.75" Width="4" />
+    <Members>
+      <Method Name="BaseDestroyDeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Command\Basic\BaseDestroyDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.DestroyDeviceCommand&lt;THost&gt;">
+    <Position X="0.5" Y="5.25" Width="4" />
+    <Members>
+      <Method Name="DestroyDeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>Command\Basic\DestroyDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.BaseSetControllerKeyDeviceCommand">
+    <Position X="0.5" Y="0.5" Width="4" />
+    <Members>
+      <Method Name="BaseSetControllerKeyDeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>EAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Command\Basic\BaseSetControllerKeyDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.SetControllerKeyDeviceCommand&lt;THost&gt;">
+    <Position X="0.5" Y="2.25" Width="4" />
+    <Members>
+      <Method Name="SetControllerKeyDeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>Command\Basic\SetControllerKeyDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

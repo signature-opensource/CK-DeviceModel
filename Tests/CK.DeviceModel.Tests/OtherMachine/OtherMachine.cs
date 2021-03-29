@@ -6,7 +6,7 @@ using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests
 {
-    public class OtherMachine : Device<OtherMachineConfiguration>, ITestDevice
+    public class OtherMachine : Device<OtherMachineConfiguration>
     {
         public static int TotalCount;
         public static int TotalRunning;
@@ -20,20 +20,6 @@ namespace CK.DeviceModel.Tests
         {
             Interlocked.Increment( ref TotalCount );
             _configRef = info.Configuration;
-        }
-
-        public Task SendAutoDestroyAsync( IActivityMonitor monitor )
-        {
-            var cmd = new AutoDestroyCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
-            SendCommand( monitor, cmd );
-            return cmd.Result.Task;
-        }
-
-        public Task<bool> SendForceAutoStopAsync( IActivityMonitor monitor )
-        {
-            var cmd = new ForceAutoStopCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
-            SendCommand( monitor, cmd );
-            return cmd.Result.Task;
         }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, OtherMachineConfiguration config )

@@ -11,7 +11,7 @@ namespace CK.DeviceModel
     /// calls <see cref="IDevice.StartAsync(IActivityMonitor)"/> only 4 times (with the following durations: 250, 500
     /// 500 and eventually 750 milliseconds) before giving up.
     /// <para>
-    /// Calls to this policy are handled by the <see cref="DeviceHostDaemon"/> but manual (direct) calls to start can be done independentely.
+    /// Calls to this policy are handled by the <see cref="DeviceHostDaemon"/> but manual (direct) calls to start can be done independently.
     /// </para>
     /// </summary>
     public interface IDeviceAlwaysRunningPolicy : ISingletonAutoService
@@ -21,8 +21,8 @@ namespace CK.DeviceModel
         /// has stopped: it can call <see cref="IDevice.StartAsync(IActivityMonitor)"/> (and, if start succeeded, should return 0).
         /// To stop trying to start the faulty device, simply returns a 0 or negative value.
         ///<para>
-        /// Once the policy has given up, an independant call to the device's StartAsync that fails (or the
-        /// next <see cref="Device{TConfiguration}.AutoStopAsync(IActivityMonitor, bool)"/> after a successful restart),
+        /// Once the policy has given up, an independent call to the device's StartAsync that fails (or the
+        /// next <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> after a successful restart),
         /// this policy will run again.
         ///</para>
         /// </summary>

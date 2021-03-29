@@ -40,7 +40,7 @@ namespace CK.DeviceModel
         {
             /// <summary>
             /// Gets the configuration.
-            /// Never null and <see cref="TConfiguration.CheckValid(IActivityMonitor)"/> is necessarily true.
+            /// Never null and <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> is necessarily true.
             /// </summary>
             public readonly TConfiguration Configuration;
 
@@ -77,7 +77,6 @@ namespace CK.DeviceModel
             SystemDeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
             SystemDeviceFolderPath = SystemDeviceFolderPath.Combine( "CK/DeviceModel/" + FullName );
 
-            InternalConfiguration = config;
             _configStatus = config.Status;
             _controllerKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
             _controllerKeyFromConfiguration = _controllerKey != null;
@@ -85,23 +84,12 @@ namespace CK.DeviceModel
             _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
 
             _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}." );
-            _commandQueue = Channel.CreateUnbounded<(DeviceCommandBase Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
-            _commandQueueImmediate = Channel.CreateUnbounded<(DeviceCommandBase Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
-            _deferredCommands = new Queue<(DeviceCommandBase Command, CancellationToken Token, bool CheckKey)>();
+            _commandQueue = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
+            _commandQueueImmediate = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
+            _deferredCommands = new Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>();
 
             _ = Task.Run( CommandRunLoop );
         }
-
-        /// <summary>
-        /// Gets the current configuration. This is internal and not exposed publicly
-        /// at all. This is intentional.
-        /// Configuration are mutable object and one should not rely on it.
-        /// Only the host, the <see cref="ReconfigureDeviceCommand{TConfiguration}"/> command
-        /// or the <see cref="ReconfigureAsync(IActivityMonitor, TConfiguration, CancellationToken)"/> method
-        /// can change this.
-        /// Obtaining a configuration must be done through the host API.
-        /// </summary>
-        internal TConfiguration InternalConfiguration { get; private set; }
 
         /// <summary>
         /// Gets the name. Necessarily not null or whitespace.
@@ -160,10 +148,12 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets the current configuration status of this device.
         /// From the implementation methods (<see cref="DoReconfigureAsync"/>, <see cref="DoStartAsync"/>,
-        /// <see cref="DoStopAsync"/>, <see cref="DoDestroyAsync"/> and <see cref="DoHandleCommandAsync(IActivityMonitor, DeviceCommandBase, CancellationToken)"/>)
+        /// <see cref="DoStopAsync"/>, <see cref="DoDestroyAsync"/> and <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand, CancellationToken)"/>)
         /// this property value is stable and can be trusted.
         /// </summary>
         public DeviceConfigurationStatus ConfigurationStatus => _configStatus;
+
+        #region Reconfigure
 
         /// <summary>
         /// Applies a new configuration to this device.
@@ -206,11 +196,21 @@ namespace CK.DeviceModel
             return cmd.Completion.Task;
         }
 
-        async Task HandleReconfigureAsync( ReconfigureDeviceCommand<TConfiguration> cmd, CancellationToken token )
+        async Task HandleReconfigureAsync( BaseReconfigureDeviceCommand<TConfiguration> cmd, CancellationToken token )
         {
-            var config = cmd.Configuration;
+            Debug.Assert( cmd.Configuration != null );
+            TConfiguration config;
+            if( cmd.ExternalConfig == null )
+            {
+                cmd.ExternalConfig = cmd.Configuration;
+                config = cmd.Configuration.Clone();
+            }
+            else
+            {
+                config = cmd.Configuration;
+            }
+
             Debug.Assert( _host != null );
-            Debug.Assert( config != null );
 
             bool specialCaseOfDisabled = false;
             bool configStatusChanged = _configStatus != config.Status;
@@ -283,13 +283,17 @@ namespace CK.DeviceModel
             {
                 applyResult = DeviceApplyConfigurationResult.UpdateSucceeded;
             }
-            await _host.OnDeviceConfiguredAsync( _commandMonitor, this, applyResult, config ).ConfigureAwait( false );
             if( controllerKeyChanged )
             {
                 await _controllerKeyChanged.SafeRaiseAsync( _commandMonitor, this, _controllerKey );
             }
+            if( applyResult != DeviceApplyConfigurationResult.None && _host.OnDeviceConfigured( _commandMonitor, this, applyResult, cmd.ExternalConfig ) )
+            {
+                await _host.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
+            }
             cmd.Completion.SetResult( applyResult );
         }
+        #endregion
 
         /// <summary>
         /// Reconfigures this device. This can be called when this device is started (<see cref="IsRunning"/> can be true) and
@@ -297,7 +301,8 @@ namespace CK.DeviceModel
         /// should be returned.
         /// <para>
         /// It is perfectly valid for this method to return <see cref="DeviceReconfiguredResult.None"/> if nothing happened instead of
-        /// <see cref="DeviceReconfiguredResult.UpdateSucceeded"/>.
+        /// <see cref="DeviceReconfiguredResult.UpdateSucceeded"/>. When None is returned, we may avoid a useless update of the <see cref="IDeviceHost"/>
+        /// set of configured devices.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -322,7 +327,7 @@ namespace CK.DeviceModel
             return cmd.Completion.Task;
         }
 
-        Task HandleSetControllerKeyAsync( SetControllerKeyDeviceCommand cmd )
+        Task HandleSetControllerKeyAsync( BaseSetControllerKeyDeviceCommand cmd )
         {
             var key = cmd.NewControllerKey;
             if( String.IsNullOrEmpty( key ) ) key = null;
@@ -382,7 +387,7 @@ namespace CK.DeviceModel
             return null;
         }
 
-        async Task HandleStartAsync( StartDeviceCommand? cmd, DeviceStartedReason reason )
+        async Task HandleStartAsync( BaseStartDeviceCommand? cmd, DeviceStartedReason reason )
         {
             Debug.Assert( _host != null );
 
@@ -436,9 +441,10 @@ namespace CK.DeviceModel
                 return HandleStopAsync( null, ignoreAlwaysRunning ? DeviceStoppedReason.AutoStoppedForceCall : DeviceStoppedReason.AutoStoppedCall )
                         .ContinueWith( t => !_isRunning );
             }
-            if( SyncStateStopCheck( monitor, ignoreAlwaysRunning ) )
+            var r = SyncStateStopCheck( monitor, ignoreAlwaysRunning );
+            if( r.HasValue )
             {
-                return Task.FromResult( true );
+                return Task.FromResult( r.Value );
             }
             var cmd = _host?.CreateStopCommand( Name, ignoreAlwaysRunning );
             if( cmd == null || !UnsafeSendCommandImmediate( monitor, cmd ) )
@@ -449,7 +455,7 @@ namespace CK.DeviceModel
             return cmd.Completion.Task;
         }
 
-        bool SyncStateStopCheck( IActivityMonitor monitor, bool ignoreAlwaysRunnig )
+        bool? SyncStateStopCheck( IActivityMonitor monitor, bool ignoreAlwaysRunnig )
         {
             if( !_isRunning )
             {
@@ -459,12 +465,12 @@ namespace CK.DeviceModel
             if( !ignoreAlwaysRunnig && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
             {
                 monitor.Error( $"Cannot stop device '{FullName}' because Status is AlwaysRunning." );
-                return true;
+                return false;
             }
-            return false;
+            return null;
         }
 
-        internal async Task HandleStopAsync( StopDeviceCommand? cmd, DeviceStoppedReason reason )
+        internal async Task HandleStopAsync( BaseStopDeviceCommand? cmd, DeviceStoppedReason reason )
         {
             Debug.Assert( _host != null );
             var isAlwaysRunning = _configStatus == DeviceConfigurationStatus.AlwaysRunning;
@@ -474,33 +480,35 @@ namespace CK.DeviceModel
                 {
                     _configStatus = DeviceConfigurationStatus.Disabled;
                 }
-                // AutoStoppedForceCall & AutoDestroy skips AlwaysRunning check.
-                if( SyncStateStopCheck( _commandMonitor, cmd?.IgnoreAlwaysRunning
-                                                            ?? reason == DeviceStoppedReason.StoppedForceCall
-                                                               || reason == DeviceStoppedReason.AutoStoppedForceCall
-                                                               || reason == DeviceStoppedReason.Destroyed
-                                                               || reason == DeviceStoppedReason.AutoDestroyed ) )
+                // StoppedForceCall, AutoStoppedForceCall, AutoDestroy and AutoDestroyed skips AlwaysRunning check.
+                var r = SyncStateStopCheck( _commandMonitor, cmd?.IgnoreAlwaysRunning
+                                                             ?? reason == DeviceStoppedReason.StoppedForceCall
+                                                                || reason == DeviceStoppedReason.AutoStoppedForceCall
+                                                                || reason == DeviceStoppedReason.Destroyed
+                                                                || reason == DeviceStoppedReason.AutoDestroyed );
+                if( !r.HasValue )
                 {
-                    return;
+                    // From now on, Stop always succeeds, even if an error occurred.
+                    _isRunning = false;
+                    r = true;
+                    try
+                    {
+                        await DoStopAsync( _commandMonitor, reason ).ConfigureAwait( false );
+                    }
+                    catch( Exception ex )
+                    {
+                        _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
+                    }
+                    if( reason != DeviceStoppedReason.Destroyed && reason != DeviceStoppedReason.AutoDestroyed )
+                    {
+                        await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason ) ).ConfigureAwait( false );
+                    }
+                    if( isAlwaysRunning )
+                    {
+                        _host.OnAlwaysRunningCheck( this, _commandMonitor );
+                    }
                 }
-                // From now on, Stop always succeeds, even if an error occurred.
-                _isRunning = false;
-                try
-                {
-                    await DoStopAsync( _commandMonitor, reason ).ConfigureAwait( false );
-                }
-                catch( Exception ex )
-                {
-                    _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
-                }
-                if( reason != DeviceStoppedReason.Destroyed && reason != DeviceStoppedReason.AutoDestroyed )
-                {
-                    await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason ) ).ConfigureAwait( false );
-                }
-                if( isAlwaysRunning )
-                {
-                    _host.OnAlwaysRunningCheck( this, _commandMonitor );
-                }
+                cmd?.Completion.SetResult( r.Value );
             }
         }
 
@@ -539,7 +547,7 @@ namespace CK.DeviceModel
             return cmd.Completion.Task;
         }
 
-        async Task HandleDestroyAsync( DestroyDeviceCommand? cmd, bool autoDestroy )
+        async Task HandleDestroyAsync( BaseDestroyDeviceCommand? cmd, bool autoDestroy )
         {
             Debug.Assert( _host != null );
             if( _isRunning )
@@ -556,11 +564,15 @@ namespace CK.DeviceModel
                 _commandMonitor.Warn( $"'{FullName}'.OnDestroyAsync error. This is ignored.", ex );
             }
             FullName += " (Destroyed)";
-            await _host.OnDeviceDestroyedAsync( _commandMonitor, this ).ConfigureAwait( false );
             await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
+            if( _host.OnDeviceDestroyed( _commandMonitor, this ) )
+            {
+                await _host.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
+            }
             _host = null;
             _statusChanged.RemoveAll();
             _controllerKeyChanged.RemoveAll();
+            cmd?.Completion.SetResult();
         }
 
         #endregion

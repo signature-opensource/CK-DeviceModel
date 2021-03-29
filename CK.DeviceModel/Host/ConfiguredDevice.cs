@@ -1,7 +1,7 @@
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Immutable capture of a device and its current configuration.
+    /// Immutable capture of a device, its current configuration and application result.
     /// The configuration is not the one of the device: see <see cref="Configuration"/>.
     /// </summary>
     public readonly struct ConfiguredDevice<T, TConfiguration>
@@ -24,10 +24,16 @@ namespace CK.DeviceModel
         /// </summary>
         public TConfiguration Configuration { get; }
 
-        internal ConfiguredDevice( T device, TConfiguration configuration )
+        /// <summary>
+        /// Gets the result of the device configuration.
+        /// </summary>
+        public DeviceApplyConfigurationResult ConfigurationResult { get; }
+
+        internal ConfiguredDevice( T device, TConfiguration configuration, DeviceApplyConfigurationResult result )
         {
             Device = device;
             Configuration = configuration;
+            ConfigurationResult = result;
         }
     }
 

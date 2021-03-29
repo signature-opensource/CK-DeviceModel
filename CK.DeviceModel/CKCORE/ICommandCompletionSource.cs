@@ -10,7 +10,7 @@ namespace CK.Core
     {
         /// <summary>
         /// Transitions the <see cref="Task"/> into the <see cref="TaskStatus.Faulted"/> state or into the <see cref="TaskStatus.RanToCompletion"/>
-        /// if <see cref="IgnoreCanceled"/> is true.
+        /// if <see cref="ICommandCompletion.IgnoreCanceled"/> is true.
         /// An <see cref="InvalidOperationException"/> is thrown if Task is already in one of the three final
         /// states: <see cref="TaskStatus.RanToCompletion"/>, <see cref="TaskStatus.Faulted"/> or <see cref="TaskStatus.Canceled"/>.
         /// <para>

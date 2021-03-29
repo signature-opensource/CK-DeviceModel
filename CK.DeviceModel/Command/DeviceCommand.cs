@@ -1,36 +1,35 @@
-using CK.Core;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
-using System.Threading.Tasks;
+using CK.Core;
 
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Base command that doesn't return a result: its <see cref="Completion"/> can be awaited either
-    /// for completion or for error.
-    /// This class cannot be directly specialized: the generic <see cref="HostedDeviceCommand{THost}"/>
-    /// must be used.
+    /// Abstract base class for commands without any result that a device can handle.
     /// </summary>
-    public abstract class DeviceCommand : DeviceCommandBase
+    public abstract class DeviceCommand<THost> : DeviceCommandNoResult where THost : IDeviceHost
     {
-        private protected DeviceCommand()
+        /// <summary>
+        /// Initializes a new <see cref="DeviceCommand{THost}"/>.
+        /// </summary>
+        protected DeviceCommand()
         {
-            Completion = new CommandCompletionSource();
-        }
-
-        private protected DeviceCommand( bool ignoreException, bool ignoreCanceled )
-        {
-            Completion = new CommandCompletionSource( ignoreException, ignoreCanceled );
         }
 
         /// <summary>
-        /// Gets the <see cref="CommandCompletionSource"/> for this command.
+        /// Initializes a new <see cref="DeviceCommand{THost}"/> thats ignores errors or cancellation.
+        /// See <see cref="CommandCompletionSource"/>.
         /// </summary>
-        public CommandCompletionSource Completion { get; }
+        /// <param name="ignoreException">True to ignore errors.</param>
+        /// <param name="ignoreCanceled">True to ignore cancellation.</param>
+        protected DeviceCommand( bool ignoreException, bool ignoreCanceled )
+            : base( ignoreException, ignoreCanceled )
+        {
+        }
 
-        internal override ICommandCompletionSource InternalCompletion => Completion;
+        /// <inheritdoc />
+        public sealed override Type HostType => typeof(THost);
 
     }
 }

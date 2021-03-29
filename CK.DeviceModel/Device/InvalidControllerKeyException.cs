@@ -6,7 +6,7 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Exception that is set on a command when the <see cref="IDevice.ControllerKey"/>
-    /// doesn't match the <see cref="DeviceCommandBase.ControllerKey"/> and <see cref="IDevice.SendCommand"/>
+    /// doesn't match the <see cref="BaseDeviceCommand.ControllerKey"/> and <see cref="IDevice.SendCommand"/>
     /// or <see cref="IDevice.SendCommandImmediate"/> has been used.
     /// </summary>
     public class InvalidControllerKeyException : Exception

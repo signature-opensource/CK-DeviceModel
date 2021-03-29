@@ -7,7 +7,7 @@ using CK.PerfectEvent;
 namespace CK.DeviceModel.Tests
 {
 
-    public class Machine : Device<MachineConfiguration>, ITestDevice
+    public class Machine : Device<MachineConfiguration>
     {
         public static int TotalCount;
         public static int TotalRunning;
@@ -46,22 +46,6 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token )
-        {
-            if( command is ForceAutoStopCommand<MachineHost> autoStop )
-            {
-                autoStop.Result.SetResult( await StopAsync( monitor, true ) );
-            }
-            else if( command is AutoDestroyCommand<MachineHost> autoDestroy )
-            {
-                await AutoDestroyAsync( monitor );
-                autoDestroy.Result.SetResult();
-            }
-            else
-            {
-                await base.DoHandleCommandAsync( monitor, command, token );
-            }
-        }
     }
 
 }

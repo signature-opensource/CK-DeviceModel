@@ -1,9 +1,10 @@
 using CK.Core;
+using System.Threading;
 
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Defines the outcome of the <see cref="DeviceHost.SendCommand(IActivityMonitor, DeviceCommandBase, CancellationToken)"/> method.
+    /// Defines the outcome of the <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/> method.
     /// </summary>
     public enum DeviceHostCommandResult
     {
@@ -13,22 +14,22 @@ namespace CK.DeviceModel
         Success,
 
         /// <summary>
-        /// The <see cref="DeviceCommand.HostType"/> is not the target one.
+        /// The <see cref="BaseDeviceCommand.HostType"/> is not the target one.
         /// </summary>
         InvalidHostType,
 
         /// <summary>
-        /// The <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> failed.
+        /// The <see cref="BaseDeviceCommand.CheckValidity(IActivityMonitor)"/> failed.
         /// </summary>
         CommandCheckValidityFailed,
 
         /// <summary>
-        /// The <see cref="DeviceCommand.DeviceName"/> target doesn't exist.
+        /// The <see cref="BaseDeviceCommand.DeviceName"/> target doesn't exist.
         /// </summary>
         DeviceNameNotFound,
 
         /// <summary>
-        /// The <see cref="Device{TConfiguration}.SendCommand(IActivityMonitor, DeviceCommandBase, System.Threading.CancellationToken)"/>
+        /// The <see cref="Device{TConfiguration}.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, bool, CancellationToken)"/>
         /// method returned false (the device has been destroyed).
         /// </summary>
         DeviceDestroyed

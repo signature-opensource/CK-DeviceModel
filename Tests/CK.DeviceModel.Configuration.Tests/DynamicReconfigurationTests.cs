@@ -168,6 +168,8 @@ namespace CK.DeviceModel.Configuration.Tests
         [Test]
         public async Task empty_configuration_does_not_create_any_device()
         {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( empty_configuration_does_not_create_any_device ) );
+
             var config = DynamicConfiguration.Create();
             await RunHost( config, services =>
             {
@@ -182,10 +184,12 @@ namespace CK.DeviceModel.Configuration.Tests
         [Test]
         public async Task initial_configuration_create_devices()
         {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( initial_configuration_create_devices ) );
+
             var config = DynamicConfiguration.Create();
-            config.Provider.Set( "Device:CameraHost:Items:C1:Status", "Runnable" );
-            config.Provider.Set( "Device:CameraHost:Items:C2:Status", "Runnable" );
-            config.Provider.Set( "Device:LightControllerHost:Items:L1:Status", "Disabled" );
+            config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "Runnable" );
+            config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "Runnable" );
+            config.Provider.Set( "CK-DeviceModel:LightControllerHost:Items:L1:Status", "Disabled" );
             await RunHost( config, services =>
             {
                 Debug.Assert( CameraHost.TestInstance != null );
@@ -209,11 +213,13 @@ namespace CK.DeviceModel.Configuration.Tests
         [Test]
         public async Task initial_configuration_can_start_devices_and_then_they_live_their_lifes()
         {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( initial_configuration_can_start_devices_and_then_they_live_their_lifes ) );
+
             var config = DynamicConfiguration.Create();
-            config.Provider.Set( "Device:CameraHost:Items:C1:Status", "RunnableStarted" );
-            config.Provider.Set( "Device:CameraHost:Items:C2:Status", "AlwaysRunning" );
-            config.Provider.Set( "Device:LightControllerHost:Items:L1:Status", "Runnable" );
-            config.Provider.Set( "Device:LightControllerHost:Items:L2:Status", "Disabled" );
+            config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "RunnableStarted" );
+            config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "AlwaysRunning" );
+            config.Provider.Set( "CK-DeviceModel:LightControllerHost:Items:L1:Status", "Runnable" );
+            config.Provider.Set( "CK-DeviceModel:LightControllerHost:Items:L2:Status", "Disabled" );
             await RunHost( config, async services =>
             {
                 Debug.Assert( CameraHost.TestInstance != null );
@@ -288,8 +294,11 @@ namespace CK.DeviceModel.Configuration.Tests
         [Test]
         public async Task configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service()
         {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service ) );
+
             var config = DynamicConfiguration.Create();
-            config.Provider.Set( "Device:CameraHost:Items:C1:Status", "RunnableStarted" );
+            config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "RunnableStarted" );
+
             await RunHost( config, async services =>
             {
                 Debug.Assert( CameraHost.TestInstance != null );
@@ -308,15 +317,15 @@ namespace CK.DeviceModel.Configuration.Tests
                 Debug.Assert( c1 != null );
                 c1.IsRunning.Should().BeTrue();
 
-                config.Provider.Set( "Device:CameraHost:Items:C1:Status", "Disabled" );
+                config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "Disabled" );
                 config.Provider.RaiseChanged();
                 await Task.Delay( 50 );
 
                 c1.IsRunning.Should().BeFalse();
                 DevicesChangedCount.Should().Be( 1 );
 
-                config.Provider.Set( "Device:CameraHost:Items:C1:Status", "AlwaysRunning" );
-                config.Provider.Set( "Device:CameraHost:Items:C2:Status", "Disabled" );
+                config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "AlwaysRunning" );
+                config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "Disabled" );
                 config.Provider.RaiseChanged();
                 await Task.Delay( 50 );
 
@@ -328,8 +337,8 @@ namespace CK.DeviceModel.Configuration.Tests
 
                 // C1 configuration is "removed", but IsPartialConfiguration is true by default:
                 // the device is not concerned by a missing configuration.
-                config.Provider.Remove( "Device:CameraHost:Items:C1" );
-                config.Provider.Set( "Device:CameraHost:Items:C2:Status", "AlwaysRunning" );
+                config.Provider.Remove( "CK-DeviceModel:CameraHost:Items:C1" );
+                config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "AlwaysRunning" );
                 config.Provider.RaiseChanged();
                 await Task.Delay( 50 );
 
@@ -337,7 +346,7 @@ namespace CK.DeviceModel.Configuration.Tests
                 c2.IsRunning.Should().BeTrue();
 
                 // Setting IsPartialConfiguration to false: the C1 device doesn't exist anymore!
-                config.Provider.Set( "Device:CameraHost:IsPartialConfiguration", "false" );
+                config.Provider.Set( "CK-DeviceModel:CameraHost:IsPartialConfiguration", "false" );
                 config.Provider.RaiseChanged();
                 await Task.Delay( 150 );
 

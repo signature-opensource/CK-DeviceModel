@@ -15,14 +15,14 @@ namespace CK.Core
         Task Task { get; }
 
         /// <summary>
-        /// Gets whether this <see cref="Task"/> will be in <see cref="TaskStatus.RanToCompletion"/> whenever <see cref="SetException(Exception)"/>
-        /// or <see cref="TrySetException(Exception)"/> have been called.
+        /// Gets whether this <see cref="Task"/> will be in <see cref="TaskStatus.RanToCompletion"/> whenever SetException
+        /// or TrySetException have been called.
         /// </summary>
         bool IgnoreException { get; }
 
         /// <summary>
-        /// Gets whether this <see cref="Task"/> will be in <see cref="TaskStatus.RanToCompletion"/> whenever <see cref="SetCanceled()"/>
-        /// or <see cref="TrySetCanceled()"/> have been called.
+        /// Gets whether this <see cref="Task"/> will be in <see cref="TaskStatus.RanToCompletion"/> whenever SetCanceled
+        /// or TrySetCanceled have been called.
         /// </summary>
         bool IgnoreCanceled { get; }
 
@@ -38,12 +38,12 @@ namespace CK.Core
         bool IsSuccessful { get; }
 
         /// <summary>
-        /// Gets whether the command failed (<see cref="SetException(Exception)"/> or <see cref="TrySetException(Exception)"/> have been called).
+        /// Gets whether the command failed (SetException or TrySetException have been called).
         /// </summary>
         bool IsError { get; }
 
         /// <summary>
-        /// Gets whether the command has been canceled (<see cref="SetCanceled()"/> or <see cref="TrySetCanceled()"/> have been called).
+        /// Gets whether the command has been canceled (SetCanceled or TrySetCanceled have been called).
         /// </summary>
         bool IsCanceled { get; }
     }

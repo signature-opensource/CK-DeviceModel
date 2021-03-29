@@ -12,21 +12,23 @@ namespace CK.DeviceModel
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        DeviceCommand<DeviceApplyConfigurationResult> CreateReconfigureCommand( string name );
+        DeviceCommandWithResult<DeviceApplyConfigurationResult> CreateReconfigureCommand( string name );
 
-        StartDeviceCommand CreateStartCommand( string name );
+        BaseStartDeviceCommand CreateStartCommand( string name );
 
-        StopDeviceCommand CreateStopCommand( string name, bool ignoreAlwaysRunning );
+        BaseStopDeviceCommand CreateStopCommand( string name, bool ignoreAlwaysRunning );
 
-        DestroyDeviceCommand CreateDestroyCommand( string name );
+        BaseDestroyDeviceCommand CreateDestroyCommand( string name );
 
-        SetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
+        BaseSetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
 
-        Task OnDeviceConfiguredAsync( IActivityMonitor commandMonitor, IDevice device, DeviceApplyConfigurationResult applyResult, DeviceConfiguration externalConfig );
+        bool OnDeviceConfigured( IActivityMonitor monitor, IDevice device, DeviceApplyConfigurationResult result, DeviceConfiguration externalConfig );
 
-        Task OnDeviceDestroyedAsync( IActivityMonitor commandMonitor, IDevice device );
+        bool OnDeviceDestroyed( IActivityMonitor monitor, IDevice device );
 
         void OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor );
+
+        Task RaiseDevicesChangedEvent( IActivityMonitor monitor );
 
         void SetDaemon( DeviceHostDaemon daemon );
 

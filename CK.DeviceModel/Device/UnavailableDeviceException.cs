@@ -15,7 +15,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="device">The stopped or destroyed device.</param>
         /// <param name="command">The command.</param>
-        public UnavailableDeviceException( IDevice device, DeviceCommandBase command )
+        public UnavailableDeviceException( IDevice device, BaseDeviceCommand command )
             : base( $"Unable to execute command '{command?.GetType().Name}' on device '{device?.FullName}', its status is {device?.Status}." )
         {
         }

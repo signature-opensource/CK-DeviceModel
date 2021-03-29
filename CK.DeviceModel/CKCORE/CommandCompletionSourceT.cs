@@ -20,7 +20,7 @@ namespace CK.Core
         /// Creates a <see cref="CommandCompletionSource{TResult}"/> that keeps the exception object
         /// and the canceled state in the <see cref="Task"/>.
         /// </summary>
-        public CommandCompletionSource() => _tcs = new TaskCompletionSource<TResult>();
+        public CommandCompletionSource() => _tcs = new TaskCompletionSource<TResult>( TaskCreationOptions.RunContinuationsAsynchronously );
 
         /// <summary>
         /// Creates a <see cref="CommandCompletionSource"/> that transforms any exception or cancellation into
@@ -29,7 +29,7 @@ namespace CK.Core
         /// <param name="errorOrCancelResult">Result that will replace error or cancellation.</param>
         public CommandCompletionSource( TResult errorOrCancelResult )
         {
-            _tcs = new TaskCompletionSource<TResult>();
+            _tcs = new TaskCompletionSource<TResult>( TaskCreationOptions.RunContinuationsAsynchronously );
             _errorTransform = _ => errorOrCancelResult;
             _cancelResult = errorOrCancelResult;
             _state = 3;
@@ -41,10 +41,10 @@ namespace CK.Core
         /// </summary>
         /// <param name="transformError">Optional transformation from the error to a result.</param>
         /// <param name="ignoreCanceled">True to transform cancellation into <paramref name="ignoreCanceled"/> result value.</param>
-        /// <param name="cancelResult">The result to use on cancellation (can be the same as the <paramref name="errorResult"/>). Used only is <paramref name="ignoreCanceled"/> is true.</param>
+        /// <param name="cancelResult">The result to use on cancellation. Used only is <paramref name="ignoreCanceled"/> is true.</param>
         public CommandCompletionSource( Func<Exception, TResult>? transformError, bool ignoreCanceled, TResult cancelResult )
         {
-            _tcs = new TaskCompletionSource<TResult>();
+            _tcs = new TaskCompletionSource<TResult>( TaskCreationOptions.RunContinuationsAsynchronously );
             if( transformError != null )
             {
                 _errorTransform = transformError;
@@ -154,6 +154,12 @@ namespace CK.Core
             if( r ) _state |= 16;
             return r;
         }
+
+        /// <summary>
+        /// Overridden to return the current status and configuration.
+        /// </summary>
+        /// <returns>The current status and configuration.</returns>
+        public override string ToString() => CommandCompletionSource.GetStatus( _state );
 
     }
 }

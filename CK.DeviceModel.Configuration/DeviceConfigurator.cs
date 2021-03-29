@@ -21,9 +21,10 @@ namespace CK.DeviceModel
     public class DeviceConfigurator : ISingletonAutoService, IHostedService
     {
         readonly IConfigurationSection _configuration;
+        readonly IConfigurationRoot _configurationRoot;
         readonly IDeviceHost[] _deviceHosts;
         readonly CancellationTokenSource _run;
-        IActivityMonitor? _changeMonitor;
+        IActivityMonitor _changeMonitor;
         IDisposable? _changeSubscription;
         readonly Channel<(IDeviceHost, IDeviceHostConfiguration)[]> _applyChannel;
 
@@ -34,21 +35,22 @@ namespace CK.DeviceModel
         /// <param name="deviceHosts">The available hosts.</param>
         public DeviceConfigurator( IConfigurationRoot configuration, IEnumerable<IDeviceHost> deviceHosts )
         {
+            _configurationRoot = configuration;
+            _changeMonitor = new ActivityMonitor( "CK-DeviceModel Configurator (Initializing)" );
             _run = new CancellationTokenSource();
-            _configuration = configuration.GetSection( "Device" );
+            _configuration = configuration.GetSection( "CK-DeviceModel" );
             _deviceHosts = deviceHosts.ToArray();
             _applyChannel = Channel.CreateUnbounded<(IDeviceHost, IDeviceHostConfiguration)[]>( new UnboundedChannelOptions() { SingleReader = true, SingleWriter = true } );
         }
 
         async Task IHostedService.StartAsync( CancellationToken cancellationToken )
         {
-            _changeMonitor = new ActivityMonitor( nameof( DeviceConfigurator ) + " (Initializing)" );
             OnConfigurationChanged();
             if( _applyChannel.Reader.TryRead( out var toApply ))
             {
                 await ApplyOnceAsync( _changeMonitor, toApply, cancellationToken );
             }
-            _changeMonitor.SetTopic( nameof( DeviceConfigurator ) + " (ConfigurationChange detection)" );
+            _changeMonitor.SetTopic( "CK-DeviceModel Configurator (Configuration change detection)" );
             _changeSubscription = ChangeToken.OnChange( _configuration.GetReloadToken, OnConfigurationChanged );
             _ = Task.Run( TheLoop );
         }
@@ -82,12 +84,23 @@ namespace CK.DeviceModel
 
         void OnConfigurationChanged()
         {
-            Debug.Assert( _changeMonitor != null );
             using( _changeMonitor.OpenInfo( "Building configuration objects for Devices." ) )
             {
                 NoItemsSectionWrapper noItemsSection = new NoItemsSectionWrapper();
                 try
                 {
+                    if( !_configuration.Exists() )
+                    {
+                        var foundDevice = _configurationRoot.GetSection( "Device" ).Exists();
+                        var foundDeviceModel = _configurationRoot.GetSection( "DeviceModel" ).Exists();
+                        var foundCKDeviceModel = _configurationRoot.GetSection( "CKDeviceModel" ).Exists();
+                        _changeMonitor.Warn( "Missing 'CK-DeviceModel' configuration section. No devices to configure." );
+                        if( foundDevice || foundDeviceModel || foundCKDeviceModel )
+                        {
+                            _changeMonitor.Error( $"Configuration section must be 'CK-DeviceModel'. A '{(foundDevice ? "Device" : (foundDeviceModel ? "DeviceModel" : "CKDeviceModel"))}' section exists. It should be renamed." );
+                        }
+                        return;
+                    }
                     int idxResult = 0;
                     (IDeviceHost, IDeviceHostConfiguration)[]? toApply = null;
                     foreach( var c in _configuration.GetChildren() )

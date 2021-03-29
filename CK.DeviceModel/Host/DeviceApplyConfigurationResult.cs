@@ -70,7 +70,7 @@ namespace CK.DeviceModel
         ConfigurationCanceled,
 
         /// <summary>
-        /// The <see cref="IDevice.ControllerKey"/> doesn't match the <see cref="DeviceCommandBase.ControllerKey"/>.
+        /// The <see cref="IDevice.ControllerKey"/> doesn't match the <see cref="BaseDeviceCommand.ControllerKey"/>.
         /// </summary>
         InvalidControllerKey,
 

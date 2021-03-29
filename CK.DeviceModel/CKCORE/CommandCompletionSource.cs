@@ -24,7 +24,7 @@ namespace CK.Core
         /// Creates a <see cref="CommandCompletionSource"/> that keeps the exception object
         /// and the canceled state in the <see cref="Task"/>.
         /// </summary>
-        public CommandCompletionSource() => _tcs = new TaskCompletionSource<object?>();
+        public CommandCompletionSource() => _tcs = new TaskCompletionSource<object?>( TaskCreationOptions.RunContinuationsAsynchronously );
 
         /// <summary>
         /// Creates a <see cref="CommandCompletionSource"/> that ignores the exception object
@@ -34,7 +34,7 @@ namespace CK.Core
         /// <param name="ignoreCanceled">True to ignore cancellation.</param>
         public CommandCompletionSource( bool ignoreException, bool ignoreCanceled )
         {
-            _tcs = new TaskCompletionSource<object?>();
+            _tcs = new TaskCompletionSource<object?>( TaskCreationOptions.RunContinuationsAsynchronously );
             if( ignoreException ) _state = 1;
             if( ignoreCanceled ) _state |= 2;
         }
@@ -129,6 +129,30 @@ namespace CK.Core
             bool r = IgnoreCanceled ? _tcs.TrySetResult( null ) : _tcs.TrySetCanceled();
             if( r ) _state |= 16;
             return r;
+        }
+
+        /// <summary>
+        /// Overridden to return the current status and configuration.
+        /// </summary>
+        /// <returns>The current status and configuration.</returns>
+        public override string ToString() => GetStatus( _state );
+
+        static readonly string[] _ignores = new[]
+        {
+            "",
+            " (IgnoreException)",
+            " (IgnoreCancel)",
+            " (IgnoreException, IgnoreCancel)"
+        };
+
+        static internal string GetStatus( byte s )
+        {
+            string r;
+            if( (s & 4) != 0 ) r = "Success";
+            else if( (s & 8) != 0 ) r = "Exception";
+            else if( (s & 16) != 0 ) r = "Canceled";
+            else r = "Waiting";
+            return r + _ignores[s & 3];
         }
     }
 }

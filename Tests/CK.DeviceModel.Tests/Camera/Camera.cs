@@ -6,7 +6,7 @@ using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests
 {
-    public class Camera : Device<CameraConfiguration>, ITestDevice
+    public class Camera : Device<CameraConfiguration>
     {
         public static int TotalCount;
         public static int TotalRunning;
@@ -25,20 +25,6 @@ namespace CK.DeviceModel.Tests
         }
 
         public PerfectEvent<Camera,int> Flash => _flash.PerfectEvent;
-
-        public Task SendAutoDestroyAsync( IActivityMonitor monitor )
-        {
-            var cmd = new AutoDestroyCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
-            SendCommand( monitor, cmd );
-            return cmd.Result.Task;
-        }
-
-        public Task<bool> SendForceAutoStopAsync( IActivityMonitor monitor )
-        {
-            var cmd = new ForceAutoStopCommand<OtherMachineHost>() { DeviceName = Name, ControllerKey = ControllerKey };
-            SendCommand( monitor, cmd );
-            return cmd.Result.Task;
-        }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
         {
@@ -59,20 +45,22 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommandBase command, CancellationToken token )
+        protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
         {
-            if( command is FlashCommand )
+            if( command is FlashCommand f )
             {
-                return _flash.RaiseAsync( monitor, this, _configRef.FlashColor );
+                await _flash.RaiseAsync( monitor, this, _configRef.FlashColor ).ConfigureAwait( false );
+                f.Completion.SetResult();
+                return;
             }
-            if( command is SetFlashColorCommand f )
+            if( command is SetFlashColorCommand c )
             {
-                _configRef.FlashColor = f.Color;
-                return Task.CompletedTask;
+                _configRef.FlashColor = c.Color;
+                c.Completion.SetResult();
+                return;
             }
-            return base.DoHandleCommandAsync( monitor, command, token );
+            await base.DoHandleCommandAsync( monitor, command, token );
         }
-
 
         protected override Task DoDestroyAsync( IActivityMonitor monitor )
         {

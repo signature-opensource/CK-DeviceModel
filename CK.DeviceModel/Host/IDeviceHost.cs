@@ -78,7 +78,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
-        /// Note that these objects are a copy of the ones that are used by the actual devices.
+        /// Note that the configuration objects are copies of the ones that are used by the actual devices.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
         /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
@@ -95,21 +95,22 @@ namespace CK.DeviceModel
         /// <summary>
         /// Sends the provided command to the device it targets.
         /// <para>
-        /// Determines whether the <see cref="DeviceCommandBase.HostType"/> is compatible with the actual type of this host,
-        /// finds the target device based on <see cref="DeviceCommandBase.DeviceName"/> and calls
-        /// <see cref="DeviceCommandBase.CheckValidity(IActivityMonitor)"/> before sending the command to the device.
+        /// Determines whether the <see cref="BaseDeviceCommand.HostType"/> is compatible with the actual type of this host,
+        /// finds the target device based on <see cref="BaseDeviceCommand.DeviceName"/> and calls
+        /// <see cref="BaseDeviceCommand.CheckValidity(IActivityMonitor)"/> before sending the command to the device.
         /// </para>
         /// <para>
-        /// The <see cref="ControllerKey"/> check is done at the time when the command is executed: if the check fails, an <see cref="InvalidControllerKeyException"/>
-        /// will be set on the <see cref="DeviceCommand.Completion"/> or <see cref="DeviceCommand{TResult}.Completion"/>. The <paramref name="checkControllerKey"/> parameter
+        /// The <see cref="IDevice.ControllerKey"/> check is done at the time when the command is executed: if the check fails, an <see cref="InvalidControllerKeyException"/>
+        /// will be set on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>. The <paramref name="checkControllerKey"/> parameter
         /// can be used to skip this check.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to validate, route and send.</param>
+        /// <param name="checkControllerKey">True to check the controller key right before executing the command.</param>
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
-        public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, DeviceCommandBase command, bool checkControllerKey = true, CancellationToken token = default );
+        public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default );
 
     }
 }
