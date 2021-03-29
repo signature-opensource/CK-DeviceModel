@@ -570,8 +570,8 @@ namespace CK.DeviceModel
             {
                 await h.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
             }
-            cmd?.Completion.SetResult();
             await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
+            cmd?.Completion.SetResult();
             _statusChanged.RemoveAll();
             _controllerKeyChanged.RemoveAll();
         }
