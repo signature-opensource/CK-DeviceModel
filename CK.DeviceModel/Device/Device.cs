@@ -564,15 +564,16 @@ namespace CK.DeviceModel
                 _commandMonitor.Warn( $"'{FullName}'.OnDestroyAsync error. This is ignored.", ex );
             }
             FullName += " (Destroyed)";
-            await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
-            if( _host.OnDeviceDestroyed( _commandMonitor, this ) )
-            {
-                await _host.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
-            }
+            var h = _host;
             _host = null;
+            if( h.OnDeviceDestroyed( _commandMonitor, this ) )
+            {
+                await h.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
+            }
+            cmd?.Completion.SetResult();
+            await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
             _statusChanged.RemoveAll();
             _controllerKeyChanged.RemoveAll();
-            cmd?.Completion.SetResult();
         }
 
         #endregion
