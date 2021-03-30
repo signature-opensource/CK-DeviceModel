@@ -90,6 +90,15 @@ namespace CK.DeviceModel
         Task DestroyAsync( IActivityMonitor monitor );
 
         /// <summary>
+        /// Cancels all the commands that are waiting to be handled, either because they have been queued
+        /// and not handled yet or because they are waiting for the device to be running.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="cancelQueuedCommands">Cancels the current command queue.</param>
+        /// <param name="cancelDeferredCommands">Cancels deferred commands waiting for the device to be running.</param>
+        void CancelAllPendingCommands( IActivityMonitor monitor, bool cancelQueuedCommands, bool cancelDeferredCommands );
+
+        /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.
         /// When null, the <see cref="BaseDeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>
         /// checks that the command's controller key is the same as this one otherwise the command is not handled.

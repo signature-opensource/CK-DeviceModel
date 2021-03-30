@@ -13,7 +13,7 @@ namespace CK.DeviceModel
     public abstract partial class Device<TConfiguration>
     {
         readonly Channel<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)> _commandQueue;
-        readonly Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)> _deferredCommands;
+        Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)> _deferredCommands;
 
         readonly Channel<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)> _commandQueueImmediate;
 
@@ -29,6 +29,35 @@ namespace CK.DeviceModel
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
         }
         static readonly CommandAwaker _commandAwaker = new();
+
+
+        /// <inheritdoc />
+        public void CancelAllPendingCommands( IActivityMonitor monitor, bool cancelQueuedCommands, bool cancelDeferredCommands )
+        {
+            int cRemoved = 0;
+            if( cancelQueuedCommands )
+            {
+                while( _commandQueue.Reader.TryRead( out var c ) )
+                {
+                    c.Command.InternalCompletion.SetCanceled();
+                    ++cRemoved;
+                }
+                // Security: run the loop.
+                _commandQueue.Writer.TryWrite( (_commandAwaker, default, false) );
+                monitor.Info( $"Canceled {cRemoved} waiting commands." );
+            }
+            if( cancelDeferredCommands )
+            {
+                var d = _deferredCommands;
+                _deferredCommands = new Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>();
+                monitor.Info( $"Canceled {d.Count} deferred commands." );
+                while( d.TryDequeue( out var c ) )
+                {
+                    c.Command.InternalCompletion.SetCanceled();
+                }
+            }
+        }
+
 
         /// <inheritdoc />
         public bool SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
@@ -102,11 +131,13 @@ namespace CK.DeviceModel
                     }
                     if( cmd == _commandAwaker ) continue;
 
-                    if( wasStop && IsRunning && _deferredCommands.Count > 0 )
+                    // Captures the reference (since it can be replaced by CancelAllPendingCommands.
+                    var deferred = _deferredCommands;
+                    if( wasStop && IsRunning && deferred.Count > 0 )
                     {
-                        using( _commandMonitor.OpenDebug( $"Device started: executing {_deferredCommands.Count} deferred commands." ) )
+                        using( _commandMonitor.OpenDebug( $"Device started: executing {deferred.Count} deferred commands." ) )
                         {
-                            while( IsRunning && _deferredCommands.TryDequeue( out var ct ) )
+                            while( IsRunning && deferred.TryDequeue( out var ct ) )
                             {
                                 currentlyExecuting = ct.Command;
                                 await HandleCommandAsync( currentlyExecuting, ct.Token, ct.CheckKey, allowDefer: false ).ConfigureAwait( false );
