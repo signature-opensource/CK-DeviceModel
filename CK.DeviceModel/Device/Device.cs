@@ -25,7 +25,7 @@ namespace CK.DeviceModel
         readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
         readonly ActivityMonitor _commandMonitor;
         bool _controllerKeyFromConfiguration;
-        bool _isRunning;
+        volatile bool _isRunning;
 
         /// <inheritdoc />
         public PerfectEvent<IDevice> StatusChanged => _statusChanged.PerfectEvent;

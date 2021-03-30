@@ -28,11 +28,13 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new <see cref="DeviceHostDaemon"/>.
         /// </summary>
-        /// <param name="deviceHosts">The available hosts.</param>
+        /// <param name="deviceHosts">The available device hosts.</param>
         public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts )
         {
             _run = new CancellationTokenSource();
-            _signal = new TaskCompletionSource<bool>();
+            // See here https://stackoverflow.com/questions/28321457/taskcontinuationoptions-runcontinuationsasynchronously-and-stack-dives
+            // why RunContinuationsAsynchronously is crucial.
+            _signal = new TaskCompletionSource<bool>( TaskCreationOptions.RunContinuationsAsynchronously );
            _deviceHosts = deviceHosts.Cast<IInternalDeviceHost>().ToArray();
         }
 
@@ -51,9 +53,8 @@ namespace CK.DeviceModel
         internal void Signal()
         {
             var s = _signal;
-            _signal = new TaskCompletionSource<bool>();
-            // This ensures that the Loop doesn't run on this thread. 
-            Task.Run( () => s.TrySetResult( true ) );
+            _signal = new TaskCompletionSource<bool>( TaskCreationOptions.RunContinuationsAsynchronously );
+            s.TrySetResult( true );
         }
 
         async Task TheLoop()
@@ -94,6 +95,7 @@ namespace CK.DeviceModel
                     }
                 }
             }
+            _daemonMonitor.MonitorEnd();
         }
 
         Task IHostedService.StopAsync( CancellationToken cancellationToken )
@@ -102,7 +104,7 @@ namespace CK.DeviceModel
             {
                 Debug.Assert( _daemonMonitor != null );
                 _run.Cancel();
-                _daemonMonitor.MonitorEnd();
+                Signal();
             }
             return Task.CompletedTask;
         }

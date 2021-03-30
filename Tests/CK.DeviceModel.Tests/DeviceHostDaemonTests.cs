@@ -122,12 +122,13 @@ namespace CK.DeviceModel.Tests
             Debug.Assert( d != null );
             d.IsRunning.Should().BeTrue();
 
-            await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true );
-            d.IsRunning.Should().BeFalse();
-
-            await Task.Delay( 20 );
-
-            d.IsRunning.Should().BeTrue();
+            (await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true )).Should().BeTrue();
+            // It can be so fast (in release) that the device has already restarted here.
+            if( !d.IsRunning )
+            {
+                await Task.Delay( 20 );
+                d.IsRunning.Should().BeTrue();
+            }
 
             await ((IHostedService)daemon).StopAsync( default );
         }
@@ -218,6 +219,7 @@ namespace CK.DeviceModel.Tests
 
 
             await ((IHostedService)daemon).StopAsync( default );
+            await host.ClearAsync( TestHelper.Monitor );
         }
 
         [Test]
@@ -259,13 +261,13 @@ namespace CK.DeviceModel.Tests
                 await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true );
             }
             TestHelper.Monitor.Trace( "*** Wait ***" );
-            await Task.Delay( 210 );
+            await Task.Delay( 300 );
             TestHelper.Monitor.Trace( "*** EndWait ***" );
             devices.Count( d => d.IsRunning ).Should().Be( 3 );
             devices.Where( d => d.IsRunning ).Select( d => d.Name ).Concatenate().Should().Be( "D1, D1, D1" );
  
             TestHelper.Monitor.Debug( "*** Wait ***" );
-            await Task.Delay( 210 );
+            await Task.Delay( 300 );
             devices.Count( d => d.IsRunning ).Should().Be( 6 );
 
             // Must destroy the cameras because they are counted!
@@ -273,6 +275,10 @@ namespace CK.DeviceModel.Tests
             await host2.Find( "D*2" )!.DestroyAsync( TestHelper.Monitor );
 
             await ((IHostedService)daemon).StopAsync( default );
+
+            await host1.ClearAsync( TestHelper.Monitor );
+            await host2.ClearAsync( TestHelper.Monitor );
+            await host3.ClearAsync( TestHelper.Monitor );
         }
     }
 }
