@@ -73,7 +73,15 @@ namespace CK.DeviceModel
             return SendRoutedCommand( command, token, false );
         }
 
-        internal bool SendRoutedCommand( BaseDeviceCommand command, CancellationToken token, bool checkControllerKey )
+        /// <summary>
+        /// Sends the given command directly in the waiting queue.
+        /// This is to be used for low level internal commands, typically initiated by timers.
+        /// </summary>
+        /// <param name="command">The command to send without any checks.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <param name="checkControllerKey">Optionally checks the ControllerKey.</param>
+        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
+        internal protected bool SendRoutedCommand( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
         {
             return _commandQueue.Writer.TryWrite( (command, token, checkControllerKey ) );
         }
@@ -92,7 +100,15 @@ namespace CK.DeviceModel
             return SendRoutedCommandImmediate( command, token, false );
         }
 
-        internal bool SendRoutedCommandImmediate( BaseDeviceCommand command, CancellationToken token, bool checkControllerKey )
+        /// <summary>
+        /// Sends the given command directly for immediate execution.
+        /// This is to be used for low level internal commands, typically initiated by timers.
+        /// </summary>
+        /// <param name="command">The command to send without any checks.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <param name="checkControllerKey">Optionally checks the ControllerKey.</param>
+        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
+        internal protected bool SendRoutedCommandImmediate( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
         {
             return _commandQueueImmediate.Writer.TryWrite( (command, token, checkControllerKey) ) && _commandQueue.Writer.TryWrite( (_commandAwaker, default, false) );
         }
@@ -154,13 +170,13 @@ namespace CK.DeviceModel
                     Debug.Assert( currentlyExecuting != null );
                     using( _commandMonitor.OpenError( $"Unhandled error in '{FullName}' while processing '{currentlyExecuting.GetType().Name}'.", ex ) )
                     {
+                        if( !currentlyExecuting.InternalCompletion.TrySetException( ex ) )
+                        {
+                            _commandMonitor.Warn( $"Command has already been completed. Unable to set the error." );
+                        }
                         bool mustStop = true;
                         try
                         {
-                            if( !currentlyExecuting.InternalCompletion.TrySetException( ex ) )
-                            {
-                                _commandMonitor.Warn( $"Command has already been completed. Unable to set the error." );
-                            }
                             mustStop = await OnCommandErrorAsync( _commandMonitor, currentlyExecuting, ex ).ConfigureAwait( false );
                         }
                         catch( Exception ex2 )
@@ -169,7 +185,9 @@ namespace CK.DeviceModel
                         }
                         if( mustStop && IsRunning )
                         {
-                            await StopAsync( _commandMonitor, ignoreAlwaysRunning: true ).ConfigureAwait( false );
+                            // Fires and forget the StopCommand: the fact that the device stops
+                            // does not belong to the faulty command plan.
+                            _ = StopAsync( _commandMonitor, ignoreAlwaysRunning: true );
                         }
                     }
                 }
