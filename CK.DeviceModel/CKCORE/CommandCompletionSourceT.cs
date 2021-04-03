@@ -7,54 +7,21 @@ namespace CK.Core
 {
     /// <summary>
     /// This is a <see cref="TaskCompletionSource{TResult}"/>-like object that allows exceptions or cancellations
-    /// to be transformed into special results: see <see cref="IgnoreCanceled"/> and <see cref="IgnoreException"/>.
+    /// to be ignored (see <see cref="IAsyncCommand{TResult}"/> OnError and OnCanceled protected methods).
     /// </summary>
     public class CommandCompletionSource<TResult> : ICommandCompletionSource
     {
         readonly TaskCompletionSource<TResult> _tcs;
-        readonly Func<Exception,TResult>? _errorTransform;
-        readonly TResult? _cancelResult;
+        readonly IAsyncCommand<TResult> _command;
         byte _state;
 
         /// <summary>
-        /// Creates a <see cref="CommandCompletionSource{TResult}"/> that keeps the exception object
-        /// and the canceled state in the <see cref="Task"/>.
+        /// Creates a <see cref="CommandCompletionSource{TResult}"/>.
         /// </summary>
-        public CommandCompletionSource() => _tcs = new TaskCompletionSource<TResult>( TaskCreationOptions.RunContinuationsAsynchronously );
-
-        /// <summary>
-        /// Creates a <see cref="CommandCompletionSource"/> that transforms any exception or cancellation into
-        /// a specific result in the <see cref="Task"/>: the Task will always be <see cref="TaskStatus.RanToCompletion"/>.
-        /// </summary>
-        /// <param name="errorOrCancelResult">Result that will replace error or cancellation.</param>
-        public CommandCompletionSource( TResult errorOrCancelResult )
+        public CommandCompletionSource( IAsyncCommand<TResult> command )
         {
             _tcs = new TaskCompletionSource<TResult>( TaskCreationOptions.RunContinuationsAsynchronously );
-            _errorTransform = _ => errorOrCancelResult;
-            _cancelResult = errorOrCancelResult;
-            _state = 3;
-        }
-
-        /// <summary>
-        /// Creates a <see cref="CommandCompletionSource"/> that can transform any exception or cancellation into
-        /// specific results in the <see cref="Task"/>: the Task will always be <see cref="TaskStatus.RanToCompletion"/>.
-        /// </summary>
-        /// <param name="transformError">Optional transformation from the error to a result.</param>
-        /// <param name="ignoreCanceled">True to transform cancellation into <paramref name="ignoreCanceled"/> result value.</param>
-        /// <param name="cancelResult">The result to use on cancellation. Used only is <paramref name="ignoreCanceled"/> is true.</param>
-        public CommandCompletionSource( Func<Exception, TResult>? transformError, bool ignoreCanceled, TResult cancelResult )
-        {
-            _tcs = new TaskCompletionSource<TResult>( TaskCreationOptions.RunContinuationsAsynchronously );
-            if( transformError != null )
-            {
-                _errorTransform = transformError;
-                _state = 1;
-            }
-            if( ignoreCanceled )
-            {
-                _cancelResult = cancelResult;
-                _state |= 2;
-            }
+            _command = command ?? throw new ArgumentNullException( nameof( command ) );
         }
 
         /// <summary>
@@ -65,22 +32,16 @@ namespace CK.Core
         Task ICommandCompletion.Task => _tcs.Task;
 
         /// <inheritdoc />
-        public bool IgnoreException => (_state & 1) != 0;
+        public bool IsCompleted => _state != 0;
 
         /// <inheritdoc />
-        public bool IgnoreCanceled => (_state & 2) != 0;
+        public bool HasSucceed => (_state & 1) != 0;
 
         /// <inheritdoc />
-        public bool IsCompleted => (_state & (4 | 8 | 16)) != 0;
+        public bool HasFailed => (_state & 2) != 0;
 
         /// <inheritdoc />
-        public bool IsSuccessful => (_state & 4) != 0;
-
-        /// <inheritdoc />
-        public bool IsError => (_state & 8) != 0;
-
-        /// <inheritdoc />
-        public bool IsCanceled => (_state & 16) != 0;
+        public bool HasBeenCanceled => (_state & 4) != 0;
 
         /// <summary>
         /// Transitions the <see cref="Task"/> into the <see cref="TaskStatus.RanToCompletion"/> state.
@@ -91,7 +52,7 @@ namespace CK.Core
         public void SetResult( TResult result )
         {
             _tcs.SetResult( result );
-            _state |= 4;
+            _state |= 1;
         }
 
         /// <summary>
@@ -105,61 +66,201 @@ namespace CK.Core
         {
             if( _tcs.TrySetResult( result ) )
             {
-                _state |= 4;
+                _state |= 1;
                 return true;
             }
             return false;
         }
 
+        /// <summary>
+        /// Enables <see cref="IAsyncCommand{TResult}"/> OnError to
+        /// transform exceptions into successful or canceled completion.
+        /// </summary>
+        public ref struct OnError
+        {
+            readonly CommandCompletionSource<TResult> _c;
+            internal bool Try;
+            internal bool Called;
+
+            internal OnError( CommandCompletionSource<TResult> c, bool t )
+            {
+                _c = c;
+                Try = t;
+                Called = false;
+            }
+
+            /// <summary>
+            /// Sets (or tries to set if <see cref="CommandCompletionSource.TrySetException(Exception)"/> has been called)
+            /// the exception.
+            /// The default <see cref="IAsyncCommand{TResult}"/> OnError method calls this method.
+            /// </summary>
+            /// <param name="ex">The exception to set.</param>
+            public void SetException( Exception ex )
+            {
+                if( Called ) throw new InvalidOperationException( "OnError methods must be called only once." );
+                Called = true;
+                if( Try )
+                {
+                    Try = _c._tcs.TrySetException( ex );
+                }
+                else
+                {
+                    _c._tcs.SetException( ex );
+                }
+            }
+
+            /// <summary>
+            /// Sets (or tries to set if <see cref="CommandCompletionSource{TResult}.TrySetException(Exception)"/> has been called)
+            /// a successful completion instead of an error.
+            /// <para>
+            /// Note that the <see cref="CommandCompletionSource{TResult}.HasFailed"/> will be true: the fact that the command
+            /// did not properly complete is available.
+            /// </para>
+            /// </summary>
+            public void SetResult( TResult result )
+            {
+                if( Called ) throw new InvalidOperationException( "OnError methods must be called only once." );
+                Called = true;
+                if( Try )
+                {
+                    Try = _c._tcs.TrySetResult( result );
+                }
+                else
+                {
+                    _c._tcs.SetResult( result );
+                }
+            }
+
+            /// <summary>
+            /// Sets (or tries to set if <see cref="CommandCompletionSource{TResult}.TrySetException(Exception)"/> has been called)
+            /// a cancellation completion instead of an error.
+            /// <para>
+            /// Note that the <see cref="CommandCompletionSource{TResult}.HasFailed"/> will be true: the fact that the command
+            /// did not properly complete is available.
+            /// </para>
+            /// </summary>
+            public void SetCanceled()
+            {
+                if( Called ) throw new InvalidOperationException( "OnError methods must be called only once." );
+                Called = true;
+                if( Try )
+                {
+                    Try = _c._tcs.TrySetCanceled();
+                }
+                else
+                {
+                    _c._tcs.SetCanceled();
+                }
+            }
+
+        }
+
         /// <inheritdoc />
         public void SetException( Exception exception )
         {
-            if( IgnoreException )
-            {
-                _tcs.SetResult( _errorTransform!( exception ) );
-            }
-            else
-            {
-                _tcs.SetException( exception );
-            }
-            _state |= 8;
+            var o = new OnError( this, false );
+            _command.OnError( exception, ref o );
+            if( !o.Called ) throw new InvalidOperationException( "One of the OnError methods must be called." );
+            _state |= 2;
         }
 
         /// <inheritdoc />
         public bool TrySetException( Exception exception )
         {
-            bool r = IgnoreException ? _tcs.TrySetResult( _errorTransform!( exception ) ) : _tcs.TrySetException( exception );
-            if( r ) _state |= 8;
-            return r;
+            var o = new OnError( this, true );
+            _command.OnError( exception, ref o );
+            if( !o.Called ) throw new InvalidOperationException( "One of the OnError methods must be called." );
+            if( o.Try ) _state |= 2;
+            return o.Try;
+        }
+
+        /// <summary>
+        /// Enables <see cref="IAsyncCommand{TResult}"/> OnCanceled method to
+        /// transform exceptions into successful or canceled completion.
+        /// </summary>
+        public ref struct OnCanceled
+        {
+            readonly CommandCompletionSource<TResult> _c;
+            internal bool Try;
+            internal bool Called;
+
+            internal OnCanceled( CommandCompletionSource<TResult> c, bool t )
+            {
+                _c = c;
+                Try = t;
+                Called = false;
+            }
+
+            /// <summary>
+            /// Sets (or tries to set if <see cref="CommandCompletionSource{TResult}.TrySetCanceled()"/> has been called)
+            /// a successful instead of a cancellation completion.
+            /// <para>
+            /// Note that the <see cref="CommandCompletionSource{TResult}.HasBeenCanceled"/> will be true: the fact that the command
+            /// has been canceled is available.
+            /// </para>
+            /// </summary>
+            public void SetResult( TResult result )
+            {
+                if( Called ) throw new InvalidOperationException( "OnCanceled methods must be called only once." );
+                Called = true;
+                if( Try )
+                {
+                    Try = _c._tcs.TrySetResult( result );
+                }
+                else
+                {
+                    _c._tcs.SetResult( result );
+                }
+            }
+
+            /// <summary>
+            /// Sets (or tries to set if <see cref="CommandCompletionSource{TResult}.TrySetCanceled()"/> has been called)
+            /// the cancellation completion.
+            /// The default <see cref="IAsyncCommand{TResult}"/> OnCanceled method calls this method.
+            /// <para>
+            /// Note that the <see cref="CommandCompletionSource{TResult}.HasBeenCanceled"/> will be true: the fact that the command
+            /// has been canceled is available.
+            /// </para>
+            /// </summary>
+            public void SetCanceled()
+            {
+                if( Called ) throw new InvalidOperationException( "OnCanceled methods must be called only once." );
+                Called = true;
+                if( Try )
+                {
+                    Try = _c._tcs.TrySetCanceled();
+                }
+                else
+                {
+                    _c._tcs.SetCanceled();
+                }
+            }
         }
 
         /// <inheritdoc />
         public void SetCanceled()
         {
-            if( IgnoreCanceled )
-            {
-                _tcs.SetResult( _cancelResult! );
-            }
-            else
-            {
-                _tcs.SetCanceled();
-            }
-            _state |= 16;
+            var o = new OnCanceled( this, false );
+            _command.OnCanceled( ref o );
+            if( !o.Called ) throw new InvalidOperationException( "One of the OnCanceled methods must be called." );
+            _state |= 4;
         }
 
         /// <inheritdoc />
         public bool TrySetCanceled()
         {
-            bool r = IgnoreCanceled ? _tcs.TrySetResult( _cancelResult! ) : _tcs.TrySetCanceled();
-            if( r ) _state |= 16;
-            return r;
+            var o = new OnCanceled( this, true );
+            _command.OnCanceled( ref o );
+            if( !o.Called ) throw new InvalidOperationException( "One of the OnCanceled methods must be called." );
+            if( o.Try ) _state |= 4;
+            return o.Try;
         }
 
         /// <summary>
-        /// Overridden to return the current status and configuration.
+        /// Overridden to return the current completion status.
         /// </summary>
-        /// <returns>The current status and configuration.</returns>
-        public override string ToString() => CommandCompletionSource.GetStatus( _state );
+        /// <returns>The current status.</returns>
+        public override string ToString() => CommandCompletionSource.GetStatus( Task.Status, _state );
 
     }
 }

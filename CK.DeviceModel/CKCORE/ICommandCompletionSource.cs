@@ -9,21 +9,25 @@ namespace CK.Core
     public interface ICommandCompletionSource : ICommandCompletion
     {
         /// <summary>
-        /// Transitions the <see cref="Task"/> into the <see cref="TaskStatus.Faulted"/> state or into the <see cref="TaskStatus.RanToCompletion"/>
-        /// if <see cref="ICommandCompletion.IgnoreCanceled"/> is true.
-        /// An <see cref="InvalidOperationException"/> is thrown if Task is already in one of the three final
-        /// states: <see cref="TaskStatus.RanToCompletion"/>, <see cref="TaskStatus.Faulted"/> or <see cref="TaskStatus.Canceled"/>.
+        /// Transitions the <see cref="ICommandCompletion.Task"/> into the <see cref="TaskStatus.Faulted"/> state (this
+        /// can be changed by the command's overridden <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation).
         /// <para>
-        /// On success, <see cref="ICommandCompletion.IsError"/> is set to true.
+        /// An <see cref="InvalidOperationException"/> is thrown if Task is already in one of the three final
+        /// states (<see cref="TaskStatus.RanToCompletion"/>, <see cref="TaskStatus.Faulted"/> or <see cref="TaskStatus.Canceled"/>)00.
+        /// </para>
+        /// <para>
+        /// Note that, on success, <see cref="ICommandCompletion.HasFailed"/> is set to true, regardless of any alteration of
+        /// the Task's result by Command's <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation.
         /// </para>
         /// </summary>
         void SetException( Exception exception );
 
         /// <summary>
-        /// Attempts to transition the underlying Task into the <see cref="TaskStatus.Faulted"/> state or into the <see cref="TaskStatus.RanToCompletion"/>
-        /// if <see cref="ICommandCompletion.IgnoreException"/> is true.
+        /// Attempts to transition the <see cref="ICommandCompletion.Task"/> into the <see cref="TaskStatus.Faulted"/> state (this
+        /// can be changed by the command's overridden <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation).
         /// <para>
-        /// On success, <see cref="ICommandCompletion.IsError"/> is set to true.
+        /// Note that, on success, <see cref="ICommandCompletion.HasFailed"/> is set to true, regardless of any alteration of
+        /// the Task's result by Command's <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation.
         /// </para>
         /// </summary> 
         /// <returns>
@@ -32,21 +36,25 @@ namespace CK.Core
         bool TrySetException( Exception exception );
 
         /// <summary>
-        /// Transitions the underlying Task into the <see cref="TaskStatus.Canceled"/> state or into the <see cref="TaskStatus.RanToCompletion"/>
-        /// if <see cref="ICommandCompletion.IgnoreCanceled"/> is true.
-        /// An <see cref="InvalidOperationException"/> is thrown if Task is already in one of the three final
-        /// states: <see cref="TaskStatus.RanToCompletion"/>, <see cref="TaskStatus.Faulted"/> or <see cref="TaskStatus.Canceled"/>.
+        /// Transitions the <see cref="ICommandCompletion.Task"/> into the <see cref="TaskStatus.Canceled"/> state (this can
+        /// be changed by the command's overridden <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation).
         /// <para>
-        /// On success, <see cref="ICommandCompletion.IsCanceled"/> is set to true.
+        /// An <see cref="InvalidOperationException"/> is thrown if Task is already in one of the three final
+        /// states (<see cref="TaskStatus.RanToCompletion"/>, <see cref="TaskStatus.Faulted"/> or <see cref="TaskStatus.Canceled"/>)00.
+        /// </para>
+        /// <para>
+        /// Note that, on success, <see cref="ICommandCompletion.HasBeenCanceled"/> is set to true, regardless of any alteration of
+        /// the Task's result by Command's <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation.
         /// </para>
         /// </summary>
         void SetCanceled();
 
         /// <summary>
-        /// Attempts to transition the underlying Task into the <see cref="TaskStatus.Canceled"/> state or into the <see cref="TaskStatus.RanToCompletion"/>
-        /// if <see cref="ICommandCompletion.IgnoreCanceled"/> is true.
+        /// Attempts to transition the <see cref="ICommandCompletion.Task"/> into the <see cref="TaskStatus.Canceled"/> state (this can
+        /// be changed by the command's overridden <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation).
         /// <para>
-        /// On success, <see cref="ICommandCompletion.IsCanceled"/> is set to true.
+        /// Note that, on success, <see cref="ICommandCompletion.HasBeenCanceled"/> is set to true, regardless of any alteration of
+        /// the Task's result by Command's <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/> implementation.
         /// </para>
         /// </summary>
         /// <returns>
