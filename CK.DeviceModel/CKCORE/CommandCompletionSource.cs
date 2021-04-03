@@ -14,6 +14,11 @@ namespace CK.Core
     /// errors or cancellations into specific results.
     /// It's much more useful than this one, but for the sake of symmetry, this "no result" class exposes the same functionalities.
     /// </para>
+    /// <para>
+    /// By design, the command is not exposed by the completion. This can be easily done without changing this base implementation:
+    /// simply create a generic CommandCompletion&lt;TCommand&gt; where TCommand is IAsyncCommand and expose the protected AsyncCommand
+    /// property as the TCommand Command property.
+    /// </para>
     /// </summary>
     public class CommandCompletionSource : ICommandCompletionSource
     {
@@ -32,6 +37,11 @@ namespace CK.Core
             _tcs = new TaskCompletionSource<object?>( TaskCreationOptions.RunContinuationsAsynchronously );
             _command = command ?? throw new ArgumentNullException( nameof(command) );
         }
+
+        /// <summary>
+        /// Gets the command that holds this completion.
+        /// </summary>
+        protected IAsyncCommand AsyncCommand => _command;
 
         /// <inheritdoc />
         public Task Task => _tcs.Task;

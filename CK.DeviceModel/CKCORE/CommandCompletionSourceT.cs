@@ -26,6 +26,12 @@ namespace CK.Core
         }
 
         /// <summary>
+        /// Gets the command that holds this completion.
+        /// See note in <see cref="CommandCompletionSource"/>.
+        /// </summary>
+        protected IAsyncCommand<TResult> AsyncCommand => _command;
+
+        /// <summary>
         /// Gets the task that will be resolved when the command completes.
         /// </summary>
         public Task<TResult> Task => _tcs.Task;
