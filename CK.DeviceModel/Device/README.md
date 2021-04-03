@@ -1,102 +1,56 @@
-# Device & StdDevice
+# Device
 
-The device base class that should be used is the StdDevice. Its implementation has been
-split into two parts: the base device is only responsible of the device life cycle and
-the StdDevice extends it to support commands (sync to async adaptation and command/result correlation).
+Devices support commands (sync to async adaptation and command/result correlation).
 
 ## Device
 A device basically exposes its [IDevice](IDevice.cs) interface that publishes its status ([DeviceStatus](DeviceStatus.cs)
 and [DeviceConfigurationStatus](../DeviceConfigurationStatus.cs) and a StatusChanged event), exposes its FullName and its
-current controller key and supports asynchronous Start, Stop and ExecuteCommand methods.
-Configuration (and dynamic reconfiguration) is handled by the [IDeviceHost](../Host/IDeviceHost.cs).
+current controller key and supports asynchronous Start, Stop, Reconfigure, Destroy and SendCommand methods.
+Configuration (and dynamic reconfiguration) is handled by its [IDeviceHost](../Host/IDeviceHost.cs).
 
-The Device implementation handles the nitty-gritty details of device life cycle but doesn't provide
-any implementation for really safe asynchronous command handling, independent monitoring or any events
-other than StatusChanged: this is the job of the StdDevice base class.
+The Device implementation handles the nitty-gritty details of device life cycle and provide
+any implementation for really safe asynchronous command handling and independent monitoring thanks to an internal asynchronous loop.
 
 Specialized devices must provide implementations for:
 
 ```csharp
 protected abstract Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason );
 protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
+protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
 protected abstract Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason );
 protected abstract Task DoDestroyAsync( IActivityMonitor monitor );
 ```
 
-They can add any number of specific methods: they can be seen as multiple instances of  [IHostedService](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.hosting.ihostedservice)
-that support dynamic reconfiguration.
+## Commands
 
-Regarding Commands, the support is minimalist. [DeviceCommand](../Command/DeviceCommand.cs) or [DeviceCommand<TResult>](../Command/DeviceCommandT.cs) can
-be submitted to the host (and are routed to the target device thanks to the `DeviceCommand.DeviceName`) or directly to the device (see the 4 `(Unsafe)ExecuteCommandAsync`
-methods on [IDevice](IDevice.cs)).
+Devices can support any number of specific methods (devices can be seen as multiple instances of micro [IHostedService](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.hosting.ihostedservice)
+that support dynamic reconfiguration), but their implementations SHOULD only be helpers that send Commands.
 
-The 2 final handlers available are minimal placeholders that should be overridden:
+> Any device implementation MUST rely on Commands. This is the only way to prevent concurrency issues.
 
-```csharp
-/// <summary>
-/// Calls <see cref="ExecuteBasicControlDeviceCommandAsync"/> if the <paramref name="command"/> is a <see cref="BasicControlDeviceCommand"/>
-/// otherwise, since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
-/// <para>
-/// The <paramref name="command"/> object that is targeted to this device (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/>
-/// and <see cref="DeviceCommand.ControllerKey"/> is either null or match the current <see cref="ControllerKey"/>).
-/// </para>
-/// </summary>
-/// <param name="monitor">The monitor to use.</param>
-/// <param name="command">The command to handle.</param>
-/// <param name="token">Cancellation token.</param>
-/// <returns>The awaitable.</returns>
-protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token )
-{
-    if( command is BasicControlDeviceCommand b )
-    {
-        return ExecuteBasicControlDeviceCommandAsync( monitor, b );
-    }
-    else
-    {
-        throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
-    }
-}
-
-/// <summary>
-/// Since all commands should be handled, this default implementation systematically throws a <see cref="ArgumentException"/>.
-/// <para>
-/// The <paramref name="command"/> object that is targeted to this device (<see cref="DeviceCommand.DeviceName"/> matches <see cref="IDevice.Name"/>
-/// and <see cref="DeviceCommand.ControllerKey"/> is either null or match the current <see cref="ControllerKey"/>).
-/// </para>
-/// </summary>
-/// <param name="monitor">The monitor to use.</param>
-/// <param name="command">The command to handle.</param>
-/// <param name="token">Cancellation token.</param>
-/// <returns>The command's result.</returns>
-protected virtual Task<TResult> DoHandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token )
-{
-    throw new ArgumentException( $"Unhandled command {command.GetType().Name}.", nameof( command ) );
-}
-```
-
-The only command that is define at the Device level is the `BasicControlDeviceCommand` that can trigger the 3 [basic
-operations](../Command/BasicControlDeviceOperation.cs).
-
-## StdDevice
-
-The [StdDevice](../StdDevice/StdDevice.cs) extends the device to better support the Command pattern. Key features are:
+Key features of the Commands support are:
 
 - Command execution is serialized thanks to an internally managed asynchronous command loop with its own ActivityMonitor and 
 a [channel](https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels).
-- Commands can generate a result (see [DeviceCommand<TResult>](../Command/DeviceCommandT.cs)) or not.
-- Commands can be awaited (via the device's `(Unsafe)ExecuteCommandAsync` methods or the host) or not (via the `StdDevice.SendCommand` method).
-- Commands that are handled while the device is stopped can be considered as errors, be canceled, still be executed or deferred until the device
- starts again (see the [StoppedBehavior enumeration](../StdDevice/StdDevice.StoppedBehavior.cs).
+- Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](../Command/DeviceCommandT.cs)) or not.
+- Commands completion MUST be signaled explicitly.
+- Commands may transform errors or cancellation into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseReconfigureDeviceCommand.cs)
+is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
+- Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
+ starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs).
 
-The 2 base `DoHandleCommandAsync` methods are sealed and replaced by 2 new abstract methods and a few other methods are available:
+More on Commands [here](../Command).
 
-```csharp
-public bool SendCommand( IActivityMonitor monitor, DeviceCommand command, CancellationToken token = default ) { ... }
-protected abstract Task HandleCommandAsync( IActivityMonitor monitor, DeviceCommand command, CancellationToken token );
-protected abstract Task<TResult> HandleCommandAsync<TResult>( IActivityMonitor monitor, DeviceCommand<TResult> command, CancellationToken token );
-protected virtual StoppedBehavior OnStoppedDeviceCommand( ActivityMonitor monitor, DeviceCommand command ) => _stoppedBehavior;
-protected virtual Task<bool> OnCommandErrorAsync( ActivityMonitor monitor, DeviceCommand command, Exception ex ) => Task.FromResult( true );
-```
+## Runtime properties & Configuration properties
 
+Nothing prevents a device to expose properties. In such case, maximal care should be taken to handle concurrency. A good approach
+is to expose only read-only properties and only update them through Commands.
 
+If a configuration property must be exposed that is on the [DeviceConfiguration](../DeviceConfiguration.cs) must be exposed, it should
+be read-only and updated by the (re)configuration.
+
+Devices don't expose a `ConfigurationChanged` event (note that devices don't expose their Configuration object).
+This is on purpose: devices only expose the `StatusChanged` event that covers the device's lifetime status and configuration.
+
+Any specific configuration properties can be handled explicitly with dedicated events and/or read-only properties on the device if needed.
 

@@ -13,16 +13,11 @@ namespace CK.DeviceModel
     /// This class cannot be directly specialized: the generic <see cref="DeviceCommand{THost}"/>
     /// must be used.
     /// </summary>
-    public abstract class DeviceCommandNoResult : BaseDeviceCommand
+    public abstract class DeviceCommandNoResult : BaseDeviceCommand, IAsyncCommand
     {
         private protected DeviceCommandNoResult()
         {
-            Completion = new CommandCompletionSource();
-        }
-
-        private protected DeviceCommandNoResult( bool ignoreException, bool ignoreCanceled )
-        {
-            Completion = new CommandCompletionSource( ignoreException, ignoreCanceled );
+            Completion = new CommandCompletionSource( this );
         }
 
         /// <summary>

@@ -69,8 +69,7 @@ namespace CK.DeviceModel.Configuration.Tests
         {
             public static CameraHost? TestInstance;
 
-            public CameraHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
-                : base( alwaysRunningPolicy )
+            public CameraHost()
             {
                 TestInstance = this;
             }
@@ -127,8 +126,7 @@ namespace CK.DeviceModel.Configuration.Tests
         {
             public static LightControllerHost? Instance;
 
-            public LightControllerHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
-                : base( alwaysRunningPolicy )
+            public LightControllerHost()
             {
                 Instance = this;
             }

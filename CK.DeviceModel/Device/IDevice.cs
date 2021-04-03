@@ -96,7 +96,8 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="cancelQueuedCommands">Cancels the current command queue.</param>
         /// <param name="cancelDeferredCommands">Cancels deferred commands waiting for the device to be running.</param>
-        void CancelAllPendingCommands( IActivityMonitor monitor, bool cancelQueuedCommands, bool cancelDeferredCommands );
+        /// <returns>The number of waiting commands and deferred commands that have been canceled.</returns>
+        (int,int) CancelAllPendingCommands( IActivityMonitor monitor, bool cancelQueuedCommands, bool cancelDeferredCommands );
 
         /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.

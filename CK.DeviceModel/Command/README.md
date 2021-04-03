@@ -3,7 +3,7 @@
 All device commands must inherit from [DeviceCommand](DeviceCommand&lt;THost&gt;.cs) or [DeviceCommand&lt;THost,TResult&gt;](DeviceCommandT.cs)
 if the command generates a result.
 
-Commands are sent a a device and are executed asynchronously by each device's command loop: developers are isolated from
+Commands are sent to a device and are executed asynchronously by each device's command loop: developers are isolated from
 any concurrency issues since all commands (including the [5 basic commands](Basic)) are handled sequentially.
 
 ## Command sending
@@ -55,7 +55,7 @@ By default, commands are queued and are executed one after the others: there is 
 the command immediately (after having wait for the end of the currently executing command).
 Once the immediate command is executed, queued commands continue to execute.
 
-Think to this *immediate* as a high priority queue (it's actually implemented this way).
+Think to this *immediate* as a higher priority queue.
 
 > The 5 [basic `IDevice` methods](Basic) (`SetControllerKeyAsync`, `StartAsync`, `StopAsync`, `ReconfigureAsync`
 >  and `DestroyAsync`) are just helpers that send such immediate commands.
@@ -101,8 +101,4 @@ or `DeviceCommandWithResult<TResult>.Completion` is eventually resolved
 by calling `SetResult`, `SetCanceled` or `SetException` on the Completion otherwise the caller 
 may indefinitely wait for the command completion.
 
-
-
-
-![Commands](/../../Common/Doc/Commands.png)
 

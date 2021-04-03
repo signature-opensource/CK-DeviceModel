@@ -13,9 +13,9 @@ can execute them immediately.
 - They all respect the `ControllerKey` optional guard.
 
 Specificities are:
-- [Destroy](BaseDestroyDeviceCommand.cs) has no result and always succeeds.
+- [Destroy](BaseDestroyDeviceCommand.cs) has no result and always succeeds (thanks to the OnError and OnCanceled implementations).
 - [Start](StartDeviceCommand.cs) and [Stop](StopDeviceCommand.cs) are boolean commands. Exceptions or cancellation are transformed into a `false' result.
-- Stop can specify `IgnoreAlwaysRunning` to stop a device even if its configuration state that it must be `AlwaysRunning`.
+- Stop can specify `IgnoreAlwaysRunning` to stop a device even if its configuration state that it must be `AlwaysRunning`. The [daemon](../../Daemon) then enters into play.
 - [ReconfigureDeviceCommand&lt;TConfiguration&gt;](ReconfigureDeviceCommand.cs) is parametrized.
 - [SetControllerKey](SetControllerKeyDeviceCommand.cs) exposes the `NewControllerKey` (in addition to the standard `ControllerKey` guard).
 

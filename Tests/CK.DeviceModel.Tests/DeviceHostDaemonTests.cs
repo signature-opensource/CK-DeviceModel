@@ -58,9 +58,9 @@ namespace CK.DeviceModel.Tests
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(simple_auto_restart) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1, MachineDuration = 200 };
-            var host = new MachineHost( policy );
+            var host = new MachineHost();
 
-            var daemon = new DeviceHostDaemon( new[] { host } );
+            var daemon = new DeviceHostDaemon( new[] { host }, policy );
 
             await ((IHostedService)daemon).StartAsync( default );
             var config = new MachineConfiguration() { Name = "M", Status = DeviceConfigurationStatus.AlwaysRunning };
@@ -111,8 +111,8 @@ namespace CK.DeviceModel.Tests
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(restart_can_be_fast) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 0, MachineDuration = 200 };
-            var host = new MachineHost( policy );
-            var daemon = new DeviceHostDaemon( new[] { host } );
+            var host = new MachineHost();
+            var daemon = new DeviceHostDaemon( new[] { host }, policy );
 
             await ((IHostedService)daemon).StartAsync( default );
             var config = new MachineConfiguration() { Name = "M", Status = DeviceConfigurationStatus.AlwaysRunning };
@@ -139,8 +139,8 @@ namespace CK.DeviceModel.Tests
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_devices_handling) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1, MachineDuration = 1000 };
-            var host = new MachineHost( policy );
-            var daemon = new DeviceHostDaemon( new[] { host } );
+            var host = new MachineHost();
+            var daemon = new DeviceHostDaemon( new[] { host }, policy );
 
             await ((IHostedService)daemon).StartAsync( default );
             var config = new MachineConfiguration() { Name = "M", Status = DeviceConfigurationStatus.AlwaysRunning };
@@ -228,10 +228,10 @@ namespace CK.DeviceModel.Tests
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_hosts_handling) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1 };
-            var host1 = new MachineHost( policy );
-            var host2 = new CameraHost( policy );
-            var host3 = new OtherMachineHost( policy );
-            var daemon = new DeviceHostDaemon( new IDeviceHost[] { host1, host2, host3 } );
+            var host1 = new MachineHost();
+            var host2 = new CameraHost();
+            var host3 = new OtherMachineHost();
+            var daemon = new DeviceHostDaemon( new IDeviceHost[] { host1, host2, host3 }, policy );
 
             await ((IHostedService)daemon).StartAsync( default );
 

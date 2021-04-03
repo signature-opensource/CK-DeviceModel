@@ -13,6 +13,7 @@ namespace CK.DeviceModel.Tests
 
         // A device can keep a reference to the current configuration:
         // this configuration is an independent clone that is accessible only to the Device.
+        // Here we use the 
         CameraConfiguration _configRef;
         readonly PerfectEventSender<Camera,int> _flash;
 
@@ -43,6 +44,19 @@ namespace CK.DeviceModel.Tests
         {
             Interlocked.Decrement( ref TotalRunning );
             return Task.CompletedTask;
+        }
+
+        public async Task<bool> FlashAsync( IActivityMonitor monitor )
+        {
+            var cmd = new FlashCommand();
+            if( !UnsafeSendCommand( monitor, cmd ) )
+            {
+                // The device is destroyed.
+                return false;
+            }
+            // Wait for the command to complete.
+            await cmd.Completion.Task;
+            return true;
         }
 
         protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )

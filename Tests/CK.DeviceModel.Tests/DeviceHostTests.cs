@@ -26,7 +26,7 @@ namespace CK.DeviceModel.Tests
             var config2 = new CameraConfiguration { Name = "Another", Status = DeviceConfigurationStatus.Runnable };
             var config3 = new CameraConfiguration { Name = "YetAnother", Status = DeviceConfigurationStatus.RunnableStarted };
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            var host = new CameraHost();
 
             var hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
             hostConfig.IsPartialConfiguration.Should().BeTrue( "By default a configuration is partial." );
@@ -129,7 +129,7 @@ namespace CK.DeviceModel.Tests
                 return Task.CompletedTask;
             }
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            var host = new CameraHost();
             host.DevicesChanged.Sync += DevicesChanged_Sync;
             host.DevicesChanged.Async += DevicesChanged_Async;
 
@@ -239,7 +239,7 @@ namespace CK.DeviceModel.Tests
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            var host = new CameraHost();
             var d = host.Find( "n°1" );
             d.Should().BeNull();
 
@@ -300,7 +300,7 @@ namespace CK.DeviceModel.Tests
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            var host = new CameraHost();
             var config = new CameraConfiguration()
             {
                 Name = "n°1",
@@ -363,7 +363,7 @@ namespace CK.DeviceModel.Tests
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            var host = new CameraHost();
             var config = new CameraConfiguration()
             {
                 Name = "n°1",

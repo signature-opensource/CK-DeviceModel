@@ -41,6 +41,8 @@ namespace CK.DeviceModel
             /// <summary>
             /// Gets the configuration.
             /// Never null and <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> is necessarily true.
+            /// This configuration is a "safe clone", the external world has no access to it: a reference to it can be
+            /// kept by the device and, even if this would be weird, may safely be altered by the device.
             /// </summary>
             public readonly TConfiguration Configuration;
 

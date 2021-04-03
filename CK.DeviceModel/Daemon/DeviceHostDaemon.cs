@@ -20,6 +20,7 @@ namespace CK.DeviceModel
     public sealed class DeviceHostDaemon : ISingletonAutoService, IHostedService
     {
         readonly IInternalDeviceHost[] _deviceHosts;
+        readonly IDeviceAlwaysRunningPolicy _alwaysRunningPolicy;
         readonly CancellationTokenSource _run;
 
         volatile TaskCompletionSource<bool> _signal;
@@ -29,13 +30,15 @@ namespace CK.DeviceModel
         /// Initializes a new <see cref="DeviceHostDaemon"/>.
         /// </summary>
         /// <param name="deviceHosts">The available device hosts.</param>
-        public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts )
+        /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
+        public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
         {
             _run = new CancellationTokenSource();
             // See here https://stackoverflow.com/questions/28321457/taskcontinuationoptions-runcontinuationsasynchronously-and-stack-dives
             // why RunContinuationsAsynchronously is crucial.
             _signal = new TaskCompletionSource<bool>( TaskCreationOptions.RunContinuationsAsynchronously );
            _deviceHosts = deviceHosts.Cast<IInternalDeviceHost>().ToArray();
+            _alwaysRunningPolicy = alwaysRunningPolicy ?? throw new ArgumentNullException( nameof( alwaysRunningPolicy ) );
         }
 
         Task IHostedService.StartAsync( CancellationToken cancellationToken )
@@ -74,7 +77,7 @@ namespace CK.DeviceModel
                     long wait = Int64.MaxValue;
                     foreach( var h in _deviceHosts )
                     {
-                        var delta = await h.DaemonCheckAlwaysRunningAsync( _daemonMonitor, now );
+                        var delta = await h.DaemonCheckAlwaysRunningAsync( _daemonMonitor, _alwaysRunningPolicy, now );
                         Debug.Assert( delta > 0 );
                         if( wait > delta ) wait = delta;
                     }

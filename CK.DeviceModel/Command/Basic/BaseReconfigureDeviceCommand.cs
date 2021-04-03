@@ -8,12 +8,23 @@ namespace CK.DeviceModel
     /// must be used.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract class BaseReconfigureDeviceCommand<TConfiguration> : DeviceCommandWithResult<DeviceApplyConfigurationResult>
+    public abstract class BaseReconfigureDeviceCommand<TConfiguration> : DeviceCommandWithResult<DeviceApplyConfigurationResult>,
+                                                                         IAsyncCommand<DeviceApplyConfigurationResult>
         where TConfiguration : DeviceConfiguration
     {
         private protected BaseReconfigureDeviceCommand()
-            : base( OnError, true, DeviceApplyConfigurationResult.ConfigurationCanceled )
         {
+        }
+
+        void IAsyncCommand<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CommandCompletionSource<DeviceApplyConfigurationResult>.OnError result )
+        {
+            if( ex is InvalidControllerKeyException ) result.SetResult( DeviceApplyConfigurationResult.InvalidControllerKey );
+            else result.SetResult( DeviceApplyConfigurationResult.UnexpectedError );
+        }
+
+        void IAsyncCommand<DeviceApplyConfigurationResult>.OnCanceled( ref CommandCompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
+        {
+            result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
         }
 
         static DeviceApplyConfigurationResult OnError( Exception ex ) => ex switch

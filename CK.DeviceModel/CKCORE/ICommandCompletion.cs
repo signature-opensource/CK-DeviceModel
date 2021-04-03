@@ -15,6 +15,14 @@ namespace CK.Core
         Task Task { get; }
 
         /// <summary>
+        /// Gets the exception data if an exception has been set.
+        /// Just like <see cref="HasFailed"/> and <see cref="HasBeenCanceled"/>, this is independent
+        /// of any error transformation applied by the <see cref="IAsyncCommand"/> or <see cref="IAsyncCommand{TResult}"/>
+        /// OnError implemented method: it is always captured and available if an exception has been set.
+        /// </summary>
+        CKExceptionData? Exception { get; }
+
+        /// <summary>
         /// Gets whether the command completed.
         /// </summary>
         bool IsCompleted { get; }

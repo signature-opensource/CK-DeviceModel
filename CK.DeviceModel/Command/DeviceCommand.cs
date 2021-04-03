@@ -17,17 +17,6 @@ namespace CK.DeviceModel
         {
         }
 
-        /// <summary>
-        /// Initializes a new <see cref="DeviceCommand{THost}"/> thats ignores errors or cancellation.
-        /// See <see cref="CommandCompletionSource"/>.
-        /// </summary>
-        /// <param name="ignoreException">True to ignore errors.</param>
-        /// <param name="ignoreCanceled">True to ignore cancellation.</param>
-        protected DeviceCommand( bool ignoreException, bool ignoreCanceled )
-            : base( ignoreException, ignoreCanceled )
-        {
-        }
-
         /// <inheritdoc />
         public sealed override Type HostType => typeof(THost);
 

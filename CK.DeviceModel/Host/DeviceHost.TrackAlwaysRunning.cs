@@ -18,7 +18,6 @@ namespace CK.DeviceModel
         /// is planned. We lock it when reading or modifying it (instead of creating an extra lock object). 
         /// </summary>
         readonly List<(IDevice Device, int Count, DateTime NextCall)> _alwayRunningStopped;
-        readonly IDeviceAlwaysRunningPolicy _alwaysRunningPolicy;
         DeviceHostDaemon? _daemon;
 
         /// <summary>
@@ -26,6 +25,26 @@ namespace CK.DeviceModel
         /// The daemon uses this without lock.
         /// </summary>
         volatile (IDevice Device, int Count, DateTime NextCall)[] _alwayRunningStoppedSafe;
+
+        /// <summary>
+        /// Extension point that enables this host to handle its own <see cref="DeviceConfigurationStatus.AlwaysRunning"/> retry policy.
+        /// <para>
+        /// This default implementation is a simple relay to the <paramref name="global"/> <see cref="IDeviceAlwaysRunningPolicy.RetryStartAsync"/>
+        /// method.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="global">The globally available policy.</param>
+        /// <param name="device">The faulty device.</param>
+        /// <param name="retryCount">
+        /// The number of previous attempts to restart the device (since the last time the device has stopped).
+        /// For the very first attempt, this is 0. 
+        /// </param>
+        /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
+        protected virtual Task<int> TryAlwaysRunningRestart( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, IDevice device, int retryCount )
+        {
+            return global.RetryStartAsync( monitor, this, device, retryCount );
+        }
 
         void IInternalDeviceHost.SetDaemon( DeviceHostDaemon daemon )
         {
@@ -73,7 +92,7 @@ namespace CK.DeviceModel
             }
         }
 
-        async ValueTask<long> IInternalDeviceHost.DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now )
+        async ValueTask<long> IInternalDeviceHost.DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, DateTime now )
         {
             // Fast path: nothing to do (hence the ValueTask).
             var devices = _alwayRunningStoppedSafe;
@@ -96,7 +115,7 @@ namespace CK.DeviceModel
                         delta = (e.NextCall - now).Ticks;
                         if( delta <= 0 )
                         {
-                            delta = await _alwaysRunningPolicy.RetryStartAsync( monitor, this, d, e.Count ).ConfigureAwait( false );
+                            delta = await TryAlwaysRunningRestart( monitor, global, d, e.Count ).ConfigureAwait( false );
                             if( d.IsRunning || delta < 0 ) delta = 0;
                             else
                             {
@@ -115,7 +134,7 @@ namespace CK.DeviceModel
             }
             catch( Exception ex )
             {
-                monitor.Fatal( $"Buggy retry policy {_alwaysRunningPolicy}.", ex );
+                monitor.Fatal( "Unexpected error during AlwaysRunning retry.", ex );
                 return Int32.MaxValue;
             }
             // Take the lock to update the _alwayRunningStopped list by merging it with the updatedDeltas.

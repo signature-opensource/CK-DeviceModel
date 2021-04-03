@@ -20,6 +20,7 @@ namespace CK.Core
         /// Adapter waiting for .Net 5 TaskCompletionSource.
         readonly TaskCompletionSource<object?> _tcs;
         readonly IAsyncCommand _command;
+        CKExceptionData? _exception;
         byte _state;
 
         /// <summary>
@@ -34,6 +35,19 @@ namespace CK.Core
 
         /// <inheritdoc />
         public Task Task => _tcs.Task;
+
+        /// <inheritdoc />
+        public CKExceptionData? Exception
+        {
+            get
+            {
+                if( _exception == null && _tcs.Task.IsFaulted )
+                {
+                    _exception = CKExceptionData.CreateFrom( _tcs.Task.Exception );
+                }
+                return _exception;
+            }
+        }
 
         /// <inheritdoc />
         public bool IsCompleted => _state != 0;
@@ -164,6 +178,10 @@ namespace CK.Core
             _command.OnError( exception, ref o );
             if( !o.Called ) throw new InvalidOperationException( "One of the OnError methods must be called." );
             _state |= 2;
+            if( !_tcs.Task.IsFaulted )
+            {
+                _exception = CKExceptionData.CreateFrom( exception );
+            }
         }
 
         /// <inheritdoc />
@@ -172,7 +190,14 @@ namespace CK.Core
             var o = new OnError( this, true );
             _command.OnError( exception, ref o );
             if( !o.Called ) throw new InvalidOperationException( "One of the OnError methods must be called." );
-            if( o.Try ) _state |= 2;
+            if( o.Try )
+            {
+                _state |= 2;
+                if( !_tcs.Task.IsFaulted )
+                {
+                    _exception = CKExceptionData.CreateFrom( exception );
+                }
+            }
             return o.Try;
         }
 

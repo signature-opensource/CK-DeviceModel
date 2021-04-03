@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -11,12 +12,14 @@ namespace CK.DeviceModel
     /// <remarks>
     /// This class cannot be specialized. The only concrete type of this command is <see cref="StopDeviceCommand{THost}"/>.
     /// </remarks>
-    public abstract class BaseStopDeviceCommand : DeviceCommandWithResult<bool>
+    public abstract class BaseStopDeviceCommand : DeviceCommandWithResult<bool>, IAsyncCommand<bool>
     {
         private protected BaseStopDeviceCommand()
-            : base( errorOrCancelResult: false )
         {
         }
+
+        void IAsyncCommand<bool>.OnError( Exception ex, ref CommandCompletionSource<bool>.OnError result ) => result.SetResult( false );
+        void IAsyncCommand<bool>.OnCanceled( ref CommandCompletionSource<bool>.OnCanceled result ) => result.SetResult( false );
 
         /// <summary>
         /// Gets or sets whether the <see cref="DeviceConfigurationStatus.AlwaysRunning"/> should be ignored.

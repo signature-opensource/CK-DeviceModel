@@ -76,9 +76,8 @@ namespace CK.DeviceModel
         /// Initializes a new host.
         /// </summary>
         /// <param name="deviceHostName">A name that SHOULD identify this host instance unambiguously in a running context.</param>
-        /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
-        protected DeviceHost( string deviceHostName, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
-            : this( true, alwaysRunningPolicy )
+        protected DeviceHost( string deviceHostName )
+            : this( true )
         {
             if( String.IsNullOrWhiteSpace( deviceHostName ) ) throw new ArgumentException( nameof( deviceHostName ) );
             // The name of the lock is the DeviceHostName.
@@ -88,19 +87,17 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new host with a <see cref="DeviceHostName"/> sets to its type name.
         /// </summary>
-        /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
-        protected DeviceHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
-            : this( true, alwaysRunningPolicy )
+        protected DeviceHost()
+            : this( true )
         {
             _applyConfigAsynclock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
         }
 
         // This is the only CS8618 warning that must be raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
-        DeviceHost( bool privateCall, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
+        DeviceHost( bool privateCall )
         {
             _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
             _devicesChanged = new PerfectEventSender<IDeviceHost>();
-            _alwaysRunningPolicy = alwaysRunningPolicy;
 
             var t = typeof( THostConfiguration );
             var ctor = t.GetConstructor( Type.EmptyTypes );

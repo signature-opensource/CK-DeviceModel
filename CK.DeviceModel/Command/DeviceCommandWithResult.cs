@@ -11,21 +11,11 @@ namespace CK.DeviceModel
     /// This class cannot be directly specialized: the generic <see cref="DeviceCommand{THost,TResult}"/> must be used.
     /// </summary>
     /// <typeparam name="TResult">The type of the command's result.</typeparam>
-    public abstract class DeviceCommandWithResult<TResult> : BaseDeviceCommand
+    public abstract class DeviceCommandWithResult<TResult> : BaseDeviceCommand, IAsyncCommand<TResult>
     {
         private protected DeviceCommandWithResult()
         {
-            Completion = new CommandCompletionSource<TResult>();
-        }
-
-        private protected DeviceCommandWithResult( TResult errorOrCancelResult )
-        {
-            Completion = new CommandCompletionSource<TResult>( errorOrCancelResult );
-        }
-
-        private protected DeviceCommandWithResult( Func<Exception, TResult>? transformError, bool ignoreCanceled, TResult cancelResult )
-        {
-            Completion = new CommandCompletionSource<TResult>( transformError, ignoreCanceled, cancelResult );
+            Completion = new CommandCompletionSource<TResult>( this );
         }
 
         /// <summary>

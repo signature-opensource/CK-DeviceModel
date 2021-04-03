@@ -13,12 +13,15 @@
       <Method Name="BaseReconfigureDeviceCommand" Hidden="true" />
       <Method Name="DoCheckValidity" Hidden="true" />
       <Property Name="ExternalConfig" Hidden="true" />
+      <Method Name="IAsyncCommand&lt;DeviceApplyConfigurationResult&gt;.OnCanceled" Hidden="true" />
+      <Method Name="IAsyncCommand&lt;DeviceApplyConfigurationResult&gt;.OnError" Hidden="true" />
       <Method Name="OnError" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>EAAAAAAAAACAAAAAAAAAAAAAEAgAAAAAgAAAAAAAAAA=</HashCode>
+      <HashCode>EAAAAAAAgACAQAAAAAAAAAAAEAgAAAAAgAAAAAAAAAA=</HashCode>
       <FileName>Command\Basic\BaseReconfigureDeviceCommand.cs</FileName>
     </TypeIdentifier>
+    <Lollipop Position="0.2" />
   </Class>
   <Class Name="CK.DeviceModel.StartDeviceCommand&lt;THost&gt;">
     <Position X="5" Y="5.25" Width="4" />
@@ -37,21 +40,27 @@
     <Position X="5" Y="3.75" Width="4" />
     <Members>
       <Method Name="BaseStartDeviceCommand" Hidden="true" />
+      <Method Name="IAsyncCommand&lt;bool&gt;.OnCanceled" Hidden="true" />
+      <Method Name="IAsyncCommand&lt;bool&gt;.OnError" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAABAAAA=</HashCode>
       <FileName>Command\Basic\BaseStartDeviceCommand.cs</FileName>
     </TypeIdentifier>
+    <Lollipop Position="0.2" />
   </Class>
   <Class Name="CK.DeviceModel.BaseStopDeviceCommand">
     <Position X="5" Y="0.5" Width="4" />
     <Members>
       <Method Name="BaseStopDeviceCommand" Hidden="true" />
+      <Method Name="IAsyncCommand&lt;bool&gt;.OnCanceled" Hidden="true" />
+      <Method Name="IAsyncCommand&lt;bool&gt;.OnError" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAA=</HashCode>
+      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAgAABAAAA=</HashCode>
       <FileName>Command\Basic\BaseStopDeviceCommand.cs</FileName>
     </TypeIdentifier>
+    <Lollipop Position="0.2" />
   </Class>
   <Class Name="CK.DeviceModel.StopDeviceCommand&lt;THost&gt;">
     <Position X="5" Y="2.25" Width="4" />
@@ -67,11 +76,14 @@
     <Position X="0.5" Y="3.75" Width="4" />
     <Members>
       <Method Name="BaseDestroyDeviceCommand" Hidden="true" />
+      <Method Name="IAsyncCommand.OnCanceled" Hidden="true" />
+      <Method Name="IAsyncCommand.OnError" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>EAAAAAQAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>Command\Basic\BaseDestroyDeviceCommand.cs</FileName>
     </TypeIdentifier>
+    <Lollipop Position="0.2" />
   </Class>
   <Class Name="CK.DeviceModel.DestroyDeviceCommand&lt;THost&gt;">
     <Position X="0.5" Y="5.25" Width="4" />

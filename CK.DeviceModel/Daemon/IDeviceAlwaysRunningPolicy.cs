@@ -7,9 +7,7 @@ namespace CK.DeviceModel
 
     /// <summary>
     /// Service that drives the policy of <see cref="DeviceConfigurationStatus.AlwaysRunning"/> devices that... don't run.
-    /// The default <see cref="DefaultDeviceAlwaysRunningPolicy"/> is tailored to handle short-time disconnection: it
-    /// calls <see cref="IDevice.StartAsync(IActivityMonitor)"/> only 4 times (with the following durations: 250, 500
-    /// 500 and eventually 750 milliseconds) before giving up.
+    /// The default <see cref="DefaultDeviceAlwaysRunningPolicy"/> is tailored to handle short-time disconnection.
     /// <para>
     /// Calls to this policy are handled by the <see cref="DeviceHostDaemon"/> but manual (direct) calls to start can be done independently.
     /// </para>

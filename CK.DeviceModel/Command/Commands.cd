@@ -27,6 +27,7 @@
       <HashCode>AAAAAAAAAAAAAAAEAAAAAAACAAAQAAAAAAAAAAAAAAA=</HashCode>
       <FileName>Command\DeviceCommandNoResult.cs</FileName>
     </TypeIdentifier>
+    <Lollipop Position="1.142" />
   </Class>
   <Class Name="CK.DeviceModel.BaseDeviceCommand">
     <Position X="2" Y="0.5" Width="2" />
@@ -50,6 +51,7 @@
       <HashCode>AAAAAAAAAAAAAAAEAAAAAAACAAAQAAAAAAAAAAAAAAA=</HashCode>
       <FileName>Command\DeviceCommandWithResult.cs</FileName>
     </TypeIdentifier>
+    <Lollipop Position="1.408" />
   </Class>
   <Class Name="CK.DeviceModel.DeviceCommand&lt;THost, TResult&gt;">
     <Position X="3.25" Y="5" Width="2.5" />

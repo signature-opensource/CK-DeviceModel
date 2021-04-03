@@ -32,7 +32,7 @@ namespace CK.DeviceModel
 
 
         /// <inheritdoc />
-        public void CancelAllPendingCommands( IActivityMonitor monitor, bool cancelQueuedCommands, bool cancelDeferredCommands )
+        public (int, int) CancelAllPendingCommands( IActivityMonitor monitor, bool cancelQueuedCommands, bool cancelDeferredCommands )
         {
             int cRemoved = 0;
             if( cancelQueuedCommands )
@@ -46,16 +46,19 @@ namespace CK.DeviceModel
                 _commandQueue.Writer.TryWrite( (_commandAwaker, default, false) );
                 monitor.Info( $"Canceled {cRemoved} waiting commands." );
             }
+            int dRemoved = 0;
             if( cancelDeferredCommands )
             {
                 var d = _deferredCommands;
                 _deferredCommands = new Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>();
-                monitor.Info( $"Canceled {d.Count} deferred commands." );
+                dRemoved = d.Count;
+                monitor.Info( $"Canceled {dRemoved} deferred commands." );
                 while( d.TryDequeue( out var c ) )
                 {
                     c.Command.InternalCompletion.SetCanceled();
                 }
             }
+            return (cRemoved, dRemoved);
         }
 
 
