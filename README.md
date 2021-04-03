@@ -151,7 +151,7 @@ Implementing a new device requires to define its host and its configuration type
 
 - To conclude, an example of the *appsettings.json* configuration file for such devices:
 
-```json
+```jsonc
 {
   // The root section must be CK-DeviceModel.
   "CK-DeviceModel": {
