@@ -3,7 +3,7 @@
   <SimpleGitVersion>
     <Branches>
       <Branch Name="develop" CIVersionMode="LastReleaseBased" VersionName="develop" />
-      <Branch Name="command-rework" CIVersionMode="ZeroTimed" VersionName="explo" />
+      <Branch Name="command-rework" CIVersionMode="ZeroTimed" VersionName="explo" UseReleaseBuildConfigurationFrom="None" />
     </Branches>
   </SimpleGitVersion>
 </RepositoryInfo>
