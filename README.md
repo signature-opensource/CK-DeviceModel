@@ -22,7 +22,7 @@ Implementing a new device requires to define its host and its configuration type
   {
   }
 ```
-- The device's configuration. The `DoCheckValid` method is optional.
+- The device's configuration: its name MUST end with `Configuration`. The `DoCheckValid` method is optional.
 
 ```csharp
   public class CameraConfiguration : DeviceConfiguration

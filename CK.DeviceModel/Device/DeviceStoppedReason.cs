@@ -28,13 +28,13 @@ namespace CK.DeviceModel
         /// <summary>
         /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/> while it is handling a command.
         /// </summary>
-        AutoStoppedCall,
+        SelfStoppedCall,
 
         /// <summary>
         /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/>, ignoring the <see cref="DeviceConfigurationStatus.AlwaysRunning"/>,
         /// while it is handling a command.
         /// </summary>
-        AutoStoppedForceCall,
+        SelfStoppedForceCall,
 
         /// <summary>
         /// The device has stopped because it is being destroyed.
@@ -45,7 +45,13 @@ namespace CK.DeviceModel
         /// The device has stopped because of a call to <see cref="IDevice.DestroyAsync(Core.IActivityMonitor)"/>,
         /// while it is handling a command.
         /// </summary>
-        AutoDestroyed
+        SelfDestroyed,
+
+        /// <summary>
+        /// The device started because of a <see cref="DeviceCommandStoppedBehavior.SilentAutoStartAndStop"/> command's <see cref="BaseDeviceCommand.StoppedBehavior"/>
+        /// and must be immediately stopped.
+        /// </summary>
+        SilentAutoStartAndStopStoppedBehavior,
     }
 }
 

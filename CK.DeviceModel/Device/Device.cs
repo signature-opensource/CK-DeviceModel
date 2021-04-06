@@ -358,7 +358,7 @@ namespace CK.DeviceModel
         {
             if( monitor.Output == _commandMonitor.Output )
             {
-                return HandleStartAsync( null, DeviceStartedReason.AutoStart ).ContinueWith( _ => _isRunning );
+                return HandleStartAsync( null, DeviceStartedReason.SelfStart ).ContinueWith( _ => _isRunning );
             }
             var preCheck = SyncStateStartCheck( monitor );
             if( preCheck.HasValue )
@@ -413,7 +413,10 @@ namespace CK.DeviceModel
                 {
                     _commandMonitor.Error( $"While starting '{FullName}'.", ex );
                 }
-                if( _isRunning ) await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason ) ).ConfigureAwait( false );
+                if( _isRunning && reason != DeviceStartedReason.SilentAutoStartAndStopStoppedBehavior )
+                {
+                    await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason ) ).ConfigureAwait( false );
+                }
                 if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                 {
                     _host.OnAlwaysRunningCheck( this, _commandMonitor );
@@ -440,7 +443,7 @@ namespace CK.DeviceModel
         {
             if( monitor.Output == _commandMonitor.Output )
             {
-                return HandleStopAsync( null, ignoreAlwaysRunning ? DeviceStoppedReason.AutoStoppedForceCall : DeviceStoppedReason.AutoStoppedCall )
+                return HandleStopAsync( null, ignoreAlwaysRunning ? DeviceStoppedReason.SelfStoppedForceCall : DeviceStoppedReason.SelfStoppedCall )
                         .ContinueWith( t => !_isRunning );
             }
             var r = SyncStateStopCheck( monitor, ignoreAlwaysRunning );
@@ -485,9 +488,9 @@ namespace CK.DeviceModel
                 // StoppedForceCall, AutoStoppedForceCall, AutoDestroy and AutoDestroyed skips AlwaysRunning check.
                 var r = SyncStateStopCheck( _commandMonitor, cmd?.IgnoreAlwaysRunning
                                                              ?? reason == DeviceStoppedReason.StoppedForceCall
-                                                                || reason == DeviceStoppedReason.AutoStoppedForceCall
+                                                                || reason == DeviceStoppedReason.SelfStoppedForceCall
                                                                 || reason == DeviceStoppedReason.Destroyed
-                                                                || reason == DeviceStoppedReason.AutoDestroyed );
+                                                                || reason == DeviceStoppedReason.SelfDestroyed );
                 if( !r.HasValue )
                 {
                     // From now on, Stop always succeeds, even if an error occurred.
@@ -501,7 +504,9 @@ namespace CK.DeviceModel
                     {
                         _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
                     }
-                    if( reason != DeviceStoppedReason.Destroyed && reason != DeviceStoppedReason.AutoDestroyed )
+                    if( reason != DeviceStoppedReason.Destroyed
+                        && reason != DeviceStoppedReason.SelfDestroyed
+                        && reason != DeviceStoppedReason.SilentAutoStartAndStopStoppedBehavior )
                     {
                         await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason ) ).ConfigureAwait( false );
                     }
@@ -554,7 +559,7 @@ namespace CK.DeviceModel
             Debug.Assert( _host != null );
             if( _isRunning )
             {
-                await HandleStopAsync( null, autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
+                await HandleStopAsync( null, autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
                 Debug.Assert( !_isRunning );
             }
             try
@@ -572,7 +577,7 @@ namespace CK.DeviceModel
             {
                 await h.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
             }
-            await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.AutoDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
+            await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
             cmd?.Completion.SetResult();
             _statusChanged.RemoveAll();
             _controllerKeyChanged.RemoveAll();

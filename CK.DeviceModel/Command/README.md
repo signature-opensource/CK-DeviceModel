@@ -42,8 +42,8 @@ By default, the `BaseDeviceCommand.DeviceName` MUST match the device's name (thi
 and raises an `ArgumentException` is raise),
 and the `BaseDeviceCommand.ControllerKey` must match the device's current `ControllerKey` (or the latter is null).
 
-The controller key is not checked when the command is sent but when right before the command execution (a previously sent
-command can change the controller key before its execution). If the controller key doesn't match, an [InvalidControllerKeyException](../Device/InvalidControllerKeyException.cs)
+The controller key is not checked when the command is sent but when right before the command execution (this is because a previously
+sent command can change the controller key). If the controller key doesn't match, an [InvalidControllerKeyException](../Device/InvalidControllerKeyException.cs)
 is set on the command completion.
 
 This (safe) behavior can be amended thanks to the SendCommand or SendCommandImmediate parameters or by calling the Unsafe methods.
@@ -76,7 +76,7 @@ The [DeviceHostCommandResult](../Host/DeviceHostCommandResult.cs) captures the r
 
 ## Command handling: Its all about command Completion!
 
-The `Device.DoHandleCommandAsync` MUST be overridden otherwise, since all commands should be handled, the default implementation
+The `Device.DoHandleCommandAsync` SHOULD be overridden otherwise, since all commands should be handled, the default implementation
 systematically throws a `NotSupportedException`.
 
 ```csharp
@@ -101,4 +101,8 @@ or `DeviceCommandWithResult<TResult>.Completion` is eventually resolved
 by calling `SetResult`, `SetCanceled` or `SetException` on the Completion otherwise the caller 
 may indefinitely wait for the command completion.
 
+## DeviceCommandStoppedBehavior
+
+Each Command has an overridable `StoppedBehavior` that specifies how it should be handled when the device is stopped.
+The [DeviceCommandStoppedBehavior](DeviceCommandStoppedBehavior.cs) enumeration describes th 8 available options.
 

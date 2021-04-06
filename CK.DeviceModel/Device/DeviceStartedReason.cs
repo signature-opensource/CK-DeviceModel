@@ -28,8 +28,18 @@ namespace CK.DeviceModel
         /// <summary>
         /// The device started because of a call to <see cref="IDevice.StartAsync(Core.IActivityMonitor)"/> while it is handling a command.
         /// </summary>
-        AutoStart,
+        SelfStart,
 
+        /// <summary>
+        /// The device started because of a <see cref="DeviceCommandStoppedBehavior.AutoStartAndKeepRunning"/> command's <see cref="BaseDeviceCommand.StoppedBehavior"/>.
+        /// </summary>
+        StartAndKeepRunningStoppedBehavior,
+
+        /// <summary>
+        /// The device started because of a <see cref="DeviceCommandStoppedBehavior.SilentAutoStartAndStop"/> command's <see cref="BaseDeviceCommand.StoppedBehavior"/>.
+        /// This status is not published to the external world.
+        /// </summary>
+        SilentAutoStartAndStopStoppedBehavior,
     }
 
 }

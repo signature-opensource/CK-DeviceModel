@@ -24,7 +24,8 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Returns <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/> since most of the commands
-        /// should not be executed while the device is stopped.
+        /// should not be executed while the device is stopped and this enables always running devices to be resilient to
+        /// unattended stops.
         /// <para>
         /// Some commands may override this, or the device can alter this behavior thanks to its
         /// <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, BaseDeviceCommand)"/> protected method.

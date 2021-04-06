@@ -8,7 +8,7 @@ The 5 basic commands follow the same pattern:
 
 - They can be sent via SendCommand or SendCommandImmediate or are simply useless since the 5 device's methods: 
 SetControllerKeyAsync, StartAsync, StopAsync, ReconfigureAsync or DestroyAsync (see [IDevice](../../Device/IDevice.cs))
-can execute them immediately.
+can send them immediately.
 
 - They all respect the `ControllerKey` optional guard.
 

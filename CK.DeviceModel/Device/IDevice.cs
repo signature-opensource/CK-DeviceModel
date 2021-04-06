@@ -181,7 +181,7 @@ namespace CK.DeviceModel
         /// <para>
         /// Note that any <see cref="BaseDeviceCommand.StoppedBehavior"/> that may wait for the next start is ignored in this mode (deferring an
         /// "immediate" command doesn't make a lot of sense). This applies to <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/>
-        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetDeviceStoppedException"/> and
+        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetUnavailableDeviceException"/> and
         /// <see cref="DeviceCommandStoppedBehavior.AlwaysWaitForNextStart"/> (a <see cref="UnavailableDeviceException"/> is set).
         /// </para>
         /// </summary>
@@ -205,7 +205,7 @@ namespace CK.DeviceModel
         /// <para>
         /// Note that any <see cref="BaseDeviceCommand.StoppedBehavior"/> that may wait for the next start is ignored in this mode (deferring an
         /// "immediate" command doesn't make a lot of sense). This applies to <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/>
-        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetDeviceStoppedException"/> and
+        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetUnavailableDeviceException"/> and
         /// <see cref="DeviceCommandStoppedBehavior.AlwaysWaitForNextStart"/> (a <see cref="UnavailableDeviceException"/> is set).
         /// </para>
         /// </summary>

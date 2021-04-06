@@ -354,7 +354,7 @@ namespace CK.DeviceModel.Tests
 
         }
 
-        //[TestCase( "UseSendCommand" )]
+        [TestCase( "UseSendCommand" )]
         [TestCase( "UseSendCommandImmediate" )]
         public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey( string mode )
         {
@@ -416,8 +416,6 @@ namespace CK.DeviceModel.Tests
                 await Task.Delay( 100 );
             }
             while( !cmdSet.Completion.IsCompleted );
-
-            //FluentActions.Awaiting( () => cmdSet.Completion.Task ).Should().Throw<InvalidControllerKeyException>();
 
             cmdSet = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "I'm controlling.", Color = 18 };
             SendCommand( cmdSet );

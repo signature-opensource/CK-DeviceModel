@@ -39,7 +39,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets whether the device has been destroyed.
         /// </summary>
-        public bool IsDestroyed => HasStopped && (StoppedReason == DeviceStoppedReason.Destroyed || StoppedReason == DeviceStoppedReason.AutoDestroyed);
+        public bool IsDestroyed => HasStopped && (StoppedReason == DeviceStoppedReason.Destroyed || StoppedReason == DeviceStoppedReason.SelfDestroyed);
 
         /// <summary>
         /// Gets the <see cref="DeviceReconfiguredResult"/> if <see cref="HasBeenReconfigured"/> is true (<see cref="DeviceReconfiguredResult.None"/> otherwise).
