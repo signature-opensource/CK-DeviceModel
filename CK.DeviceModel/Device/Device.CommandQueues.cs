@@ -354,8 +354,9 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Extension point that can be overridden to avoid calling <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> (ignoring
-        /// the <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration), when the handling of a command raised an exception.
+        /// Extension point that can be overridden to avoid calling <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> (that ignores
+        /// the <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration), when the handling of a command raised an exception,
+        /// and/or to emit an event (typically an UnexpectedErrorEvent).
         /// <para>
         /// This default implementation returns always true: the device is stopped by default.
         /// </para>

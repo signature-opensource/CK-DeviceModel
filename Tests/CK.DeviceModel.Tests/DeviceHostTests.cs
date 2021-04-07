@@ -460,5 +460,51 @@ namespace CK.DeviceModel.Tests
 
         }
 
+        [Test]
+        public async Task Disabling_sends_a_stop_status_change()
+        {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( Disabling_sends_a_stop_status_change ) );
+            var host = new MachineHost();
+
+            var config = new MachineConfiguration()
+            {
+                Name = "Test",
+                Status = DeviceConfigurationStatus.AlwaysRunning
+            };
+
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+
+            var device = host["Test"];
+            Debug.Assert( device != null );
+
+            bool stopReceived = false;
+            bool destroyReceived = false;
+
+            device.StatusChanged.Sync += ( monitor, d ) =>
+            {
+                TestHelper.Monitor.Info( $"Status change." );
+                if( d.Status.IsDestroyed )
+                {
+                    destroyReceived.Should().BeFalse();
+                    destroyReceived = true;
+                }
+                else if( d.Status.HasStopped )
+                {
+                    // HasStopped is true when IsDestroyed is sent.
+                    stopReceived.Should().BeFalse();
+                    stopReceived = true;
+                }
+            };
+
+            var configStopped = new MachineConfiguration( config ) { Status = DeviceConfigurationStatus.Disabled };
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, configStopped )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+
+            stopReceived.Should().BeTrue();
+            destroyReceived.Should().BeFalse();
+
+            await device.DestroyAsync( TestHelper.Monitor );
+            destroyReceived.Should().BeTrue();
+        }
+
     }
 }

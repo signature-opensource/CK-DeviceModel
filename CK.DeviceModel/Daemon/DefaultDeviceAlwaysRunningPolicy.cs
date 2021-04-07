@@ -17,26 +17,29 @@ namespace CK.DeviceModel
     {
         readonly int[] _retryTimeouts;
 
+        DefaultDeviceAlwaysRunningPolicy( int[] retryTimeoutsMilliseconds )
+        {
+            _retryTimeouts = retryTimeoutsMilliseconds;
+        }
+
         /// <summary>
         /// Initializes a new <see cref="DefaultDeviceAlwaysRunningPolicy"/>.
         /// Default timeouts are: 250, 300, 500 and eventually 750 milliseconds.
         /// After 5 unsuccessful calls to <see cref="IDevice.StartAsync(IActivityMonitor)"/>, it gives up.
-        /// See <see cref="DefaultDeviceAlwaysRunningPolicy(int[])"/>.
+        /// See <see cref="Create(int[])"/>.
         /// </summary>
         public DefaultDeviceAlwaysRunningPolicy()
+             : this( new int[] { 250, 300, 500, 750 } )
         {
-            _retryTimeouts = new int[] { 250, 300, 500, 750 }; 
         }
 
         /// <summary>
         /// Initializes a new <see cref="DefaultDeviceAlwaysRunningPolicy"/> with a list of retry timeouts (it applies to all hosts).
-        /// Each call to <see cref="RetryStartAsync(IActivityMonitor, IDeviceHost, IDevice, int)"/> triggers a call to <see cref="IDevice.StartAsync(IActivityMonitor)"/> )
-        /// and, if StartAsync returned false, the timeouts are returned.
         /// </summary>
         /// <param name="retryTimeoutsMilliseconds">Timeouts to apply as long as restarting the device fails.</param>
-        public DefaultDeviceAlwaysRunningPolicy( params int[] retryTimeoutsMilliseconds )
+        public static DefaultDeviceAlwaysRunningPolicy Create( params int[] retryTimeoutsMilliseconds )
         {
-            _retryTimeouts = retryTimeoutsMilliseconds;
+            return new DefaultDeviceAlwaysRunningPolicy( retryTimeoutsMilliseconds );
         }
 
         /// <summary>

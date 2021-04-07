@@ -140,7 +140,7 @@ Implementing a new device requires to define its host and its configuration type
         var cmd = new FlashCommand();
         if( !UnsafeSendCommand( monitor, cmd ) )
         {
-            // The device is destroyed.
+            // The device has been destroyed.
             return false;
         }
         // Wait for the command to complete.
