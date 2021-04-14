@@ -41,7 +41,7 @@ namespace CK.DeviceModel
         SetUnavailableDeviceException,
 
         /// <summary>
-        /// <see cref="ICommandCompletionSource.SetCanceled()"/> is called on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
+        /// <see cref="ICompletionSource.SetCanceled()"/> is called on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
         /// </summary>
         Cancel,
 

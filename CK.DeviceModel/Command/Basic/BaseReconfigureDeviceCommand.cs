@@ -9,20 +9,20 @@ namespace CK.DeviceModel
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
     public abstract class BaseReconfigureDeviceCommand<TConfiguration> : DeviceCommandWithResult<DeviceApplyConfigurationResult>,
-                                                                         IAsyncCommand<DeviceApplyConfigurationResult>
+                                                                         ICompletable<DeviceApplyConfigurationResult>
         where TConfiguration : DeviceConfiguration
     {
         private protected BaseReconfigureDeviceCommand()
         {
         }
 
-        void IAsyncCommand<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CommandCompletionSource<DeviceApplyConfigurationResult>.OnError result )
+        void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
         {
             if( ex is InvalidControllerKeyException ) result.SetResult( DeviceApplyConfigurationResult.InvalidControllerKey );
             else result.SetResult( DeviceApplyConfigurationResult.UnexpectedError );
         }
 
-        void IAsyncCommand<DeviceApplyConfigurationResult>.OnCanceled( ref CommandCompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
+        void ICompletable<DeviceApplyConfigurationResult>.OnCanceled( ref CompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
         {
             result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
         }

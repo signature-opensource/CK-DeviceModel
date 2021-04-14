@@ -11,19 +11,24 @@ namespace CK.DeviceModel
     /// This class cannot be directly specialized: the generic <see cref="DeviceCommand{THost,TResult}"/> must be used.
     /// </summary>
     /// <typeparam name="TResult">The type of the command's result.</typeparam>
-    public abstract class DeviceCommandWithResult<TResult> : BaseDeviceCommand, IAsyncCommand<TResult>
+    public abstract class DeviceCommandWithResult<TResult> : BaseDeviceCommand, ICompletable<TResult>
     {
         private protected DeviceCommandWithResult()
         {
-            Completion = new CommandCompletionSource<TResult>( this );
+            Completion = new CompletionSource<TResult>( this );
         }
 
         /// <summary>
-        /// Gets the <see cref="CommandCompletionSource"/> for this command.
+        /// Gets the <see cref="CompletionSource"/> for this command.
         /// </summary>
-        public CommandCompletionSource<TResult> Completion { get; }
+        public CompletionSource<TResult> Completion { get; }
 
-        internal override ICommandCompletionSource InternalCompletion => Completion;
+        /// <summary>
+        /// Gets the <see cref="CompletionSource"/> for this command.
+        /// </summary>
+        ICompletion<TResult> ICompletable<TResult>.Completion => Completion;
+
+        internal override ICompletionSource InternalCompletion => Completion;
 
         /// <summary>
         /// Overridden to return this type name and <see cref="Completion"/> status.

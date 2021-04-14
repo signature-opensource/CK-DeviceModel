@@ -24,7 +24,7 @@ namespace CK.DeviceModel
         class CommandAwaker : BaseDeviceCommand
         {
             public override Type HostType => throw new NotImplementedException();
-            internal override ICommandCompletionSource InternalCompletion => throw new NotImplementedException();
+            internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
         }
         static readonly CommandAwaker _commandAwaker = new();

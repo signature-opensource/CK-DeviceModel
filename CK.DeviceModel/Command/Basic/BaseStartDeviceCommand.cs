@@ -12,14 +12,14 @@ namespace CK.DeviceModel
     /// <remarks>
     /// This class cannot be specialized. The only concrete type of this command is <see cref="StartDeviceCommand{THost}"/>.
     /// </remarks>
-    public abstract class BaseStartDeviceCommand : DeviceCommandWithResult<bool>, IAsyncCommand<bool>
+    public abstract class BaseStartDeviceCommand : DeviceCommandWithResult<bool>, ICompletable<bool>
     {
         private protected BaseStartDeviceCommand()
         {
         }
 
-        void IAsyncCommand<bool>.OnError( Exception ex, ref CommandCompletionSource<bool>.OnError result ) => result.SetResult( false );
-        void IAsyncCommand<bool>.OnCanceled( ref CommandCompletionSource<bool>.OnCanceled result) => result.SetResult( false );
+        void ICompletable<bool>.OnError( Exception ex, ref CompletionSource<bool>.OnError result ) => result.SetResult( false );
+        void ICompletable<bool>.OnCanceled( ref CompletionSource<bool>.OnCanceled result) => result.SetResult( false );
 
         /// <summary>
         /// Obviously returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>.

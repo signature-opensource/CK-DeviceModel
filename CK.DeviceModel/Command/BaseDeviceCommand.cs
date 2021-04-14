@@ -79,7 +79,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Waiting for covariant return type in .Net 5: this could be public virtual.
         /// </summary>
-        internal abstract ICommandCompletionSource InternalCompletion { get; }
+        internal abstract ICompletionSource InternalCompletion { get; }
 
         /// <summary>
         /// Extension point to <see cref="CheckValidity(IActivityMonitor)"/>. Called only after basic checks successfully passed.
