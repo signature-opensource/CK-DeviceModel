@@ -17,7 +17,11 @@ namespace CK.DeviceModel
     {
         readonly int[] _retryTimeouts;
 
-        DefaultDeviceAlwaysRunningPolicy( int[] retryTimeoutsMilliseconds )
+        /// <summary>
+        /// Initializes a new <see cref="DefaultDeviceAlwaysRunningPolicy"/> with a list of retry timeouts (it applies to all hosts).
+        /// </summary>
+        /// <param name="retryTimeoutsMilliseconds">Timeouts to apply as long as restarting the device fails.</param>
+        protected DefaultDeviceAlwaysRunningPolicy( int[] retryTimeoutsMilliseconds )
         {
             _retryTimeouts = retryTimeoutsMilliseconds;
         }
