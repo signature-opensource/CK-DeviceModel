@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Comment CommentText="These classes cannot be specialized (outside of the CK.DeviceModel). ">
+    <Position X="5.901" Y="3.548" Height="0.75" Width="1.7" />
+  </Comment>
+  <Comment CommentText="Theses are the base class to specialize.">
+    <Position X="5.953" Y="5.117" Height="0.75" Width="1.7" />
+  </Comment>
+  <Class Name="CK.DeviceModel.DeviceCommand&lt;THost&gt;">
+    <Position X="0.5" Y="5" Width="2" />
+    <Members>
+      <Method Name="DeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>Command\DeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.DeviceCommandNoResult">
+    <Position X="0.5" Y="3.5" Width="2" />
+    <Members>
+      <Method Name="DeviceCommandNoResult" Hidden="true" />
+      <Property Name="InternalCompletion" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAEAAAAAAACAAAQAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Command\DeviceCommandNoResult.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="1.142" />
+  </Class>
+  <Class Name="CK.DeviceModel.BaseDeviceCommand">
+    <Position X="2" Y="0.5" Width="2" />
+    <Members>
+      <Method Name="BaseDeviceCommand" Hidden="true" />
+      <Property Name="InternalCompletion" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>EAAAAAAAAAAAAAEAAAAAAAAAAAgQAAABAAAIAAAAAQA=</HashCode>
+      <FileName>Command\BaseDeviceCommand.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.DeviceModel.DeviceCommandWithResult&lt;TResult&gt;">
+    <Position X="3.25" Y="3.5" Width="2.5" />
+    <Members>
+      <Method Name="DeviceCommandWithResult" Hidden="true" />
+      <Property Name="InternalCompletion" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAEAAAAAAACAAAQAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Command\DeviceCommandWithResult.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="1.408" />
+  </Class>
+  <Class Name="CK.DeviceModel.DeviceCommand&lt;THost, TResult&gt;">
+    <Position X="3.25" Y="5" Width="2.5" />
+    <Members>
+      <Method Name="DeviceCommand" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>Command\DeviceCommandT.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Enum Name="CK.DeviceModel.DeviceCommandStoppedBehavior">
+    <Position X="4.5" Y="0.75" Width="4.25" />
+    <TypeIdentifier>
+      <HashCode>AIAAAAABQAAAIAAAAAAAAAAAAAAQAAAAAAAAABAAAAA=</HashCode>
+      <FileName>Command\DeviceCommandStoppedBehavior.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

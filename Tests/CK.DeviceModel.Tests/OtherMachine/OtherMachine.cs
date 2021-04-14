@@ -6,14 +6,14 @@ using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests
 {
-    public class OtherMachine : Device<OtherMachineConfiguration>, ITestDevice
+    public class OtherMachine : Device<OtherMachineConfiguration>
     {
         public static int TotalCount;
         public static int TotalRunning;
 
         // A device can keep a reference to the current configuration:
         // this configuration is an independent clone that is accessible only to the Device.
-        OtherMachineConfiguration _configRef;
+        readonly OtherMachineConfiguration _configRef;
 
         public OtherMachine( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
@@ -21,10 +21,6 @@ namespace CK.DeviceModel.Tests
             Interlocked.Increment( ref TotalCount );
             _configRef = info.Configuration;
         }
-
-        public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
-
-        public Task TestForceStopAsync( IActivityMonitor monitor ) => AutoStopAsync( monitor, ignoreAlwaysRunning: true );
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, OtherMachineConfiguration config )
         {

@@ -3,6 +3,7 @@ using CK.PerfectEvent;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
@@ -58,15 +59,7 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>
         /// <returns>the result of the device configuration.</returns>
-        Task<DeviceApplyConfigurationResult> ApplyDeviceConfigurationAsync( IActivityMonitor monitor, DeviceConfiguration configuration );
-
-        /// <summary>
-        /// Attempts to destroy a device.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="deviceName">The device name.</param>
-        /// <returns>The awaitable.</returns>
-        Task DestroyDeviceAsync( IActivityMonitor monitor, string deviceName );
+        Task<DeviceApplyConfigurationResult> EnsureDeviceAsync( IActivityMonitor monitor, DeviceConfiguration configuration );
 
         /// <summary>
         /// Gets a device by its name.
@@ -85,7 +78,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
-        /// Note that these objects are a copy of the ones that are used by the actual devices.
+        /// Note that the configuration objects are copies of the ones that are used by the actual devices.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
         /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
@@ -100,21 +93,24 @@ namespace CK.DeviceModel
         PerfectEvent<IDeviceHost> DevicesChanged { get; }
 
         /// <summary>
-        /// Determines whether the <see cref="DeviceCommand.HostType"/> is compatible with the actual type of this host,
-        /// finds the target device based on <see cref="DeviceCommand.DeviceName"/> and checks the <see cref="DeviceCommand.ControllerKey"/>
-        /// against the <see cref="IDevice.ControllerKey"/>.
+        /// Sends the provided command to the device it targets.
         /// <para>
-        /// When the returned <see cref="RoutedDeviceCommand.Success"/> is true, the command can be executed synchronously or asynchronously by
-        /// the <see cref="RoutedDeviceCommand"/>.
+        /// Determines whether the <see cref="BaseDeviceCommand.HostType"/> is compatible with the actual type of this host,
+        /// finds the target device based on <see cref="BaseDeviceCommand.DeviceName"/> and calls
+        /// <see cref="BaseDeviceCommand.CheckValidity(IActivityMonitor)"/> before sending the command to the device.
         /// </para>
         /// <para>
-        /// Note that <see cref="DeviceCommand.CheckValidity(IActivityMonitor)"/> must be true otherwise an <see cref="ArgumentException"/> is thrown.
+        /// The <see cref="IDevice.ControllerKey"/> check is done at the time when the command is executed: if the check fails, an <see cref="InvalidControllerKeyException"/>
+        /// will be set on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>. The <paramref name="checkControllerKey"/> parameter
+        /// can be used to skip this check.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to route.</param>
-        /// <returns>The routing result.</returns>
-        RoutedDeviceCommand Handle( IActivityMonitor monitor, DeviceCommand command );
+        /// <param name="command">The command to validate, route and send.</param>
+        /// <param name="checkControllerKey">True to check the controller key right before executing the command.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
+        public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default );
 
     }
 }

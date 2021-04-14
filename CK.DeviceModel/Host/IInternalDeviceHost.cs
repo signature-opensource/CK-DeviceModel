@@ -7,25 +7,31 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Internal interface that define non-generic host behaviors: Devices
+    /// Internal interface that define non-generic host behaviors: Devices and DeviceHostDaemon
     /// call these methods.
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        Task<bool> StartAsync( IDevice d, IActivityMonitor monitor );
+        DeviceCommandWithResult<DeviceApplyConfigurationResult> CreateReconfigureCommand( string name );
 
-        Task<bool> StopAsync( IDevice d, IActivityMonitor monitor );
+        BaseStartDeviceCommand CreateStartCommand( string name );
 
-        Task<bool> AutoStopAsync( IDevice d, IActivityMonitor monitor, bool ignoreAlwaysRunning );
+        BaseStopDeviceCommand CreateStopCommand( string name, bool ignoreAlwaysRunning );
 
-        Task<bool> SetControllerKeyAsync( IDevice d, IActivityMonitor monitor, bool checkCurrent, string? current, string? key );
+        BaseDestroyDeviceCommand CreateDestroyCommand( string name );
 
-        Task AutoDestroyAsync( IDevice d, IActivityMonitor monitor );
+        BaseSetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
+
+        bool OnDeviceConfigured( IActivityMonitor monitor, IDevice device, DeviceApplyConfigurationResult result, DeviceConfiguration externalConfig );
+
+        bool OnDeviceDestroyed( IActivityMonitor monitor, IDevice device );
 
         void OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor );
 
+        Task RaiseDevicesChangedEvent( IActivityMonitor monitor );
+
         void SetDaemon( DeviceHostDaemon daemon );
 
-        ValueTask<long> CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
+        ValueTask<long> DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, DateTime now );
     }
 }

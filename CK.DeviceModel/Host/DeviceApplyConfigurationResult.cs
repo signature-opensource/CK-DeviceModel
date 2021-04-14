@@ -4,7 +4,8 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Describes the result of a device initial configuration or reconfiguration.
-    /// This is returned for each device in <see cref="DeviceHost{T, THostConfiguration, TConfiguration}.ConfigurationResult"/>.
+    /// This is returned for each device in <see cref="DeviceHost{T, THostConfiguration, TConfiguration}.ConfigurationResult"/>
+    /// and is the result of the <see cref="ReconfigureDeviceCommand{THost,TConfiguration}"/>.
     /// </summary>
     public enum DeviceApplyConfigurationResult
     {
@@ -55,9 +56,30 @@ namespace CK.DeviceModel
         UpdateSucceededButStartFailed,
 
         /// <summary>
-        /// The host has considered that the whole configuration was invalid.
+        /// The configuration was invalid.
         /// </summary>
-        InvalidHostConfiguration
+        InvalidConfiguration,
+
+        /// <summary>
+        /// The device has been destroyed.
+        /// </summary>
+        DeviceDestroyed,
+
+        /// <summary>
+        /// The configuration has been canceled.
+        /// </summary>
+        ConfigurationCanceled,
+
+        /// <summary>
+        /// The <see cref="IDevice.ControllerKey"/> doesn't match the <see cref="BaseDeviceCommand.ControllerKey"/>.
+        /// </summary>
+        InvalidControllerKey,
+
+        /// <summary>
+        /// An unexpected error occurred.
+        /// </summary>
+        UnexpectedError
+
     }
 
 }

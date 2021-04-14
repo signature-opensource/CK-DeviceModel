@@ -16,25 +16,42 @@ namespace CK.DeviceModel
         StoppedByDisabledConfiguration,
 
         /// <summary>
-        /// The device stopped because of a call to the public <see cref="IDevice.StopAsync(Core.IActivityMonitor)"/>.
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/>.
         /// </summary>
         StoppedCall,
 
         /// <summary>
-        /// The device stopped because of a call to the protected <see cref="Device{TConfiguration}.AutoStopAsync(Core.IActivityMonitor, bool)"/>.
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/>, ignoring the <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.
         /// </summary>
-        AutoStoppedCall,
+        StoppedForceCall,
 
         /// <summary>
-        /// The device stopped because of a call to the protected <see cref="Device{TConfiguration}.AutoStopAsync(Core.IActivityMonitor, bool)"/>
-        /// with ignoreAlwaysRunning parameter set to true.
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/> while it is handling a command.
         /// </summary>
-        AutoStoppedForceCall,
+        SelfStoppedCall,
 
         /// <summary>
-        /// The device has stopped because it has been destroyed.
+        /// The device stopped because of a call to <see cref="IDevice.StopAsync(Core.IActivityMonitor, bool)"/>, ignoring the <see cref="DeviceConfigurationStatus.AlwaysRunning"/>,
+        /// while it is handling a command.
         /// </summary>
-        Destroyed
+        SelfStoppedForceCall,
+
+        /// <summary>
+        /// The device has stopped because it is being destroyed.
+        /// </summary>
+        Destroyed,
+
+        /// <summary>
+        /// The device has stopped because of a call to <see cref="IDevice.DestroyAsync(Core.IActivityMonitor)"/>,
+        /// while it is handling a command.
+        /// </summary>
+        SelfDestroyed,
+
+        /// <summary>
+        /// The device started because of a <see cref="DeviceCommandStoppedBehavior.SilentAutoStartAndStop"/> command's <see cref="BaseDeviceCommand.StoppedBehavior"/>
+        /// and must be immediately stopped.
+        /// </summary>
+        SilentAutoStartAndStopStoppedBehavior,
     }
 }
 

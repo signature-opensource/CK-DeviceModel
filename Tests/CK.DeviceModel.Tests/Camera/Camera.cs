@@ -6,13 +6,14 @@ using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests
 {
-    public class Camera : Device<CameraConfiguration>, ITestDevice
+    public class Camera : Device<CameraConfiguration>
     {
         public static int TotalCount;
         public static int TotalRunning;
 
         // A device can keep a reference to the current configuration:
         // this configuration is an independent clone that is accessible only to the Device.
+        // Here we use the 
         CameraConfiguration _configRef;
         readonly PerfectEventSender<Camera,int> _flash;
 
@@ -25,10 +26,6 @@ namespace CK.DeviceModel.Tests
         }
 
         public PerfectEvent<Camera,int> Flash => _flash.PerfectEvent;
-
-        public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
-
-        public Task TestForceStopAsync( IActivityMonitor monitor ) => AutoStopAsync( monitor, ignoreAlwaysRunning: true );
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
         {
@@ -49,23 +46,34 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, AsyncDeviceCommand command )
+        public async Task<bool> FlashAsync( IActivityMonitor monitor )
         {
-            if( command is FlashCommand )
+            var cmd = new FlashCommand();
+            if( !UnsafeSendCommand( monitor, cmd ) )
             {
-                return _flash.RaiseAsync( monitor, this, _configRef.FlashColor );
+                // The device is destroyed.
+                return false;
             }
-            return base.DoHandleCommandAsync( monitor, command );
+            // Wait for the command to complete.
+            await cmd.Completion.Task;
+            return true;
         }
 
-        protected override void DoHandleCommand( IActivityMonitor monitor, SyncDeviceCommand command )
+        protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
         {
-            if( command is SetFlashColorCommand f )
+            if( command is FlashCommand f )
             {
-                _configRef.FlashColor = f.Color;
+                await _flash.RaiseAsync( monitor, this, _configRef.FlashColor ).ConfigureAwait( false );
+                f.Completion.SetResult();
                 return;
             }
-            base.DoHandleCommand( monitor, command );
+            if( command is SetFlashColorCommand c )
+            {
+                _configRef.FlashColor = c.Color;
+                c.Completion.SetResult();
+                return;
+            }
+            await base.DoHandleCommandAsync( monitor, command, token );
         }
 
         protected override Task DoDestroyAsync( IActivityMonitor monitor )

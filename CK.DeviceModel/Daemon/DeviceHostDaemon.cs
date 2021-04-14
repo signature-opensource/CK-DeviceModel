@@ -20,6 +20,7 @@ namespace CK.DeviceModel
     public sealed class DeviceHostDaemon : ISingletonAutoService, IHostedService
     {
         readonly IInternalDeviceHost[] _deviceHosts;
+        readonly IDeviceAlwaysRunningPolicy _alwaysRunningPolicy;
         readonly CancellationTokenSource _run;
 
         volatile TaskCompletionSource<bool> _signal;
@@ -28,12 +29,16 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new <see cref="DeviceHostDaemon"/>.
         /// </summary>
-        /// <param name="deviceHosts">The available hosts.</param>
-        public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts )
+        /// <param name="deviceHosts">The available device hosts.</param>
+        /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
+        public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
         {
             _run = new CancellationTokenSource();
-            _signal = new TaskCompletionSource<bool>();
+            // See here https://stackoverflow.com/questions/28321457/taskcontinuationoptions-runcontinuationsasynchronously-and-stack-dives
+            // why RunContinuationsAsynchronously is crucial.
+            _signal = new TaskCompletionSource<bool>( TaskCreationOptions.RunContinuationsAsynchronously );
            _deviceHosts = deviceHosts.Cast<IInternalDeviceHost>().ToArray();
+            _alwaysRunningPolicy = alwaysRunningPolicy ?? throw new ArgumentNullException( nameof( alwaysRunningPolicy ) );
         }
 
         Task IHostedService.StartAsync( CancellationToken cancellationToken )
@@ -51,9 +56,8 @@ namespace CK.DeviceModel
         internal void Signal()
         {
             var s = _signal;
-            _signal = new TaskCompletionSource<bool>();
-            // This ensures that the Loop doesn't run on this thread. 
-            Task.Run( () => s.TrySetResult( true ) );
+            _signal = new TaskCompletionSource<bool>( TaskCreationOptions.RunContinuationsAsynchronously );
+            s.TrySetResult( true );
         }
 
         async Task TheLoop()
@@ -73,7 +77,7 @@ namespace CK.DeviceModel
                     long wait = Int64.MaxValue;
                     foreach( var h in _deviceHosts )
                     {
-                        var delta = await h.CheckAlwaysRunningAsync( _daemonMonitor, now );
+                        var delta = await h.DaemonCheckAlwaysRunningAsync( _daemonMonitor, _alwaysRunningPolicy, now );
                         Debug.Assert( delta > 0 );
                         if( wait > delta ) wait = delta;
                     }
@@ -94,6 +98,7 @@ namespace CK.DeviceModel
                     }
                 }
             }
+            _daemonMonitor.MonitorEnd();
         }
 
         Task IHostedService.StopAsync( CancellationToken cancellationToken )
@@ -102,7 +107,7 @@ namespace CK.DeviceModel
             {
                 Debug.Assert( _daemonMonitor != null );
                 _run.Cancel();
-                _daemonMonitor.MonitorEnd();
+                Signal();
             }
             return Task.CompletedTask;
         }
