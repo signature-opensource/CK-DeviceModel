@@ -36,5 +36,22 @@ namespace CK.DeviceModel
         /// <returns>This type name and current completion status.</returns>
         public override string ToString() => GetType().Name + '<' + typeof( TResult ).Name + "> " + Completion.ToString();
 
+        void ICompletable<TResult>.OnError( Exception ex, ref CompletionSource<TResult>.OnError result ) => OnError( ex, ref result );
+        void ICompletable<TResult>.OnCanceled( ref CompletionSource<TResult>.OnCanceled result ) => OnCanceled( ref result );
+
+        /// <summary>
+        /// Called by the CompletionSource when a error is set.
+        /// This default implementation calls <see cref="CompletionSource{TResult}.OnError.SetException(Exception)"/>.
+        /// </summary>
+        /// <param name="ex">The exception.</param>
+        /// <param name="result">Captures the result: one of the 3 available methods must be called.</param>
+        protected virtual void OnError( Exception ex, ref CompletionSource<TResult>.OnError result ) => result.SetException( ex );
+
+        /// <summary>
+        /// Called by the CompletionSource when a cancellation occurred.
+        /// This default implementation calls <see cref="CompletionSource{TResult}.OnCanceled.SetCanceled()"/>.
+        /// </summary>
+        /// <param name="result">Captures the result: one of the 2 available methods must be called.</param>
+        protected virtual void OnCanceled( ref CompletionSource<TResult>.OnCanceled result ) => result.SetCanceled();
     }
 }
