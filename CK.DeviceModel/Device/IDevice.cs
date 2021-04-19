@@ -3,6 +3,7 @@ using CK.PerfectEvent;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
@@ -38,6 +39,21 @@ namespace CK.DeviceModel
         bool IsDestroyed { get; }
 
         /// <summary>
+        /// Gets the <see cref="DeviceStatus"/> that captures the last change that occurred.
+        /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
+        /// based on this "instant" status should be avoided.
+        /// </summary>
+        public DeviceStatus Status { get; }
+
+        /// <summary>
+        /// Raised whenever a reconfiguration, a start or a stop happens: either the <see cref="IDevice.ConfigurationStatus"/>
+        /// or <see cref="IDevice.Status"/> has changed.
+        /// Reentrancy is forbidden: while handling this event, calling <see cref="StopAsync"/>, <see cref="StartAsync"/> or <see cref="IDeviceHost.ApplyConfigurationAsync"/>
+        /// will throw a <see cref="LockRecursionException"/>.
+        /// </summary>
+        PerfectEvent<IDevice> StatusChanged { get; }
+
+        /// <summary>
         /// Gets the current configuration status of this device.
         /// Just like <see cref="IsRunning"/>, since a device lives in multi-threaded/concurrent contexts,
         /// any sensible decision based on this "instant" status should be avoided.
@@ -61,9 +77,43 @@ namespace CK.DeviceModel
         Task<bool> StartAsync( IActivityMonitor monitor );
 
         /// <summary>
-        /// Raised whenever a reconfiguration, a start or a stop happens.
+        /// Gets the current controller key. It can be null but not the empty string.
+        /// When null, the <see cref="DeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.Handle(IActivityMonitor, DeviceCommand)"/>
+        /// checks that the command's controller key is the same as this one otherwise the command is not handled.
         /// </summary>
-        PerfectEvent<IDevice, DeviceStateChangedEvent> StateChanged { get; }
+        string? ControllerKey { get; }
+
+        /// <summary>
+        /// Sets a new <see cref="ControllerKey"/>, whatever its current value is.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="key">The controller key.</param>
+        /// <returns>
+        /// True if it has been changed, false otherwise, typically because the key has been fixed
+        /// by the <see cref="DeviceConfiguration.ControllerKey"/>.
+        /// </returns>
+        Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? key );
+
+        /// <summary>
+        /// Sets a new <see cref="ControllerKey"/> only if the current one is the same as the specified <paramref name="current"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="current">The current value to challenge.</param>
+        /// <param name="key">The controller key to set.</param>
+        /// <returns>
+        /// True if it has been changed, false otherwise: either the current key doesn't match the <paramref name="current"/>
+        /// or the key has been fixed by configuration (the <see cref="DeviceConfiguration.ControllerKey"/>).
+        /// </returns>
+        Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key );
+
+        /// <summary>
+        /// Raised whenever the <see cref="ControllerKey"/> changed, either because of a reconfiguration or
+        /// because of a call to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or <see cref="SetControllerKeyAsync(IActivityMonitor, string?, string?)"/>.
+        /// <para>
+        /// When handling such event it is possible to call methods on this device since the async lock has been released.
+        /// </para>
+        /// </summary>
+        PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
     }
 

@@ -35,8 +35,8 @@ namespace CK.DeviceModel.Configuration.Tests
             public static int TotalCount;
             public static int TotalRunning;
 
-            public Camera( IActivityMonitor monitor, CameraConfiguration config )
-                : base( monitor, config )
+            public Camera( IActivityMonitor monitor, CreateInfo info )
+                : base( monitor, info )
             {
                 Interlocked.Increment( ref TotalCount );
             }
@@ -67,11 +67,12 @@ namespace CK.DeviceModel.Configuration.Tests
 
         public class CameraHost : DeviceHost<Camera, DeviceHostConfiguration<CameraConfiguration>, CameraConfiguration>
         {
-            public static CameraHost? Instance;
+            public static CameraHost? TestInstance;
 
-            public CameraHost()
+            public CameraHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
+                : base( alwaysRunningPolicy )
             {
-                Instance = this;
+                TestInstance = this;
             }
         }
 
@@ -92,8 +93,8 @@ namespace CK.DeviceModel.Configuration.Tests
             public static int TotalCount;
             public static int TotalRunning;
 
-            public LightController( IActivityMonitor monitor, LightControllerConfiguration config )
-                : base( monitor, config )
+            public LightController( IActivityMonitor monitor, CreateInfo info )
+                : base( monitor, info )
             {
                 Interlocked.Increment( ref TotalCount );
             }
@@ -126,7 +127,8 @@ namespace CK.DeviceModel.Configuration.Tests
         {
             public static LightControllerHost? Instance;
 
-            public LightControllerHost()
+            public LightControllerHost( IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
+                : base( alwaysRunningPolicy )
             {
                 Instance = this;
             }
@@ -186,16 +188,16 @@ namespace CK.DeviceModel.Configuration.Tests
             config.Provider.Set( "Device:LightControllerHost:Items:L1:Status", "Disabled" );
             await RunHost( config, services =>
             {
-                Debug.Assert( CameraHost.Instance != null );
+                Debug.Assert( CameraHost.TestInstance != null );
                 Debug.Assert( LightControllerHost.Instance != null );
 
                 Camera.TotalCount.Should().Be( 2 );
                 Camera.TotalRunning.Should().Be( 0 );
                 LightController.TotalCount.Should().Be( 1 );
                 LightController.TotalRunning.Should().Be( 0 );
-                var c1 = CameraHost.Instance.FindWithConfiguration( "C1" );
-                var c2 = CameraHost.Instance.FindWithConfiguration( "C2" );
-                var l1 = LightControllerHost.Instance.FindWithConfiguration( "L1" );
+                var c1 = CameraHost.TestInstance.GetConfiguredDevice( "C1" );
+                var c2 = CameraHost.TestInstance.GetConfiguredDevice( "C2" );
+                var l1 = LightControllerHost.Instance.GetConfiguredDevice( "L1" );
                 Debug.Assert( c1 != null && c2 != null && l1 != null );
                 c1.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
                 c2.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
@@ -214,15 +216,15 @@ namespace CK.DeviceModel.Configuration.Tests
             config.Provider.Set( "Device:LightControllerHost:Items:L2:Status", "Disabled" );
             await RunHost( config, async services =>
             {
-                Debug.Assert( CameraHost.Instance != null );
+                Debug.Assert( CameraHost.TestInstance != null );
                 Debug.Assert( LightControllerHost.Instance != null );
 
                 Camera.TotalCount.Should().Be( 2 );
                 Camera.TotalRunning.Should().Be( 2 );
                 LightController.TotalCount.Should().Be( 2 );
                 LightController.TotalRunning.Should().Be( 0 );
-                var c1 = CameraHost.Instance.Find( "C1" );
-                var c2 = CameraHost.Instance.Find( "C2" );
+                var c1 = CameraHost.TestInstance.Find( "C1" );
+                var c2 = CameraHost.TestInstance.Find( "C2" );
                 var l1 = LightControllerHost.Instance.Find( "L1" );
                 var l2 = LightControllerHost.Instance.Find( "L2" );
                 Debug.Assert( c1 != null && c2 != null && l1 != null && l2 != null );
@@ -261,7 +263,7 @@ namespace CK.DeviceModel.Configuration.Tests
                 l1.IsDestroyed.Should().BeFalse();
                 l2.IsDestroyed.Should().BeFalse();
 
-                await CameraHost.Instance.ClearAsync( TestHelper.Monitor );
+                await CameraHost.TestInstance.ClearAsync( TestHelper.Monitor );
                 await LightControllerHost.Instance.ClearAsync( TestHelper.Monitor );
 
                 c1.IsRunning.Should().BeFalse();
@@ -276,6 +278,13 @@ namespace CK.DeviceModel.Configuration.Tests
             } );
         }
 
+        static int DevicesChangedCount = 0;
+        static Task DevicesChanged_Async( IActivityMonitor monitor, IDeviceHost e )
+        {
+            Interlocked.Increment( ref DevicesChangedCount );
+            return Task.CompletedTask;
+        }
+
         [Test]
         public async Task configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service()
         {
@@ -283,15 +292,19 @@ namespace CK.DeviceModel.Configuration.Tests
             config.Provider.Set( "Device:CameraHost:Items:C1:Status", "RunnableStarted" );
             await RunHost( config, async services =>
             {
-                Debug.Assert( CameraHost.Instance != null );
+                Debug.Assert( CameraHost.TestInstance != null );
                 Debug.Assert( LightControllerHost.Instance != null );
+
+                CameraHost.TestInstance.Should().BeSameAs( services.GetRequiredService<CameraHost>() );
+                CameraHost.TestInstance.DevicesChanged.Async += DevicesChanged_Async; 
 
                 Camera.TotalCount.Should().Be( 1 );
                 Camera.TotalRunning.Should().Be( 1 );
                 LightController.TotalCount.Should().Be( 0 );
                 LightController.TotalRunning.Should().Be( 0 );
+                DevicesChangedCount = 0;
 
-                var c1 = CameraHost.Instance.Find( "C1" );
+                var c1 = CameraHost.TestInstance.Find( "C1" );
                 Debug.Assert( c1 != null );
                 c1.IsRunning.Should().BeTrue();
 
@@ -300,13 +313,14 @@ namespace CK.DeviceModel.Configuration.Tests
                 await Task.Delay( 50 );
 
                 c1.IsRunning.Should().BeFalse();
+                DevicesChangedCount.Should().Be( 1 );
 
                 config.Provider.Set( "Device:CameraHost:Items:C1:Status", "AlwaysRunning" );
                 config.Provider.Set( "Device:CameraHost:Items:C2:Status", "Disabled" );
                 config.Provider.RaiseChanged();
                 await Task.Delay( 50 );
 
-                var c2 = CameraHost.Instance.Find( "C2" );
+                var c2 = CameraHost.TestInstance.Find( "C2" );
                 Debug.Assert( c2 != null );
 
                 c1.IsRunning.Should().BeTrue();
@@ -325,17 +339,19 @@ namespace CK.DeviceModel.Configuration.Tests
                 // Setting IsPartialConfiguration to false: the C1 device doesn't exist anymore!
                 config.Provider.Set( "Device:CameraHost:IsPartialConfiguration", "false" );
                 config.Provider.RaiseChanged();
-                await Task.Delay( 50 );
+                await Task.Delay( 150 );
 
                 c1.IsDestroyed.Should().BeTrue( "C1 is dead." );
                 c2.IsRunning.Should().BeTrue();
 
-                await CameraHost.Instance.ClearAsync( TestHelper.Monitor );
+                CameraHost.TestInstance.DevicesChanged.Async -= DevicesChanged_Async;
+                await CameraHost.TestInstance.ClearAsync( TestHelper.Monitor );
 
                 c1.IsDestroyed.Should().BeTrue();
                 c2.IsDestroyed.Should().BeTrue();
             } );
         }
+
 
         async Task RunHost( DynamicConfiguration config, Func<IServiceProvider,Task> running, [CallerMemberName] string? caller = null )
         {
@@ -345,18 +361,21 @@ namespace CK.DeviceModel.Configuration.Tests
                 Camera.TotalRunning.Should().Be( 0 );
                 LightController.TotalCount.Should().Be( 0 );
                 LightController.TotalRunning.Should().Be( 0 );
-                CameraHost.Instance.Should().BeNull();
+                CameraHost.TestInstance.Should().BeNull();
                 LightControllerHost.Instance.Should().BeNull();
 
                 using( var host = new HostBuilder()
                                         .ConfigureAppConfiguration( builder => builder.AddConfiguration( config.Root ) )
                                         .ConfigureServices( services =>
                                         {
+                                            services.AddSingleton( config.Root );
                                             // All this is done automatically by CKSetup.
                                             services.AddSingleton<LightControllerHost>();
                                             services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, LightControllerHost>( sp => sp.GetRequiredService<LightControllerHost>() ) );
                                             services.AddSingleton<CameraHost>();
                                             services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, CameraHost>( sp => sp.GetRequiredService<CameraHost>() ) );
+                                            services.AddHostedService<DeviceHostDaemon>();
+                                            services.AddSingleton<IDeviceAlwaysRunningPolicy, DefaultDeviceAlwaysRunningPolicy>();
                                             services.AddHostedService<DeviceConfigurator>();
                                         } )
                                         .Build() )
@@ -370,7 +389,7 @@ namespace CK.DeviceModel.Configuration.Tests
                     var hosts = new IDeviceHost[] { host.Services.GetRequiredService<CameraHost>(), host.Services.GetRequiredService<LightControllerHost>() };
                     allHosts.Should().BeEquivalentTo( hosts, o => o.WithoutStrictOrdering() );
 
-                    CameraHost.Instance.Should().NotBeNull();
+                    CameraHost.TestInstance.Should().NotBeNull();
                     LightControllerHost.Instance.Should().NotBeNull();
 
                     await running( host.Services );
@@ -378,7 +397,7 @@ namespace CK.DeviceModel.Configuration.Tests
                     await host.StopAsync();
                 }
 
-                CameraHost.Instance = null;
+                CameraHost.TestInstance = null;
                 LightControllerHost.Instance = null;
             }
         }

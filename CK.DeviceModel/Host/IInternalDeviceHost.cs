@@ -10,7 +10,7 @@ namespace CK.DeviceModel
     /// Internal interface that define non-generic host behaviors: Devices
     /// call these methods.
     /// </summary>
-    internal interface IInternalDeviceHost : IDeviceHost
+    interface IInternalDeviceHost : IDeviceHost
     {
         Task<bool> StartAsync( IDevice d, IActivityMonitor monitor );
 
@@ -18,6 +18,14 @@ namespace CK.DeviceModel
 
         Task<bool> AutoStopAsync( IDevice d, IActivityMonitor monitor, bool ignoreAlwaysRunning );
 
+        Task<bool> SetControllerKeyAsync( IDevice d, IActivityMonitor monitor, bool checkCurrent, string? current, string? key );
+
         Task AutoDestroyAsync( IDevice d, IActivityMonitor monitor );
+
+        void OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor );
+
+        void SetDaemon( DeviceHostDaemon daemon );
+
+        ValueTask<long> CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
     }
 }

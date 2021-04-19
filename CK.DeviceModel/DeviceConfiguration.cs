@@ -27,6 +27,7 @@ namespace CK.DeviceModel
         {
             Name = source.Name;
             Status = source.Status;
+            ControllerKey = source.ControllerKey;
         }
 
         /// <summary>
@@ -41,11 +42,18 @@ namespace CK.DeviceModel
         public DeviceConfigurationStatus Status { get; set; }
 
         /// <summary>
+        /// Gets or sets the configured controller key.
+        /// When not null this locks the <see cref="IDevice.ControllerKey"/> to this value.
+        /// When a configuration is applied, this configuration value overrides any existing device's controller key.
+        /// </summary>
+        public string? ControllerKey { get; set; }
+
+        /// <summary>
         /// Checks whether this configuration is valid.
         /// This checks that the <see cref="Name"/> is not empty and calls the protected <see cref="DoCheckValid(IActivityMonitor)"/>
         /// that can handle specialized checks.
         /// </summary>
-        /// <param name="monitor">The monitor to log error, warnigs or other.</param>
+        /// <param name="monitor">The monitor to log errors or warnings or information.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
         public bool CheckValid( IActivityMonitor monitor )
         {
@@ -60,9 +68,9 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Optional extension point to check for validity.
-        /// Always returs true by default.
+        /// Always returns true by default.
         /// </summary>
-        /// <param name="monitor">The monitor to log error, warnigs or other.</param>
+        /// <param name="monitor">The monitor to log error, warnings or other.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
         protected virtual bool DoCheckValid( IActivityMonitor monitor ) => true;
 

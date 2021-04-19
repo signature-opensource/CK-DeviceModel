@@ -52,7 +52,12 @@ namespace CK.DeviceModel
         /// The device's configuration has been changed but the configured status (<see cref="DeviceConfigurationStatus.AlwaysRunning"/> or <see cref="DeviceConfigurationStatus.RunnableStarted"/>)
         /// implied a Start that failed.
         /// </summary>
-        UpdateSucceededButStartFailed
+        UpdateSucceededButStartFailed,
+
+        /// <summary>
+        /// The host has considered that the whole configuration was invalid.
+        /// </summary>
+        InvalidHostConfiguration
     }
 
 }

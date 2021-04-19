@@ -14,7 +14,9 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Handles the "Device" configuration section by configuring all the <see cref="IDeviceHost"/> available in the DI Container.
+    /// Handles the "Device" configuration section (if it exists) by configuring all the <see cref="IDeviceHost"/> available in the DI Container
+    /// and supports the "restarter daemon" that allows devices with <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration
+    /// to be monitored and automatically restarted when stopped (see <see cref="IDeviceAlwaysRunningPolicy"/>).
     /// </summary>
     public class DeviceConfigurator : ISingletonAutoService, IHostedService
     {
@@ -30,7 +32,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="configuration">The global configuration.</param>
         /// <param name="deviceHosts">The available hosts.</param>
-        public DeviceConfigurator( IConfiguration configuration, IEnumerable<IDeviceHost> deviceHosts )
+        public DeviceConfigurator( IConfigurationRoot configuration, IEnumerable<IDeviceHost> deviceHosts )
         {
             _run = new CancellationTokenSource();
             _configuration = configuration.GetSection( "Device" );
@@ -53,24 +55,23 @@ namespace CK.DeviceModel
 
         async Task TheLoop()
         {
-            IActivityMonitor monitor = new ActivityMonitor( nameof( DeviceConfigurator ) + " (ApplyConfiguration)" );
+            Debug.Assert( _changeMonitor != null );
             var tRun = _run.Token;
             while( !_run.IsCancellationRequested )
             {
                 var toApply = await _applyChannel.Reader.ReadAsync( tRun );
-                await ApplyOnceAsync( monitor, toApply, tRun );
+                await ApplyOnceAsync( _changeMonitor, toApply, tRun );
             }
-            monitor.MonitorEnd();
         }
 
         async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply, CancellationToken cancellationToken )
         {
-            foreach( var (device, config) in toApply )
+            foreach( var (host, config) in toApply )
             {
-                if( device == null ) break;
+                if( host == null ) break;
                 try
                 {
-                    await device.ApplyConfigurationAsync( monitor, config );
+                    await host.ApplyConfigurationAsync( monitor, config );
                 }
                 catch( Exception ex )
                 {
@@ -200,7 +201,7 @@ namespace CK.DeviceModel
                 public IConfigurationSection GetSection( string key ) => new Empty( this, key );
             }
 
-            static readonly string SkippedLeaf = ConfigurationPath.KeyDelimiter + nameof(IDeviceHostConfiguration.Items );
+            static readonly string _skippedLeaf = ConfigurationPath.KeyDelimiter + nameof(IDeviceHostConfiguration.Items );
 
             public IConfigurationSection InnerSection = null!;
 
@@ -222,7 +223,7 @@ namespace CK.DeviceModel
 
             public IEnumerable<IConfigurationSection> GetChildren()
             {
-                return InnerSection.GetChildren().Where( c => !c.Path.EndsWith( SkippedLeaf ) );
+                return InnerSection.GetChildren().Where( c => !c.Path.EndsWith( _skippedLeaf ) );
             }
 
             public IChangeToken GetReloadToken() => InnerSection.GetReloadToken();
@@ -235,6 +236,7 @@ namespace CK.DeviceModel
 
         Task IHostedService.StopAsync( CancellationToken cancellationToken )
         {
+            Debug.Assert( _changeMonitor != null );
             _run.Cancel();
             _changeSubscription?.Dispose();
             _changeMonitor.MonitorEnd();
