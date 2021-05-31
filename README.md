@@ -168,6 +168,7 @@ Implementing a new device requires to define its host and its configuration type
 >  - The `Flash` event here is dedicated to a "flash" device event. When multiple device events exist, 
  a generic `AllEvent` that sends a base `MyDeviceEvent` class and multiple specialized events classes is easier
 to implement and use (the event handler applies a simple pattern matching on the event argument).
+>  - More documentation on Commands can be found [here](CK.DeviceModel/Command#command-handling-its-all-about-command-completion).
 
 
 - Below is a helper that triggers a flash directly on the device: such specific device API must always be simple helpers that eventually send a command (an await its completion).
