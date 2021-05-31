@@ -163,14 +163,14 @@ Implementing a new device requires to define its host and its configuration type
     }
 ```
 
-Notes:
- - [Perfect events](https://github.com/Invenietis/CK-ActivityMonitor/tree/master/CK.PerfectEvent) support Sync, Async and ParrallelAsync handlers and comes with a monitor that callbacks can use.
- - The `Flash` event here is dedicated to the "flash" device event. When multiple device events exist, 
+> Notes:
+>  - [Perfect events](https://github.com/Invenietis/CK-ActivityMonitor/tree/master/CK.PerfectEvent) support Sync, Async and ParrallelAsync handlers (and provides a monitor to the callbacks).
+>  - The `Flash` event here is dedicated to a "flash" device event. When multiple device events exist, 
  a generic `AllEvent` that sends a base `MyDeviceEvent` class and multiple specialized events classes is easier
 to implement and use (the event handler applies a simple pattern matching on the event argument).
 
-- Below is a helper that triggers a flash directly on the device: such specific API must always be a simple helper 
-- that eventually sends a command (an awaits its completion).
+
+- Below is a helper that triggers a flash directly on the device: such specific device API must always be simple helpers that eventually send a command (an await its completion).
 
 ```csharp
     public async Task<bool> FlashAsync( IActivityMonitor monitor )
