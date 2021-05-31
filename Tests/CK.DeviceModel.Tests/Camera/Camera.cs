@@ -61,18 +61,21 @@ namespace CK.DeviceModel.Tests
 
         protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
         {
-            if( command is FlashCommand f )
+            switch( command )
             {
-                await _flash.RaiseAsync( monitor, this, _configRef.FlashColor ).ConfigureAwait( false );
-                f.Completion.SetResult();
-                return;
+                case FlashCommand f:
+                    await _flash.RaiseAsync( monitor, this, _configRef.FlashColor ).ConfigureAwait( false );
+                    f.Completion.SetResult();
+                    return;
+                case SetFlashColorCommand c:
+                    {
+                        var prevColor = _configRef.FlashColor;
+                        _configRef.FlashColor = c.Color;
+                        c.Completion.SetResult( prevColor );
+                        return;
+                    }
             }
-            if( command is SetFlashColorCommand c )
-            {
-                _configRef.FlashColor = c.Color;
-                c.Completion.SetResult();
-                return;
-            }
+            // The base.DoHandleCommandAsync throws a NotSupportedException: all defined commands MUST be handled above.
             await base.DoHandleCommandAsync( monitor, command, token );
         }
 

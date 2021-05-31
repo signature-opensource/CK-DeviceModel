@@ -4,8 +4,14 @@ using System.Text;
 
 namespace CK.DeviceModel.Tests
 {
-    public class SetFlashColorCommand : DeviceCommand<CameraHost>
+    /// <summary>
+    /// The command returns the previous color.
+    /// </summary>
+    public class SetFlashColorCommand : DeviceCommand<CameraHost,int>
     {
+        /// <summary>
+        /// The new color to set.
+        /// </summary>
         public int Color { get; set; }
     }
 }

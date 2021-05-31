@@ -45,7 +45,11 @@ Implementing a new device requires to define its host and its configuration type
       public int FlashColor { get; set; }
 
       public int FlashRate { get; set; } = 1;
-
+      
+      /// <summary>
+      /// This uses the monitor to declare/explain errors.
+      /// </summary>
+      /// <returns>True if the configuration is valid, false otherwise.</returns>
       protected override bool DoCheckValid( IActivityMonitor monitor )
       {
           bool isValid = true;
@@ -64,7 +68,7 @@ Implementing a new device requires to define its host and its configuration type
   }
 ```
 
-- The device itself. This is a minimal definition without any Command nor event but that keeps the configuration and handles the reconfiguration.
+- The device itself. This is a minimal definition without any Command nor event. It keeps the configuration and handles reconfiguration.
 
 ```csharp
   public class Camera : Device<CameraConfiguration>
@@ -106,33 +110,67 @@ Implementing a new device requires to define its host and its configuration type
 
 ```
 
-- Defining a Command (without result).
+- Defining two commands (one without result and one with a result).
 
 ```csharp
+    /// <summary>
+    /// This command triggers a flash on the camera (and raise our <see cref="Camera.Flash"/> event).
+    /// </summary>
     public class FlashCommand : DeviceCommand<CameraHost>
     {
     }
+
+    /// <summary>
+    /// The command returns the previous color.
+    /// </summary>
+    public class SetFlashColorCommand : DeviceCommand<CameraHost,int>
+    {
+        /// <summary>
+        /// The new color to set.
+        /// </summary>
+        public int Color { get; set; }
+    }
 ```
 
-- Extending the device with a `Flash` event and the handling of the command.
+- Here we define a `Flash` event and we implement the two commands defined above:
 
 ```csharp
     ...
     readonly PerfectEventSender<Camera,int> _flash;
-    ...
-    protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
+
+    public PerfectEvent<Camera,int> Flash => _flash.PerfectEvent;
+
+    protected override async Task DoHandleCommandAsync( IActivityMonitor monitor,
+                                                        BaseDeviceCommand command,
+                                                        CancellationToken token )
     {
-        if( command is FlashCommand f )
+        switch( command )
         {
-            await _flash.RaiseAsync( monitor, this, _configRef.FlashColor ).ConfigureAwait( false );
-            f.Completion.SetResult();
-            return;
+            case FlashCommand f:
+                await _flash.RaiseAsync( monitor, this, _configRef.FlashColor ).ConfigureAwait( false );
+                f.Completion.SetResult();
+                return;
+            case SetFlashColorCommand c:
+                {
+                    var prevColor = _configRef.FlashColor;
+                    _configRef.FlashColor = c.Color;
+                    c.Completion.SetResult( prevColor );
+                    return;
+                }
         }
+        // The base.DoHandleCommandAsync throws a NotSupportedException: all defined commands MUST be handled above!
         await base.DoHandleCommandAsync( monitor, command, token );
     }
 ```
 
-- Providing a helper that triggers a flash directly on the device MUST rely on the Command:
+Notes:
+ - [Perfect events](https://github.com/Invenietis/CK-ActivityMonitor/tree/master/CK.PerfectEvent) support Sync, Async and ParrallelAsync handlers and comes with a monitor that callbacks can use.
+ - The `Flash` event here is dedicated to the "flash" device event. When multiple device events exist, 
+ a generic `AllEvent` that sends a base `MyDeviceEvent` class and multiple specialized events classes is easier
+to implement and use (the event handler applies a simple pattern matching on the event argument).
+
+- Below is a helper that triggers a flash directly on the device: such specific API must always be a simple helper 
+- that eventually sends a command (an awaits its completion).
 
 ```csharp
     public async Task<bool> FlashAsync( IActivityMonitor monitor )
