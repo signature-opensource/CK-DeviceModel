@@ -23,6 +23,11 @@ namespace CK.DeviceModel.Tests
             _configRef = info.Configuration;
         }
 
+        /// <summary>
+        /// Gets or sets whether <see cref="DoStartAsync(IActivityMonitor, DeviceStartedReason)"/> will fail.
+        /// </summary>
+        public bool FailToStart { get; set; }
+
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, MachineConfiguration config )
         {
             return Task.FromResult( DeviceReconfiguredResult.None );
@@ -31,7 +36,7 @@ namespace CK.DeviceModel.Tests
         protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
         {
             Interlocked.Increment( ref TotalRunning );
-            return Task.FromResult( true );
+            return Task.FromResult( !FailToStart );
         }
 
         protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )

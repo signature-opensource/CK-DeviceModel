@@ -9,10 +9,10 @@ is `AlwaysRunning`.
 The global [IDeviceAlwaysRunningPolicy](IDeviceAlwaysRunningPolicy.cs) service that is in charge of trying to restart the devices
 is also injected.
 
-The [DefaultDeviceAlwaysRunningPolicy](DefaultDeviceAlwaysRunningPolicy.cs) is a simple default implementation. Being a ISingletonAutoService,
+The [DefaultDeviceAlwaysRunningPolicy](DefaultDeviceAlwaysRunningPolicy.cs) is a simple default global implementation. Being a ISingletonAutoService,
 it can easily be specialized or replaced with any specific implementation.
 
-This global policy applies to all the devices regardless of the their host. But a [DeviceHost](../Host/DeviceHost.TrackAlwaysRunning.cs)
+This global policy applies to all the devices regardless of the their host. But each [DeviceHost](../Host/DeviceHost.TrackAlwaysRunning.cs)
 can override the following method to handle the restart of its devices if needed:
 
 ```csharp

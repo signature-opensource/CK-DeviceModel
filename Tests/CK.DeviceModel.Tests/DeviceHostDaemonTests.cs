@@ -280,5 +280,57 @@ namespace CK.DeviceModel.Tests
             await host2.ClearAsync( TestHelper.Monitor );
             await host3.ClearAsync( TestHelper.Monitor );
         }
+
+        [Test]
+        public async Task DefaultDeviceAlwaysRunningPolicy_always_retry_by_default()
+        {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( DefaultDeviceAlwaysRunningPolicy_always_retry_by_default ) );
+
+            var policy = new DefaultDeviceAlwaysRunningPolicy();
+            var host = new MachineHost();
+
+            var daemon = new DeviceHostDaemon( new[] { host }, policy );
+
+            await ((IHostedService)daemon).StartAsync( default );
+            var config = new MachineConfiguration() { Name = "M", Status = DeviceConfigurationStatus.AlwaysRunning };
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+
+            var d = host["M"];
+            Debug.Assert( d != null );
+            d.IsRunning.Should().BeTrue();
+
+            // The device now fails to start. Reset the counter.
+            Machine.TotalRunning = 0;
+            d.FailToStart = true;
+            await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true );
+            d.IsRunning.Should().BeFalse();
+
+            // Waiting for all the timeouts.
+            foreach( var delay in policy.RetryTimeouts )
+            {
+                await Task.Delay( delay );
+                d.IsRunning.Should().BeFalse();
+            }
+            // Waiting for 2 more attempts.
+            for( int i = 0; i < 2; ++i )
+            {
+                await Task.Delay( policy.RetryTimeouts[^1] );
+                d.IsRunning.Should().BeFalse();
+            }
+            // To be sure that we have honored the "alwaysRetry" parameter.
+            Machine.TotalRunning.Should().BeGreaterThan( policy.RetryTimeouts.Count );
+
+            // Let the device be started again.
+            d.FailToStart = false;
+            await Task.Delay( policy.RetryTimeouts[^1] );
+            d.IsRunning.Should().BeTrue();
+
+            await d.DestroyAsync( TestHelper.Monitor );
+            d.IsRunning.Should().BeFalse();
+            d.IsDestroyed.Should().BeTrue();
+            await ((IHostedService)daemon).StopAsync( default );
+        }
+
+
     }
 }
