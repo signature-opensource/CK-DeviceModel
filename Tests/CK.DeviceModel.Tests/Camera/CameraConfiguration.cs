@@ -39,6 +39,23 @@ namespace CK.DeviceModel.Tests
             }
             return isValid;
         }
+
+        public CameraConfiguration( ICKBinaryReader r )
+            : base( r )
+        {
+            r.ReadByte(); // version
+            FlashColor = r.ReadInt32();
+            FlashRate = r.ReadInt32();
+        }
+
+        public override void Write( ICKBinaryWriter w )
+        {
+            base.Write( w );
+            w.Write( (byte)0 );
+            w.Write( FlashColor );
+            w.Write( FlashRate );
+        }
+
     }
 
 }

@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
 
 namespace CK.DeviceModel
 {
@@ -10,12 +11,14 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class DeviceConfiguration : ICloneableCopyCtor
     {
+        string _name;
+
         /// <summary>
         /// Initializes a new device configuration with an empty name and a <see cref="DeviceConfigurationStatus.Disabled"/> status.
         /// </summary>
         protected DeviceConfiguration()
         {
-            Name = String.Empty;
+            _name = String.Empty;
         }
 
         /// <summary>
@@ -25,16 +28,53 @@ namespace CK.DeviceModel
         /// <param name="source">The source configuration to copy.</param>
         protected DeviceConfiguration( DeviceConfiguration source )
         {
-            Name = source.Name;
+            _name = source.Name;
             Status = source.Status;
             ControllerKey = source.ControllerKey;
         }
 
         /// <summary>
+        /// Deserialization constructor.
+        /// Every specialized configuration MUST define its own deserialization
+        /// constructor (that must call this base) and override the <see cref="Write(ICKBinaryWriter)"/>
+        /// method (that must start to call its base Write method).
+        /// </summary>
+        /// <param name="r">The reader.</param>
+        protected DeviceConfiguration( ICKBinaryReader r )
+        {
+            r.ReadByte(); // Version
+            _name = r.ReadString();
+            Status = r.ReadEnum<DeviceConfigurationStatus>();
+            ControllerKey = r.ReadNullableString();
+        }
+
+        /// <summary>
+        /// Writes this configuration to the binary writer.
+        /// This method MUST be overridden and MUST start with:
+        /// <list type="bullet">
+        ///     <item>A call to <c>base.Write( w );</item>
+        ///     <item>Writing its version number (typically a byte).</item>
+        /// </list>
+        /// </summary>
+        /// <param name="w">The writer.</param>
+        public virtual void Write( ICKBinaryWriter w )
+        {
+            w.Write( (byte)0 ); // Version
+            w.Write( _name );
+            w.WriteEnum( Status );
+            w.WriteNullableString( ControllerKey );
+        }
+
+
+        /// <summary>
         /// Gets or sets the name of the device.
         /// This is a unique key for a device in its host.
         /// </summary>
-        public string Name { get; set; }
+        public string Name
+        {
+            get => _name;
+            set => _name = value ?? throw new ArgumentNullException( nameof( Name ) );
+        }
 
         /// <summary>
         /// Gets or sets the <see cref="DeviceConfigurationStatus"/>.

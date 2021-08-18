@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -32,6 +33,21 @@ namespace CK.DeviceModel.Tests
             }
 
             public string? Trace { get; set; }
+
+            public DConfiguration( ICKBinaryReader r )
+                : base( r )
+            {
+                r.ReadByte(); // version
+                Trace = r.ReadNullableString();
+            }
+
+            public override void Write( ICKBinaryWriter w )
+            {
+                base.Write( w );
+                w.Write( (byte)0 );
+                w.WriteNullableString( Trace );
+            }
+
         }
 
         public class D : Device<DConfiguration>

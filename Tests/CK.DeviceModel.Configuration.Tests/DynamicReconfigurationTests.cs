@@ -28,6 +28,18 @@ namespace CK.DeviceModel.Configuration.Tests
                 : base( o )
             {
             }
+
+            public CameraConfiguration( ICKBinaryReader r )
+                : base( r )
+            {
+                r.ReadByte(); // version
+            }
+
+            public override void Write( ICKBinaryWriter w )
+            {
+                base.Write( w );
+                w.Write( (byte)0 );
+            }
         }
 
         public class Camera : Device<CameraConfiguration>
@@ -84,6 +96,18 @@ namespace CK.DeviceModel.Configuration.Tests
             public LightControllerConfiguration( LightControllerConfiguration o )
                 : base( o )
             {
+            }
+
+            public LightControllerConfiguration( ICKBinaryReader r )
+                : base( r )
+            {
+                r.ReadByte(); // version
+            }
+
+            public override void Write( ICKBinaryWriter w )
+            {
+                base.Write( w );
+                w.Write( (byte)0 );
             }
         }
 
