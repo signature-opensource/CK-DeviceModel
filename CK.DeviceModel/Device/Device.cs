@@ -9,6 +9,7 @@ using CK.Core;
 using CK.PerfectEvent;
 using CK.Text;
 using System.Threading.Channels;
+
 namespace CK.DeviceModel
 {
     /// <summary>
@@ -24,6 +25,7 @@ namespace CK.DeviceModel
         readonly PerfectEventSender<IDevice> _statusChanged;
         readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
         readonly ActivityMonitor _commandMonitor;
+        readonly CancellationTokenSource _destroyed;
         bool _controllerKeyFromConfiguration;
         volatile bool _isRunning;
 
@@ -58,7 +60,10 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new device bound to a configuration.
         /// Concrete device must expose a constructor with the exact same signature: initial configuration is handled by
-        /// this constructor, warnings or errors must be logged and exception can be thrown if anything goes wrong. 
+        /// this constructor, warnings or errors must be logged and exception can be thrown if anything goes wrong.
+        /// <para>
+        /// The monitor here must be used only during the construction of the device. No reference to it must be kept.
+        /// </para>
         /// </summary>
         /// <param name="monitor">
         /// The monitor to use for the initialization phase. A reference to this monitor must not be kept.
@@ -89,12 +94,12 @@ namespace CK.DeviceModel
             _commandQueue = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
             _commandQueueImmediate = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
             _deferredCommands = new Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>();
-
+            _destroyed = new CancellationTokenSource();
             _ = Task.Run( CommandRunLoop );
         }
 
         /// <summary>
-        /// Gets the name. Necessarily not null or whitespace.
+        /// Gets the device name (relative to its host). Necessarily not null or whitespace.
         /// </summary>
         public string Name { get; }
 
@@ -136,7 +141,12 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets whether this device has been destroyed.
         /// </summary>
-        public bool IsDestroyed => _host == null;
+        public bool IsDestroyed => _destroyed.IsCancellationRequested;
+
+        /// <summary>
+        /// Gets a cancellation token that is bound to the destruction of this device.
+        /// </summary>
+        protected CancellationToken DestroyedToken => _destroyed.Token;
 
         /// <inheritdoc />
         public DeviceStatus Status => _status;
@@ -485,7 +495,7 @@ namespace CK.DeviceModel
                 {
                     _configStatus = DeviceConfigurationStatus.Disabled;
                 }
-                // StoppedForceCall, AutoStoppedForceCall, AutoDestroy and AutoDestroyed skips AlwaysRunning check.
+                // StoppedForceCall, SelfStoppedForceCall, Destroyed and SelfDestroyed skips AlwaysRunning check.
                 var r = SyncStateStopCheck( _commandMonitor, cmd?.IgnoreAlwaysRunning
                                                              ?? reason == DeviceStoppedReason.StoppedForceCall
                                                                 || reason == DeviceStoppedReason.SelfStoppedForceCall
@@ -573,6 +583,7 @@ namespace CK.DeviceModel
             FullName += " (Destroyed)";
             var h = _host;
             _host = null;
+            _destroyed.Cancel();
             if( h.OnDeviceDestroyed( _commandMonitor, this ) )
             {
                 await h.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );

@@ -5,7 +5,7 @@ using System.Text;
 namespace CK.DeviceModel.Tests
 {
     /// <summary>
-    /// The command returns the previous color.
+    /// This command returns the previous color.
     /// </summary>
     public class SetFlashColorCommand : DeviceCommand<CameraHost,int>
     {
