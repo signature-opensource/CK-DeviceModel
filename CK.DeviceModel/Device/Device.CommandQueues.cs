@@ -140,7 +140,9 @@ namespace CK.DeviceModel
             while( !IsDestroyed )
             {
                 BaseDeviceCommand? currentlyExecuting = null;
-                (BaseDeviceCommand cmd, CancellationToken token, bool checkKey) = (null!, default, false);
+                BaseDeviceCommand cmd;
+                CancellationToken token;
+                bool checkKey;
                 try
                 {
                     (cmd, token, checkKey) = await _commandQueue.Reader.ReadAsync().ConfigureAwait( false );

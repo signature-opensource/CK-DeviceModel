@@ -44,7 +44,7 @@ namespace CK.DeviceModel.Tests
                 }
                 var match = Regex.Match( device.Name, ".*\\*(\\d+)" );
                 int mult = match.Success ? int.Parse( match.Groups[1].Value ) : 1;
-                int deltaMS = host switch { CameraHost c => CameraDuration * mult, MachineHost m => MachineDuration * mult, _ => OtherDuration * mult };
+                int deltaMS = host switch { CameraHost _ => CameraDuration * mult, MachineHost _ => MachineDuration * mult, _ => OtherDuration * mult };
                 monitor.Trace( $"{device.FullName} -> {deltaMS} ms." );
                 return deltaMS;
             }

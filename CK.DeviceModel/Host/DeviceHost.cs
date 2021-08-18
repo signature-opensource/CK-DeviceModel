@@ -143,8 +143,10 @@ namespace CK.DeviceModel
                     _reconfiguringDevicesChanged = true;
                     return false;
                 }
-                var devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
-                devices[device.Name] = configured;
+                var devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices )
+                {
+                    [device.Name] = configured
+                };
                 _devices = devices;
                 return true;
             }

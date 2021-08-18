@@ -46,7 +46,7 @@ More on Commands [here](../Command).
 Nothing prevents a device to expose properties. In such case, maximal care should be taken to handle concurrency. A good approach
 is to expose only read-only properties and only update them through Commands.
 
-If a configuration property must be exposed that is on the [DeviceConfiguration](../DeviceConfiguration.cs) must be exposed, it should
+If a configuration property that is on the [DeviceConfiguration](../DeviceConfiguration.cs) must be exposed, it should
 be read-only and updated by the (re)configuration.
 
 Devices don't expose a `ConfigurationChanged` event (note that devices don't expose their Configuration object).

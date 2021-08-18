@@ -7,7 +7,7 @@ Device implementation heavily relies on [Commands](CK.DeviceModel/Command). Thei
 
 All devices are configured (see [DeviceConfiguration](CK.DeviceModel/DeviceConfiguration.cs)) and can be reconfigured dynamically.
 The configuration can specify that the device must be `AlwaysRunning` and a [daemon](CK.DeviceModel/Daemon) automatically
-ensures that they are restarted if it has stopped (typically due to an unexpected error).
+ensures that they are restarted when stopped (typically due to an unexpected error).
 
 By installing the optional [CK.DeviceModel.Configuration](CK.DeviceModel.Configuration/DeviceConfigurator.cs) package,
 configurations from the standard .Net configuration API (*appsettings.json* and so on) are automatically and dynamically
@@ -85,7 +85,8 @@ Implementing a new device requires to define its host and its configuration type
 
       protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CameraConfiguration config )
       {
-          bool configHasChanged = config.FlashColor != _configRef.FlashColor;
+          bool configHasChanged = config.FlashColor != _configRef.FlashColor
+                                  || config.FlashRate != _configRef.FlashRate;
           _configRef = config;
           return Task.FromResult( configHasChanged
                                     ? DeviceReconfiguredResult.UpdateSucceeded

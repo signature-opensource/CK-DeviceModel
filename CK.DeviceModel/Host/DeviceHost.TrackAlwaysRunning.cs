@@ -184,7 +184,7 @@ namespace CK.DeviceModel
             _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
             if( monitor.ShouldLogLine( LogLevel.Debug ) )
             {
-                monitor.UnfilteredLog( null, LogLevel.Debug|LogLevel.IsFiltered, $"Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall.ToString( "HH:mm.ss.ff" )})" ).Concatenate( ", (" )}).", monitor.NextLogTime(), null );
+                monitor.UnfilteredLog( null, LogLevel.Debug|LogLevel.IsFiltered, $"Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall:HH:mm.ss.ff})" ).Concatenate( ", (" )}).", monitor.NextLogTime(), null );
                 monitor.UnfilteredLog( null, LogLevel.Debug|LogLevel.IsFiltered, signalHost ? "Host signaled!" : "(no signal.)", monitor.NextLogTime(), null );
             }
             if( signalHost ) _daemon?.Signal();

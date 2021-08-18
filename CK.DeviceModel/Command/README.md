@@ -33,7 +33,7 @@ bool UnsafeSendCommandImmediate( IActivityMonitor monitor,
                                  BaseDeviceCommand command,
                                  CancellationToken token = default );
 ```
-These methods return `false` if the device is destroyed and cannot receive commands anymore throw an `ArgumentException`
+These methods return `false` if the device is destroyed and cannot receive commands anymore and throw an `ArgumentException`
 if the command is null or if its `CheckValidity` method returns `false`.
 
 #### Safe vs. Unsafe
@@ -42,7 +42,7 @@ By default, the `BaseDeviceCommand.DeviceName` MUST match the device's name (thi
 and raises an `ArgumentException` is raise),
 and the `BaseDeviceCommand.ControllerKey` must match the device's current `ControllerKey` (or the latter is null).
 
-The controller key is not checked when the command is sent but when right before the command execution (this is because a previously
+The controller key is not checked when the command is sent but right before the command execution (this is because a previously
 sent command can change the controller key). If the controller key doesn't match, an [InvalidControllerKeyException](../Device/InvalidControllerKeyException.cs)
 is set on the command completion.
 

@@ -1,13 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1">
   <Comment CommentText="These classes cannot be specialized (outside of the CK.DeviceModel). ">
-    <Position X="5.901" Y="3.548" Height="0.75" Width="1.7" />
+    <Position X="6.318" Y="3.39" Height="0.75" Width="1.7" />
   </Comment>
   <Comment CommentText="Theses are the base class to specialize.">
-    <Position X="5.953" Y="5.117" Height="0.75" Width="1.7" />
+    <Position X="6.553" Y="5.067" Height="0.75" Width="1.7" />
   </Comment>
   <Class Name="CK.DeviceModel.DeviceCommand&lt;THost&gt;">
-    <Position X="0.5" Y="5" Width="2" />
+    <Position X="0.5" Y="6.25" Width="2" />
     <Members>
       <Method Name="DeviceCommand" Hidden="true" />
     </Members>
@@ -24,7 +24,7 @@
       <Method Name="ToString" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>AAAAAAAAAAAAAAAEAAAAAAACAAAQAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>AAAAAIAAAACAAAAEAAAAAAACBAAQAAQAAAAAAAAAgAA=</HashCode>
       <FileName>Command\DeviceCommandNoResult.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="1.142" />
@@ -48,13 +48,13 @@
       <Method Name="ToString" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>AAAAAAAAAAAAAAAEAAAAAAACAAAQAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>AAAAAAAAAACAAAREAIAAAAACAAAQAAAAAAAAAAAAgAA=</HashCode>
       <FileName>Command\DeviceCommandWithResult.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="1.408" />
   </Class>
   <Class Name="CK.DeviceModel.DeviceCommand&lt;THost, TResult&gt;">
-    <Position X="3.25" Y="5" Width="2.5" />
+    <Position X="3.25" Y="6.25" Width="2.5" />
     <Members>
       <Method Name="DeviceCommand" Hidden="true" />
     </Members>
@@ -66,7 +66,7 @@
   <Enum Name="CK.DeviceModel.DeviceCommandStoppedBehavior">
     <Position X="4.5" Y="0.75" Width="4.25" />
     <TypeIdentifier>
-      <HashCode>AIAAAAABQAAAIAAAAAAAAAAAAAAQAAAAAAAAABAAAAA=</HashCode>
+      <HashCode>AIAAAAABQAIAAAAEAAAAAAAIAAAQAAAAgAAAAAAAAAA=</HashCode>
       <FileName>Command\DeviceCommandStoppedBehavior.cs</FileName>
     </TypeIdentifier>
   </Enum>
