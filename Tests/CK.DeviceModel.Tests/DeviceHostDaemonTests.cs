@@ -44,7 +44,7 @@ namespace CK.DeviceModel.Tests
                 }
                 var match = Regex.Match( device.Name, ".*\\*(\\d+)" );
                 int mult = match.Success ? int.Parse( match.Groups[1].Value ) : 1;
-                int deltaMS = host switch { CameraHost _ => CameraDuration * mult, MachineHost _ => MachineDuration * mult, _ => OtherDuration * mult };
+                int deltaMS = host switch { FlashBulbHost _ => CameraDuration * mult, MachineHost _ => MachineDuration * mult, _ => OtherDuration * mult };
                 monitor.Trace( $"{device.FullName} -> {deltaMS} ms." );
                 return deltaMS;
             }
@@ -229,7 +229,7 @@ namespace CK.DeviceModel.Tests
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1 };
             var host1 = new MachineHost();
-            var host2 = new CameraHost();
+            var host2 = new FlashBulbHost();
             var host3 = new OtherMachineHost();
             var daemon = new DeviceHostDaemon( new IDeviceHost[] { host1, host2, host3 }, policy );
 
@@ -240,7 +240,7 @@ namespace CK.DeviceModel.Tests
             c1.Name = "D*2";
             (await host1.EnsureDeviceAsync( TestHelper.Monitor, c1 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
 
-            var c2 = new CameraConfiguration() { Name = "D1", Status = DeviceConfigurationStatus.AlwaysRunning };
+            var c2 = new FlashBulbConfiguration() { Name = "D1", Status = DeviceConfigurationStatus.AlwaysRunning };
             (await host2.EnsureDeviceAsync( TestHelper.Monitor, c2 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
             c2.Name = "D*2";
             (await host2.EnsureDeviceAsync( TestHelper.Monitor, c2 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );

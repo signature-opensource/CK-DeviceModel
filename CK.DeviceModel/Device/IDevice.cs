@@ -47,10 +47,31 @@ namespace CK.DeviceModel
         public DeviceStatus Status { get; }
 
         /// <summary>
-        /// Raised whenever a reconfiguration, a start or a stop happens: either the <see cref="IDevice.ConfigurationStatus"/>
-        /// or <see cref="IDevice.Status"/> has changed.
+        /// Raised whenever a change occurred:
+        /// <list type="table">
+        /// <item>
+        ///     <term>ControllerKey</term>
+        ///     <description>
+        ///     A <see cref="DeviceControllerKeyChangedEvent"/> is raised, either because of a reconfiguration or because of a call
+        ///     to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or a <see cref="SetControllerKeyDeviceCommand{THost}"/>
+        ///     command has been handled.
+        ///     </description>
+        /// </item>
+        /// <item>
+        ///     <term>Status</term>
+        ///     <description>
+        ///     A <see cref="DeviceStatusChangedEvent"/> is raised, whenever a reconfiguration, a start or a stop happens.
+        ///     </description>
+        /// </item>
+        /// <item>
+        ///     <term>Configuration</term>
+        ///     <description>
+        ///     A <see cref="DeviceConfigurationChangedEvent{TConfiguration}"/> is raised after a successful reconfiguration.
+        ///     </description>
+        /// </item>
+        /// </list>
         /// </summary>
-        PerfectEvent<IDevice> StatusChanged { get; }
+        PerfectEvent<DeviceLifetimeEvent> LifetimeEvent { get; }
 
         /// <summary>
         /// Gets the current configuration status of this device.
@@ -128,12 +149,6 @@ namespace CK.DeviceModel
         /// or the key has been fixed by configuration (the <see cref="DeviceConfiguration.ControllerKey"/>).
         /// </returns>
         Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key );
-
-        /// <summary>
-        /// Raised whenever the <see cref="ControllerKey"/> changed, either because of a reconfiguration or
-        /// because of a call to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or <see cref="SetControllerKeyAsync(IActivityMonitor, string?, string?)"/>.
-        /// </summary>
-        PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
 
         /// <summary>
         /// Sends a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>.

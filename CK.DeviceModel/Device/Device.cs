@@ -22,18 +22,15 @@ namespace CK.DeviceModel
         DeviceConfigurationStatus _configStatus;
         string? _controllerKey;
         DeviceStatus _status;
-        readonly PerfectEventSender<IDevice> _statusChanged;
-        readonly PerfectEventSender<IDevice, string?> _controllerKeyChanged;
+        readonly PerfectEventSender<DeviceLifetimeEvent> _lifetimeChanged;
         readonly ActivityMonitor _commandMonitor;
         readonly CancellationTokenSource _destroyed;
+        TConfiguration _currentConfiguration;
         bool _controllerKeyFromConfiguration;
         volatile bool _isRunning;
 
         /// <inheritdoc />
-        public PerfectEvent<IDevice> StatusChanged => _statusChanged.PerfectEvent;
-
-        /// <inheritdoc />
-        public PerfectEvent<IDevice, string?> ControllerKeyChanged => _controllerKeyChanged.PerfectEvent;
+        public PerfectEvent<DeviceLifetimeEvent> LifetimeEvent => _lifetimeChanged.PerfectEvent;
 
         /// <summary>
         /// Factory information (opaque token).
@@ -84,11 +81,11 @@ namespace CK.DeviceModel
             SystemDeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
             SystemDeviceFolderPath = SystemDeviceFolderPath.Combine( "CK/DeviceModel/" + FullName );
 
+            _currentConfiguration = config;
             _configStatus = config.Status;
             _controllerKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
             _controllerKeyFromConfiguration = _controllerKey != null;
-            _statusChanged = new PerfectEventSender<IDevice>();
-            _controllerKeyChanged = new PerfectEventSender<IDevice, string?>();
+            _lifetimeChanged = new PerfectEventSender<DeviceLifetimeEvent>();
 
             _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}." );
             _commandQueue = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
@@ -151,10 +148,25 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public DeviceStatus Status => _status;
 
+        /// <summary>
+        /// Gets the current configuration. This is a clone of the last configuration submitted
+        /// to <see cref="ReconfigureAsync(IActivityMonitor, TConfiguration, CancellationToken)"/> (or
+        /// the <see cref="ReconfigureDeviceCommand{THost, TConfiguration}"/>'s configuration command)
+        /// that is accessible only (protected) from this device.
+        /// <para>
+        /// Configuration are mutable but device's code should avoid to alter it.
+        /// </para>
+        /// <para>
+        /// This is updated once <see cref="DoReconfigureAsync(IActivityMonitor, TConfiguration)"/> returned
+        /// a successful result (<see cref="DeviceReconfiguredResult.UpdateSucceeded"/>).
+        /// </para>
+        /// </summary>
+        protected TConfiguration CurrentConfiguration => _currentConfiguration;
+
         Task SetDeviceStatusAsync( IActivityMonitor monitor, DeviceStatus status )
         {
             _status = status;
-            return _statusChanged.SafeRaiseAsync( monitor, this );
+            return _lifetimeChanged.SafeRaiseAsync( monitor, new DeviceStatusChangedEvent( this, status ) );
         }
 
         /// <summary>
@@ -180,7 +192,10 @@ namespace CK.DeviceModel
             return InternalReconfigureAsync( monitor, config, null, token );
         }
 
-        internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor, TConfiguration externalConfig, TConfiguration? validAndClonedconfig, CancellationToken token = default )
+        internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
+                                                                                TConfiguration externalConfig,
+                                                                                TConfiguration? validAndClonedconfig,
+                                                                                CancellationToken token = default )
         {
             var cmd = (InternalReconfigureDeviceCommand<TConfiguration>?)_host?.CreateReconfigureCommand( Name );
             if( cmd == null )
@@ -193,7 +208,7 @@ namespace CK.DeviceModel
             }
             else
             {
-                // Just in case externalConfig is actually null: CheckValidity will handle it.
+                // Just in case externalConfig is actually null: BaseReconfigureDeviceCommand<TConfiguration>.DoCheckValidity will handle it.
                 cmd.Configuration = externalConfig?.Clone();
                 if( !cmd.CheckValidity( monitor ) )
                 {
@@ -264,11 +279,17 @@ namespace CK.DeviceModel
                 reconfigResult = DeviceReconfiguredResult.UpdateFailed;
             }
 
+            bool configurationChanged = false;
             bool shouldEmitDeviceStatusChanged = reconfigResult != DeviceReconfiguredResult.None;
             if( shouldEmitDeviceStatusChanged )
             {
                 // Don't emit the change of status right now.
                 _status = new DeviceStatus( reconfigResult, _isRunning );
+                if( reconfigResult == DeviceReconfiguredResult.UpdateSucceeded )
+                {
+                    _currentConfiguration = config;
+                    configurationChanged = true;
+                }
             }
 
             DeviceApplyConfigurationResult applyResult = (DeviceApplyConfigurationResult)reconfigResult;
@@ -287,17 +308,21 @@ namespace CK.DeviceModel
                     shouldEmitDeviceStatusChanged = false;
                 }
             }
-            if( shouldEmitDeviceStatusChanged )
-            {
-                await _statusChanged.SafeRaiseAsync( _commandMonitor, this ).ConfigureAwait( false );
-            }
             if( specialCaseOfDisabled && applyResult == DeviceApplyConfigurationResult.None )
             {
                 applyResult = DeviceApplyConfigurationResult.UpdateSucceeded;
             }
+            if( shouldEmitDeviceStatusChanged )
+            {
+                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceStatusChangedEvent( this, _status ) ).ConfigureAwait( false );
+            }
             if( controllerKeyChanged )
             {
-                await _controllerKeyChanged.SafeRaiseAsync( _commandMonitor, this, _controllerKey );
+                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, _controllerKey ) );
+            }
+            if( configurationChanged )
+            {
+                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceConfigurationChangedEvent( this, cmd.ExternalConfig ) );
             }
             if( applyResult != DeviceApplyConfigurationResult.None && _host.OnDeviceConfigured( _commandMonitor, this, applyResult, cmd.ExternalConfig ) )
             {
@@ -339,7 +364,7 @@ namespace CK.DeviceModel
             return cmd.Completion.Task;
         }
 
-        Task HandleSetControllerKeyAsync( BaseSetControllerKeyDeviceCommand cmd )
+        async Task HandleSetControllerKeyAsync( BaseSetControllerKeyDeviceCommand cmd )
         {
             var key = cmd.NewControllerKey;
             if( String.IsNullOrEmpty( key ) ) key = null;
@@ -349,14 +374,13 @@ namespace CK.DeviceModel
                 {
                     _commandMonitor.Warn( $"Unable to take control of device '{FullName}' with key '{key}': key from configuration is '{_controllerKey}'." );
                     cmd.Completion.SetResult( false );
-                    return Task.CompletedTask;
+                    return;
                 }
                 _commandMonitor.Trace( $"Device {FullName}: controller key changed from '{_controllerKey}' to '{key}'." );
                 _controllerKey = key;
-                _controllerKeyChanged.SafeRaiseAsync( _commandMonitor, this, key );
+                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, key ) ).ConfigureAwait( false );
             }
             cmd.Completion.SetResult( true );
-            return Task.CompletedTask;
         }
 
         #endregion
@@ -590,8 +614,7 @@ namespace CK.DeviceModel
             }
             await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
             cmd?.Completion.SetResult();
-            _statusChanged.RemoveAll();
-            _controllerKeyChanged.RemoveAll();
+            _lifetimeChanged.RemoveAll();
         }
 
         #endregion

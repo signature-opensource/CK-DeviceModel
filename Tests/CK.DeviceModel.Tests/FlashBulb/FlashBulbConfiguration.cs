@@ -3,9 +3,9 @@ using CK.Core;
 namespace CK.DeviceModel.Tests
 {
 
-    public class CameraConfiguration : DeviceConfiguration
+    public class FlashBulbConfiguration : DeviceConfiguration
     {
-        public CameraConfiguration()
+        public FlashBulbConfiguration()
         {
         }
 
@@ -13,7 +13,7 @@ namespace CK.DeviceModel.Tests
         /// The copy constructor is required.
         /// </summary>
         /// <param name="o">The other configuration to be copied.</param>
-        public CameraConfiguration( CameraConfiguration o )
+        public FlashBulbConfiguration( FlashBulbConfiguration o )
             : base( o )
         {
             FlashColor = o.FlashColor;
@@ -40,7 +40,7 @@ namespace CK.DeviceModel.Tests
             return isValid;
         }
 
-        public CameraConfiguration( ICKBinaryReader r )
+        public FlashBulbConfiguration( ICKBinaryReader r )
             : base( r )
         {
             r.ReadByte(); // version

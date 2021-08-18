@@ -126,9 +126,9 @@ namespace CK.DeviceModel.Tests
             D? d = h["First"];
             Debug.Assert( d != null );
 
-            bool eventRaised = false;
-            void StatusChanged( IActivityMonitor monitor, IDevice e ) => eventRaised = true;
-            d.StatusChanged.Sync += StatusChanged;
+            bool statusChanged = false;
+            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e is DeviceStatusChangedEvent;
+            d.LifetimeEvent.Sync += OnLifetimeChange;
 
             var commands = Enumerable.Range( 0, 3 ).Select( i => new DCommand() { DeviceName = "First", Trace = $"n°{i}" } ).ToArray();
             var destroy = new DestroyDeviceCommand<DHost>() { DeviceName = "First" };
@@ -141,7 +141,7 @@ namespace CK.DeviceModel.Tests
             h.SendCommand( TestHelper.Monitor, destroy );
 
             await commands[0].Completion.Task;
-            eventRaised.Should().BeTrue( "Since the first deferred command is executed, the device has started." );
+            statusChanged.Should().BeTrue( "Since the first deferred command is executed, the device has started." );
 
             await destroy.Completion.Task;
 
@@ -172,9 +172,9 @@ namespace CK.DeviceModel.Tests
             var initialStatus = d.Status.ToString();
             initialStatus.Should().Be( "Stopped (None)" );
 
-            bool eventRaised = false;
-            void StatusChanged( IActivityMonitor monitor, IDevice e ) => eventRaised = true;
-            d.StatusChanged.Sync += StatusChanged;
+            bool statusChanged = false;
+            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e is DeviceStatusChangedEvent;
+            d.LifetimeEvent.Sync += OnLifetimeChange;
 
             var commands = Enumerable.Range( 0, 3 ).Select( i => new DCommand() { DeviceName = "First", Trace = $"n°{i}" } ).ToArray();
             var starter = new DCommandStarter( keepDeviceRunning: false ) { DeviceName = "First", Trace = "DO IT" };
@@ -190,7 +190,7 @@ namespace CK.DeviceModel.Tests
             // To let the implicit Stop command do its work.
             await Task.Delay( 50 );
 
-            eventRaised.Should().BeFalse();
+            statusChanged.Should().BeFalse();
             d.Status.ToString().Should().Be( initialStatus );
 
             h.SendCommand( TestHelper.Monitor, destroy );
