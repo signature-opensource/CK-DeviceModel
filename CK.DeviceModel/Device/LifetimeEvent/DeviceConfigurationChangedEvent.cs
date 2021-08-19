@@ -19,5 +19,12 @@ namespace CK.DeviceModel
         /// Gets the new configuration.
         /// </summary>
         public DeviceConfiguration Configuration { get; }
+
+        /// <summary>
+        /// Overridden to return a string with the <see cref="IDevice.FullName"/>.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"Device '{Device.FullName}' Configuration changed.";
+
     }
 }

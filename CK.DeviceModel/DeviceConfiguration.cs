@@ -33,7 +33,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Deserialization constructor.
         /// Every specialized configuration MUST define its own deserialization
-        /// constructor (that must call this base) and override the <see cref="Write(ICKBinaryWriter)"/>
+        /// constructor (that must call its base) and override the <see cref="Write(ICKBinaryWriter)"/>
         /// method (that must start to call its base Write method).
         /// </summary>
         /// <param name="r">The reader.</param>
@@ -75,6 +75,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets or sets the <see cref="DeviceConfigurationStatus"/>.
+        /// Defaults to <see cref="DeviceConfigurationStatus.Disabled"/>.
         /// </summary>
         public DeviceConfigurationStatus Status { get; set; }
 

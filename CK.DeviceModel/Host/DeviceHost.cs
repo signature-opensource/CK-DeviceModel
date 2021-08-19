@@ -188,6 +188,9 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets a device and its applied configuration by its name.
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
+        /// <para>
+        /// Use <see cref="Find(string)"/> to easily get the <see cref="ConfiguredDevice{T, TConfiguration}.Device"/> if it exists.
+        /// </para>
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device and its configuration or null if not found.</returns>

@@ -19,5 +19,12 @@ namespace CK.DeviceModel
         /// Gets the new controller key.
         /// </summary>
         public string? ControllerKey { get; }
+
+        /// <summary>
+        /// Overridden to return a string with the <see cref="IDevice.FullName"/> and <see cref="ControllerKey"/>.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"Device '{Device.FullName}' ControllerKey changed: {ControllerKey ?? "<null>"}.";
+
     }
 }

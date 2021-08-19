@@ -64,3 +64,11 @@ dotnet_style_require_accessibility_modifiers = omit_if_default:silent
 dotnet_diagnostic.CA1034.severity = none
 # Motive: Nested types can be used to design a good API.
 # /Signature-Code .editorconfig
+
+# <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="16.10.56">
+#   <PrivateAssets>all</PrivateAssets>
+#   <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+# </PackageReference>
+
+# VSTHRD101: Avoid unsupported async delegates
+dotnet_diagnostic.VSTHRD101.severity = error

@@ -39,7 +39,7 @@ if the command is null or if its `CheckValidity` method returns `false`.
 #### Safe vs. Unsafe
 
 By default, the `BaseDeviceCommand.DeviceName` MUST match the device's name (this is checked when the command is sent
-and raises an `ArgumentException` is raise),
+and may raise an `ArgumentException`),
 and the `BaseDeviceCommand.ControllerKey` must match the device's current `ControllerKey` (or the latter is null).
 
 The controller key is not checked when the command is sent but right before the command execution (this is because a previously
@@ -62,8 +62,8 @@ Think to this *immediate* as a higher priority queue.
 
 ### Through the DeviceHost
 
-By calling [`IDeviceHost`](../Host/IDeviceHost.cs) `SendCommand` method, relying on the `IDevice.DeviceName` to route the command to
-the target device:
+Commands can be sent by calling [`IDeviceHost`](../Host/IDeviceHost.cs) `SendCommand` method, relying on the `IDevice.DeviceName`
+to route the command to the target device:
 
 ```csharp
 DeviceHostCommandResult SendCommand( IActivityMonitor monitor,
@@ -104,5 +104,12 @@ may indefinitely wait for the command completion.
 ## DeviceCommandStoppedBehavior
 
 Each Command has an overridable `StoppedBehavior` that specifies how it should be handled when the device is stopped.
-The [DeviceCommandStoppedBehavior](DeviceCommandStoppedBehavior.cs) enumeration describes th 8 available options.
+The [DeviceCommandStoppedBehavior](DeviceCommandStoppedBehavior.cs) enumeration describes the 8 available options.
+
+This "stopped behavior" is rather complete and should cover all needs. The default behavior is `WaitForNextStartWhenAlwaysRunningOrCancel`
+that cancels the command (calling `SetCanceled` on the command's completion) if the device is stopped, unless the DeviceConfigurationStatus is
+`AlwaysRunning`: in such case, the command is stored in an internal queue and executed as soon as the device restarts.
+
+Another useful behavior is `RunAnyway`: all the basic commands (Destroy, Reconfigure, SetControllerKey, Start and Stop) uses this
+behavior since they must obviously do their job even if the device is stopped (the Stop does nothing when the device is already stopped).
 
