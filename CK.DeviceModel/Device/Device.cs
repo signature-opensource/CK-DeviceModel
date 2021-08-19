@@ -33,6 +33,11 @@ namespace CK.DeviceModel
         public PerfectEvent<DeviceLifetimeEvent> LifetimeEvent => _lifetimeChanged.PerfectEvent;
 
         /// <summary>
+        /// This can be overridden only by ActiveDevice (this is not available to regular devices).
+        /// </summary>
+        private protected virtual Task SafeRaiseLifetimeEventAsync( DeviceLifetimeEvent e ) => _lifetimeChanged.SafeRaiseAsync( _commandMonitor, e );
+
+        /// <summary>
         /// Factory information (opaque token).
         /// </summary>
         public readonly struct CreateInfo
@@ -163,10 +168,10 @@ namespace CK.DeviceModel
         /// </summary>
         protected TConfiguration CurrentConfiguration => _currentConfiguration;
 
-        Task SetDeviceStatusAsync( IActivityMonitor monitor, DeviceStatus status )
+        Task SetDeviceStatusAsync( DeviceStatus status )
         {
             _status = status;
-            return _lifetimeChanged.SafeRaiseAsync( monitor, new DeviceStatusChangedEvent( this, status ) );
+            return SafeRaiseLifetimeEventAsync( new DeviceStatusChangedEvent( this, status ) );
         }
 
         /// <summary>
@@ -314,15 +319,15 @@ namespace CK.DeviceModel
             }
             if( shouldEmitDeviceStatusChanged )
             {
-                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceStatusChangedEvent( this, _status ) ).ConfigureAwait( false );
+                await SafeRaiseLifetimeEventAsync( new DeviceStatusChangedEvent( this, _status ) ).ConfigureAwait( false );
             }
             if( controllerKeyChanged )
             {
-                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, _controllerKey ) );
+                await SafeRaiseLifetimeEventAsync( new DeviceControllerKeyChangedEvent( this, _controllerKey ) );
             }
             if( configurationChanged )
             {
-                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceConfigurationChangedEvent( this, cmd.ExternalConfig ) );
+                await SafeRaiseLifetimeEventAsync( new DeviceConfigurationChangedEvent( this, cmd.ExternalConfig ) );
             }
             if( applyResult != DeviceApplyConfigurationResult.None && _host.OnDeviceConfigured( _commandMonitor, this, applyResult, cmd.ExternalConfig ) )
             {
@@ -378,7 +383,7 @@ namespace CK.DeviceModel
                 }
                 _commandMonitor.Trace( $"Device {FullName}: controller key changed from '{_controllerKey}' to '{key}'." );
                 _controllerKey = key;
-                await _lifetimeChanged.SafeRaiseAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, key ) ).ConfigureAwait( false );
+                await SafeRaiseLifetimeEventAsync( new DeviceControllerKeyChangedEvent( this, key ) ).ConfigureAwait( false );
             }
             cmd.Completion.SetResult( true );
         }
@@ -449,7 +454,7 @@ namespace CK.DeviceModel
                 }
                 if( _isRunning && reason != DeviceStartedReason.SilentAutoStartAndStopStoppedBehavior )
                 {
-                    await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason ) ).ConfigureAwait( false );
+                    await SetDeviceStatusAsync( new DeviceStatus( reason ) ).ConfigureAwait( false );
                 }
                 if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                 {
@@ -542,7 +547,7 @@ namespace CK.DeviceModel
                         && reason != DeviceStoppedReason.SelfDestroyed
                         && reason != DeviceStoppedReason.SilentAutoStartAndStopStoppedBehavior )
                     {
-                        await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason ) ).ConfigureAwait( false );
+                        await SetDeviceStatusAsync( new DeviceStatus( reason ) ).ConfigureAwait( false );
                     }
                     if( isAlwaysRunning )
                     {
@@ -612,7 +617,7 @@ namespace CK.DeviceModel
             {
                 await h.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
             }
-            await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
+            await SetDeviceStatusAsync( new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
             cmd?.Completion.SetResult();
             _lifetimeChanged.RemoveAll();
         }

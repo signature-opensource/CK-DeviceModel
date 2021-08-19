@@ -6,8 +6,8 @@ namespace CK.DeviceModel.Tests
 {
     public sealed class SimpleScaleMeasureEvent : SimpleScaleEvent
     {
-        internal SimpleScaleMeasureEvent( double measure, string text )
-            : base( text )
+        internal SimpleScaleMeasureEvent( SimpleScale device, double measure, string text )
+            : base( device, text )
         {
             Measure = measure;
         }

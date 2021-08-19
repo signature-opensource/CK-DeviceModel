@@ -14,14 +14,14 @@ namespace CK.DeviceModel
     /// </summary>
     /// <typeparam name="TConfiguration">The device's configuration type.</typeparam>
     /// <typeparam name="TEvent">The event type.</typeparam>
-    public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>, ActiveDevice<TConfiguration,TEvent>.IEventLoop
+    public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>, IActiveDevice, ActiveDevice<TConfiguration,TEvent>.IEventLoop
         where TConfiguration : DeviceConfiguration
-        where TEvent : class
+        where TEvent : BaseDeviceEvent
     {
         readonly Channel<object> _events;
         readonly ActivityMonitor _eventMonitor;
-        readonly PerfectEventSender<IDevice,TEvent> _deviceEvent;
-
+        readonly PerfectEventSender<TEvent> _deviceEvent;
+        readonly PerfectEventSender<BaseDeviceEvent> _allEvent;
 
         /// <inheritdoc />
         public ActiveDevice( IActivityMonitor monitor, CreateInfo info )
@@ -29,7 +29,8 @@ namespace CK.DeviceModel
         {
             _events = Channel.CreateUnbounded<object>( new UnboundedChannelOptions() { SingleReader = true } );
             _eventMonitor = new ActivityMonitor( $"Event loop for device {FullName}." );
-            _deviceEvent = new PerfectEventSender<IDevice, TEvent>();
+            _deviceEvent = new PerfectEventSender<TEvent>();
+            _allEvent = new PerfectEventSender<BaseDeviceEvent>();
             _ = Task.Run( RunEventLoop );
         }
 
@@ -37,7 +38,16 @@ namespace CK.DeviceModel
         /// Central event for all device specific events.
         /// These events should not overlap with existing device's <see cref="Device{TConfiguration}.LifetimeEvent"/>.
         /// </summary>
-        public PerfectEvent<IDevice, TEvent> DeviceEvent => _deviceEvent.PerfectEvent;
+        public PerfectEvent<TEvent> DeviceEvent => _deviceEvent.PerfectEvent;
+
+        /// <inheritdoc />
+        public PerfectEvent<BaseDeviceEvent> AllEvent => _allEvent.PerfectEvent;
+
+        private protected override Task SafeRaiseLifetimeEventAsync( DeviceLifetimeEvent e )
+        {
+            DoPost( e );
+            return base.SafeRaiseLifetimeEventAsync( e );
+        }
 
         /// <summary>
         /// Posts an event in this device's event queue.
@@ -76,22 +86,25 @@ namespace CK.DeviceModel
                 try
                 {
                     ev = await r.ReadAsync( DestroyedToken ).ConfigureAwait( false );
-                    if( ev == null ) continue;
-                    if( ev is Action<IActivityMonitor> sAction )
+                    switch( ev )
                     {
-                        sAction( _eventMonitor );
-                    }
-                    else if( ev is Func<IActivityMonitor,Task> aAction )
-                    {
-                        await aAction( _eventMonitor ).ConfigureAwait( false );
-                    }
-                    else if( ev is TEvent e )
-                    {
-                        await _deviceEvent.SafeRaiseAsync( _eventMonitor, this, e ).ConfigureAwait( false );
-                    }
-                    else
-                    {
-                        _eventMonitor.Error( $"Unknown event type '{ev.GetType()}'." );
+                        case null: continue;
+                        case Action<IActivityMonitor> a:
+                            a( _eventMonitor );
+                            break;
+                        case Func<IActivityMonitor, Task> a:
+                            await a( _eventMonitor ).ConfigureAwait( false );
+                            break;
+                        case TEvent e:
+                            await _deviceEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
+                            await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
+                            break;
+                        case DeviceLifetimeEvent e:
+                            await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
+                            break;
+                        default:
+                            _eventMonitor.Error( $"Unknown event type '{ev.GetType()}'." );
+                            break;
                     }
                 }
                 catch( Exception ex )

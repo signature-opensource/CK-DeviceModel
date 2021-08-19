@@ -9,8 +9,8 @@ namespace CK.DeviceModel.Tests
     /// </summary>
     public sealed class SimpleScaleResetEvent : SimpleScaleEvent
     {
-        internal SimpleScaleResetEvent()
-            : base( "Reset" )
+        internal SimpleScaleResetEvent( SimpleScale device )
+            : base( device, "Reset" )
         {
         }
     }

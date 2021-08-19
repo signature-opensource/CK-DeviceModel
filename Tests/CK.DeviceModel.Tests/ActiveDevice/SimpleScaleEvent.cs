@@ -8,11 +8,12 @@ namespace CK.DeviceModel.Tests
     /// Base class for all SimpleScale events.
     /// SimpleScale events have a readable ToString().
     /// </summary>
-    public abstract class SimpleScaleEvent
+    public abstract class SimpleScaleEvent : ActiveDeviceEvent<SimpleScale>
     {
         readonly string _text;
 
-        private protected SimpleScaleEvent( string text )
+        private protected SimpleScaleEvent( SimpleScale device, string text )
+            : base( device )
         {
             _text = text;
         }

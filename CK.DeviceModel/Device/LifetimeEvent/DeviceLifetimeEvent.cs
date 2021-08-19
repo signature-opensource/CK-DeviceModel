@@ -8,16 +8,11 @@ namespace CK.DeviceModel
     /// Base class for <see cref="DeviceStatusChangedEvent"/>, <see cref="DeviceControllerKeyChangedEvent"/>
     /// and <see cref="DeviceConfigurationChangedEvent"/>.
     /// </summary>
-    public abstract class DeviceLifetimeEvent
+    public abstract class DeviceLifetimeEvent : BaseDeviceEvent
     {
         private protected DeviceLifetimeEvent( IDevice device )
+            : base( device )
         {
-            Device = device;
         }
-
-        /// <summary>
-        /// Gets the device that raised this event.
-        /// </summary>
-        public IDevice Device { get; }
     }
 }

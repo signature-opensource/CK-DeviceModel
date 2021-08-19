@@ -50,7 +50,7 @@ namespace CK.DeviceModel.Tests
             {
                 _currentSum = 0;
                 _stepCount = 0;
-                EventLoop.RaiseEvent( new SimpleScaleResetEvent() );
+                EventLoop.RaiseEvent( new SimpleScaleResetEvent( this ) );
             }
         }
 
@@ -72,6 +72,17 @@ namespace CK.DeviceModel.Tests
                     // Here we need to call the asynchronous StopAsync method.
                     EventLoop.LogTrace( "StopOnNegativeValue is true: stopping the device." );
                     EventLoop.Execute( m => StopAsync( m, ignoreAlwaysRunning: true ) );
+                    if( config.AllowUnattendedRestartAfterStopOnNegativeValue )
+                    {
+                        // This is awful and should never be done is real code!
+                        // This is just for tests, to avoid subsequent stops.
+                        config.StopOnNegativeValue = false;
+                        _ = Task.Run( async () =>
+                        {
+                            await Task.Delay( 10 * config.PhysicalRate );
+                            EventLoop.Execute( m => StartAsync( m ) );
+                        } );
+                    }
                 }
                 return;
             }
@@ -81,7 +92,7 @@ namespace CK.DeviceModel.Tests
             {
                 var text = config.MeasurePattern ?? "{0}";
                 var m = (double)_currentSum / _stepCount;
-                EventLoop.RaiseEvent( new SimpleScaleMeasureEvent( m, string.Format( text, m ) ) );
+                EventLoop.RaiseEvent( new SimpleScaleMeasureEvent( this, m, string.Format( text, m ) ) );
                 _stepCount = 0;
             }
         }

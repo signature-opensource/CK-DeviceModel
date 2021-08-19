@@ -23,7 +23,13 @@ namespace CK.DeviceModel.Tests
         /// Gets or sets whether when we receive a negative value, the
         /// device must stop.
         /// </summary>
-        public bool StopOnNegativeValue{ get; set; }
+        public bool StopOnNegativeValue { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether after a <see cref="StopOnNegativeValue"/>, a call to
+        /// StartAsync is done automatically 10*PhysicalRate ms after the stop from the event loop.
+        /// </summary>
+        public bool AllowUnattendedRestartAfterStopOnNegativeValue { get; set; }
 
         public SimpleScaleConfiguration( SimpleScaleConfiguration o )
             : base( o )
@@ -32,6 +38,8 @@ namespace CK.DeviceModel.Tests
             MeasureStep = o.MeasureStep;
             MeasurePattern = o.MeasurePattern;
             ResetOnStart = o.ResetOnStart;
+            StopOnNegativeValue = o.StopOnNegativeValue;
+            AllowUnattendedRestartAfterStopOnNegativeValue = o.AllowUnattendedRestartAfterStopOnNegativeValue;
         }
 
 
@@ -43,6 +51,8 @@ namespace CK.DeviceModel.Tests
             MeasureStep = r.ReadInt32();
             MeasurePattern = r.ReadNullableString();
             ResetOnStart = r.ReadBoolean();
+            StopOnNegativeValue = r.ReadBoolean();
+            AllowUnattendedRestartAfterStopOnNegativeValue = r.ReadBoolean();
         }
 
         public override void Write( ICKBinaryWriter w )
@@ -53,6 +63,8 @@ namespace CK.DeviceModel.Tests
             w.Write( MeasureStep );
             w.WriteNullableString( MeasurePattern );
             w.Write( ResetOnStart );
+            w.Write( StopOnNegativeValue );
+            w.Write( AllowUnattendedRestartAfterStopOnNegativeValue );
         }
     }
 }
