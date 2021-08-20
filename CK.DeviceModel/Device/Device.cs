@@ -214,7 +214,7 @@ namespace CK.DeviceModel
             else
             {
                 // Just in case externalConfig is actually null: BaseReconfigureDeviceCommand<TConfiguration>.DoCheckValidity will handle it.
-                cmd.Configuration = externalConfig?.Clone();
+                cmd.Configuration = externalConfig?.DeepClone();
                 if( !cmd.CheckValidity( monitor ) )
                 {
                     return Task.FromResult( DeviceApplyConfigurationResult.InvalidConfiguration );
@@ -235,7 +235,7 @@ namespace CK.DeviceModel
             if( cmd.ExternalConfig == null )
             {
                 cmd.ExternalConfig = cmd.Configuration;
-                config = cmd.Configuration.Clone();
+                config = cmd.Configuration.DeepClone();
             }
             else
             {

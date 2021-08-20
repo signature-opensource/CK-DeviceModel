@@ -24,11 +24,6 @@ namespace CK.DeviceModel.Configuration.Tests
             {
             }
 
-            public CameraConfiguration( CameraConfiguration o )
-                : base( o )
-            {
-            }
-
             public CameraConfiguration( ICKBinaryReader r )
                 : base( r )
             {
@@ -90,11 +85,6 @@ namespace CK.DeviceModel.Configuration.Tests
         public class LightControllerConfiguration : DeviceConfiguration
         {
             public LightControllerConfiguration()
-            {
-            }
-
-            public LightControllerConfiguration( LightControllerConfiguration o )
-                : base( o )
             {
             }
 

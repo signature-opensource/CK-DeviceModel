@@ -31,18 +31,6 @@ namespace CK.DeviceModel.Tests
         /// </summary>
         public bool AllowUnattendedRestartAfterStopOnNegativeValue { get; set; }
 
-        public SimpleScaleConfiguration( SimpleScaleConfiguration o )
-            : base( o )
-        {
-            PhysicalRate = o.PhysicalRate;
-            MeasureStep = o.MeasureStep;
-            MeasurePattern = o.MeasurePattern;
-            ResetOnStart = o.ResetOnStart;
-            StopOnNegativeValue = o.StopOnNegativeValue;
-            AllowUnattendedRestartAfterStopOnNegativeValue = o.AllowUnattendedRestartAfterStopOnNegativeValue;
-        }
-
-
         public SimpleScaleConfiguration( ICKBinaryReader r )
             : base( r )
         {

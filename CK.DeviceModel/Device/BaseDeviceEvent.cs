@@ -16,8 +16,7 @@ namespace CK.DeviceModel
         /// <param name="device">The device that raised this event.</param>
         protected BaseDeviceEvent( IDevice device )
         {
-            if( device == null ) throw new ArgumentNullException( nameof( device ) );
-            Device = device;
+            Device = device ?? throw new ArgumentNullException( nameof( device ) );
         }
 
         /// <summary>

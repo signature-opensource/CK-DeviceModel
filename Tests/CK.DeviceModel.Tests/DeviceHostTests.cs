@@ -501,8 +501,8 @@ namespace CK.DeviceModel.Tests
                 }
             };
 
-            var configStopped = new MachineConfiguration( config ) { Status = DeviceConfigurationStatus.Disabled };
-            (await host.EnsureDeviceAsync( TestHelper.Monitor, configStopped )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+            config.Status = DeviceConfigurationStatus.Disabled;
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
 
             stopReceived.Should().BeTrue();
             destroyReceived.Should().BeFalse();

@@ -9,11 +9,6 @@ namespace CK.DeviceModel.Tests
         {
         }
 
-        public OtherMachineConfiguration( OtherMachineConfiguration o )
-            : base( o )
-        {
-        }
-
         public OtherMachineConfiguration( ICKBinaryReader r )
             : base( r )
         {

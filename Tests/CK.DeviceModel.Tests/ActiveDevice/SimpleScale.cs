@@ -109,7 +109,7 @@ namespace CK.DeviceModel.Tests
         {
             switch( command )
             {
-                case SimpleScaleResetCommand c:
+                case SimpleScaleResetCommand _:
                     Reset();
                     return Task.CompletedTask;
                 default:

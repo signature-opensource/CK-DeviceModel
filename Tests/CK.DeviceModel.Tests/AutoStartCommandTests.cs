@@ -26,12 +26,6 @@ namespace CK.DeviceModel.Tests
             {
             }
 
-            public DConfiguration( DConfiguration other )
-                : base( other )
-            {
-                Trace = other.Trace;
-            }
-
             public string? Trace { get; set; }
 
             public DConfiguration( ICKBinaryReader r )

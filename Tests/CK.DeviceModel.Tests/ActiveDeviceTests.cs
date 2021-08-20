@@ -12,8 +12,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
-#pragma warning disable VSTHRD200 // Use "Async" suffix for async methods
-
 namespace CK.DeviceModel.Tests
 {
     [TestFixture]

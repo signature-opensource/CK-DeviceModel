@@ -6,7 +6,7 @@ namespace CK.DeviceModel
     /// <summary>
     /// Base class for configuration.
     /// </summary>
-    public abstract class DeviceConfiguration : ICloneableCopyCtor
+    public abstract class DeviceConfiguration : ICKSimpleBinarySerializable
     {
         string _name;
 
@@ -19,22 +19,10 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Copy constructor (see <see cref="ICloneableCopyCtor"/>).
-        /// Specialized configurations MUST implement their copy constructor.
-        /// </summary>
-        /// <param name="source">The source configuration to copy.</param>
-        protected DeviceConfiguration( DeviceConfiguration source )
-        {
-            _name = source.Name;
-            Status = source.Status;
-            ControllerKey = source.ControllerKey;
-        }
-
-        /// <summary>
         /// Deserialization constructor.
         /// Every specialized configuration MUST define its own deserialization
-        /// constructor (that must call its base) and override the <see cref="Write(ICKBinaryWriter)"/>
-        /// method (that must start to call its base Write method).
+        /// constructor (that must call its base) and the <see cref="Write(ICKBinaryWriter)"/>
+        /// method must be overridden.
         /// </summary>
         /// <param name="r">The reader.</param>
         protected DeviceConfiguration( ICKBinaryReader r )
@@ -61,7 +49,6 @@ namespace CK.DeviceModel
             w.WriteEnum( Status );
             w.WriteNullableString( ControllerKey );
         }
-
 
         /// <summary>
         /// Gets or sets the name of the device.

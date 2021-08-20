@@ -9,17 +9,6 @@ namespace CK.DeviceModel.Tests
         {
         }
 
-        /// <summary>
-        /// The copy constructor is required.
-        /// </summary>
-        /// <param name="o">The other configuration to be copied.</param>
-        public FlashBulbConfiguration( FlashBulbConfiguration o )
-            : base( o )
-        {
-            FlashColor = o.FlashColor;
-            FlashRate = o.FlashRate;
-        }
-
         public int FlashColor { get; set; }
 
         public int FlashRate { get; set; } = 1;
