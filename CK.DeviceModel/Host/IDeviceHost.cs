@@ -85,8 +85,8 @@ namespace CK.DeviceModel
         /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
-        /// <returns>The device and its configuration (or null references if not found).</returns>
-        (IDevice?, DeviceConfiguration?) GetConfiguredDevice( string deviceName );
+        /// <returns>The device and its configuration or null if not found.</returns>
+        (IDevice, DeviceConfiguration)? GetConfiguredDevice( string deviceName );
 
         /// <summary>
         /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.

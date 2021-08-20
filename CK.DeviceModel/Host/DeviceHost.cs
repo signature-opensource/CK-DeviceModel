@@ -201,9 +201,9 @@ namespace CK.DeviceModel
             return _devices.TryGetValue( deviceName, out var e ) ? e : null;
         }
 
-        (IDevice?, DeviceConfiguration?) IDeviceHost.GetConfiguredDevice( string deviceName )
+        (IDevice, DeviceConfiguration)? IDeviceHost.GetConfiguredDevice( string deviceName )
         {
-            return _devices.TryGetValue( deviceName, out var e ) ? (e.Device, e.Configuration) : (null, null);
+            return _devices.TryGetValue( deviceName, out var e ) ? (e.Device, e.Configuration) : null;
         }
 
         /// <summary>
