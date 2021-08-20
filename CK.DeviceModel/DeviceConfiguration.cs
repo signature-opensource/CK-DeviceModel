@@ -5,6 +5,10 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Base class for configuration.
+    /// <para>
+    /// Concrete DeviceConfiguration classes should be sealed since simple binary de/serialization
+    /// and auto configuration don't support polymorphism.
+    /// </para>
     /// </summary>
     public abstract class DeviceConfiguration : ICKSimpleBinarySerializable
     {

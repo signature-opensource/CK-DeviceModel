@@ -5,7 +5,7 @@ namespace CK.DeviceModel
     /// <summary>
     /// Describes the result of a device initial configuration or reconfiguration.
     /// This is returned for each device in <see cref="DeviceHost{T, THostConfiguration, TConfiguration}.ConfigurationResult"/>
-    /// and is the result of the <see cref="ReconfigureDeviceCommand{THost,TConfiguration}"/>.
+    /// and is the result of the <see cref="ConfigureDeviceCommand{THost,TConfiguration}"/>.
     /// </summary>
     public enum DeviceApplyConfigurationResult
     {

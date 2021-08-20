@@ -93,7 +93,6 @@ namespace CK.DeviceModel
             _applyConfigAsynclock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
         }
 
-        // This is the only CS8618 warning that must be raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
         DeviceHost( bool privateCall )
         {
             _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
@@ -110,6 +109,9 @@ namespace CK.DeviceModel
             _reconfigureSyncLock = new object();
             _alwayRunningStopped = new List<(IDevice Device, int Count, DateTime NextCall)>();
             _alwayRunningStoppedSafe = Array.Empty<(IDevice, int, DateTime)>();
+            // Shut up the CS8618 warning is raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
+            // (But keep the warning for any other fields.)
+            _applyConfigAsynclock = null!;
         }
 
         /// <inheritdoc />
@@ -122,7 +124,7 @@ namespace CK.DeviceModel
 
         Type IDeviceHost.GetDeviceConfigurationType() => typeof( TConfiguration );
 
-        DeviceCommandWithResult<DeviceApplyConfigurationResult> IInternalDeviceHost.CreateReconfigureCommand( string name ) => new InternalReconfigureDeviceCommand<TConfiguration>( GetType(), name );
+        BaseConfigureDeviceCommand IInternalDeviceHost.CreateConfigureCommand( string name, DeviceConfiguration? configuration ) => new InternalConfigureDeviceCommand<TConfiguration>( GetType(), name, configuration );
 
         BaseStartDeviceCommand IInternalDeviceHost.CreateStartCommand( string name ) => new InternalStartDeviceCommand( GetType(), name );
 
@@ -312,6 +314,12 @@ namespace CK.DeviceModel
             var r = await ApplyConfigurationAsync( monitor, (THostConfiguration)configuration, allowEmptyConfiguration ).ConfigureAwait( false );
             return r.Success;
         }
+
+        BaseConfigureDeviceCommand IDeviceHost.CreateConfigureCommand( DeviceConfiguration? configuration )
+        {
+            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), string.Empty, configuration );
+        }
+
 
         /// <summary>
         /// Applies a host configuration: multiple devices can be configured at once and if <see cref="DeviceHostConfiguration{TConfiguration}.IsPartialConfiguration"/> is false,

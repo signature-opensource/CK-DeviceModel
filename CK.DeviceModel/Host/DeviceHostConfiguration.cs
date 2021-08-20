@@ -10,6 +10,10 @@ namespace CK.DeviceModel
     /// <summary>
     /// Default implementation of a host device configuration.
     /// This class can be specialized if needed (recall to implement its binary serialization/deserialization).
+    /// <para>
+    /// Just like DeviceCofiguration, concrete DeviceHostConfiguration classes should be sealed since simple
+    /// binary de/serialization and auto configuration don't support polymorphism.
+    /// </para>
     /// </summary>
     /// <typeparam name="TConfiguration"></typeparam>
     public class DeviceHostConfiguration<TConfiguration> : IDeviceHostConfiguration where TConfiguration : DeviceConfiguration

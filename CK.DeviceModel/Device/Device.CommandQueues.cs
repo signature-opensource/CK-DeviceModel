@@ -323,7 +323,7 @@ namespace CK.DeviceModel
             {
                 BaseStopDeviceCommand stop => HandleStopAsync( stop, DeviceStoppedReason.StoppedCall ),
                 BaseStartDeviceCommand start => HandleStartAsync( start, DeviceStartedReason.StartCall ),
-                BaseReconfigureDeviceCommand<TConfiguration> config => HandleReconfigureAsync( config, token ),
+                BaseConfigureDeviceCommand<TConfiguration> config => HandleReconfigureAsync( config, token ),
                 BaseSetControllerKeyDeviceCommand setC => HandleSetControllerKeyAsync( setC ),
                 BaseDestroyDeviceCommand destroy => HandleDestroyAsync( destroy, false ),
                 _ => DoHandleCommandAsync( _commandMonitor, command, token )

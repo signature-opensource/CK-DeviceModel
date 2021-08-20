@@ -156,7 +156,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets the current configuration. This is a clone of the last configuration submitted
         /// to <see cref="ReconfigureAsync(IActivityMonitor, TConfiguration, CancellationToken)"/> (or
-        /// the <see cref="ReconfigureDeviceCommand{THost, TConfiguration}"/>'s configuration command)
+        /// the <see cref="ConfigureDeviceCommand{THost, TConfiguration}"/>'s configuration command)
         /// that is accessible only (protected) from this device.
         /// <para>
         /// Configuration are mutable but device's code should avoid to alter it.
@@ -194,31 +194,23 @@ namespace CK.DeviceModel
         /// <returns>The configuration result.</returns>
         public Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, TConfiguration config, CancellationToken token = default )
         {
-            return InternalReconfigureAsync( monitor, config, null, token );
+            if( config == null ) throw new ArgumentNullException( nameof( config ) );
+            if( !config.CheckValid( monitor ) )
+            {
+                return Task.FromResult( DeviceApplyConfigurationResult.InvalidConfiguration );
+            }
+            return InternalReconfigureAsync( monitor, config, config.DeepClone(), token );
         }
 
         internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
                                                                                 TConfiguration externalConfig,
-                                                                                TConfiguration? validAndClonedconfig,
+                                                                                TConfiguration validAndClonedconfig,
                                                                                 CancellationToken token = default )
         {
-            var cmd = (InternalReconfigureDeviceCommand<TConfiguration>?)_host?.CreateReconfigureCommand( Name );
+            var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateConfigureCommand( Name, validAndClonedconfig );
             if( cmd == null )
             {
                 return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
-            }
-            if( validAndClonedconfig != null )
-            {
-                cmd.Configuration = validAndClonedconfig;
-            }
-            else
-            {
-                // Just in case externalConfig is actually null: BaseReconfigureDeviceCommand<TConfiguration>.DoCheckValidity will handle it.
-                cmd.Configuration = externalConfig?.DeepClone();
-                if( !cmd.CheckValidity( monitor ) )
-                {
-                    return Task.FromResult( DeviceApplyConfigurationResult.InvalidConfiguration );
-                }
             }
             cmd.ExternalConfig = externalConfig;
             if( !UnsafeSendCommandImmediate( monitor, cmd ) )
@@ -228,7 +220,7 @@ namespace CK.DeviceModel
             return cmd.Completion.Task;
         }
 
-        async Task HandleReconfigureAsync( BaseReconfigureDeviceCommand<TConfiguration> cmd, CancellationToken token )
+        async Task HandleReconfigureAsync( BaseConfigureDeviceCommand<TConfiguration> cmd, CancellationToken token )
         {
             Debug.Assert( cmd.Configuration != null );
             TConfiguration config;

@@ -4,16 +4,16 @@ using System;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// This class cannot be directly specialized: the generic <see cref="ReconfigureDeviceCommand{THost,TConfiguration}"/>
-    /// must be used.
+    /// Non-generic base for the generic <see cref="ConfigureDeviceCommand{THost,TConfiguration}"/> (that
+    /// is the only one that can be used).
+    /// It exposes a base <see cref="DeviceConfiguration"/> and is useful when configuration type
+    /// is not statically available.
     /// </summary>
-    /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract class BaseReconfigureDeviceCommand<TConfiguration> : DeviceCommandWithResult<DeviceApplyConfigurationResult>,
-                                                                         ICompletable<DeviceApplyConfigurationResult>
-        where TConfiguration : DeviceConfiguration
+    public abstract class BaseConfigureDeviceCommand : DeviceCommandWithResult<DeviceApplyConfigurationResult>, ICompletable<DeviceApplyConfigurationResult>
     {
-        private protected BaseReconfigureDeviceCommand()
+        private protected BaseConfigureDeviceCommand( DeviceConfiguration configuration )
         {
+            Configuration = configuration ?? throw new ArgumentNullException( nameof( configuration ) );
         }
 
         void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
@@ -27,37 +27,25 @@ namespace CK.DeviceModel
             result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
         }
 
-        static DeviceApplyConfigurationResult OnError( Exception ex ) => ex switch
-        {
-            InvalidControllerKeyException => DeviceApplyConfigurationResult.InvalidControllerKey,
-            _ => DeviceApplyConfigurationResult.UnexpectedError
-        };
-
-        internal TConfiguration? ExternalConfig { get; set; }
-
         /// <summary>
         /// Returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>: the configuration can obviously be executed while the device is stopped.
         /// </summary>
         protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
 
         /// <summary>
-        /// Gets or sets the configuration to apply.
+        /// Gets the configuration to apply.
         /// </summary>
-        public TConfiguration? Configuration { get; set; }
+        public DeviceConfiguration Configuration { get; }
 
         /// <summary>
-        /// Checks that the configuration is present and that <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> returns true.
+        /// Calls <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> on the <see cref="Configuration"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
         protected override bool DoCheckValidity( IActivityMonitor monitor )
         {
-            if( Configuration == null )
-            {
-                monitor.Error( "Missing Configuration object." );
-                return false;
-            }
             return Configuration.CheckValid( monitor );
         }
+
     }
 }

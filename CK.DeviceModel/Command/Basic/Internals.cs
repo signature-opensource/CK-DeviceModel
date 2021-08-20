@@ -4,10 +4,11 @@ using System.Text;
 
 namespace CK.DeviceModel
 {
-    internal class InternalReconfigureDeviceCommand<TConfiguration> : BaseReconfigureDeviceCommand<TConfiguration>
+    internal class InternalConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
         where TConfiguration : DeviceConfiguration
     {
-        public InternalReconfigureDeviceCommand( Type hostType, string name )
+        public InternalConfigureDeviceCommand( Type hostType, string name, DeviceConfiguration? configuration )
+            : base( (TConfiguration?)configuration )
         {
             HostType = hostType;
             DeviceName = name;

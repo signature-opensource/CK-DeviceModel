@@ -45,6 +45,17 @@ namespace CK.DeviceModel
         Type GetDeviceConfigurationType();
 
         /// <summary>
+        /// Creates a <see cref="BaseConfigureDeviceCommand"/> with an existing or new empty Configuration
+        /// of the correct type and an empty <see cref="BaseDeviceCommand.DeviceName"/>.
+        /// <para>
+        /// If a configuration object is provided, its type must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
+        /// </para>
+        /// </summary>
+        /// <param name="configuration">The existing configuration or null to initialize a new empty configuration object.</param>
+        /// <returns>The reconfigure command.</returns>
+        BaseConfigureDeviceCommand CreateConfigureCommand( DeviceConfiguration? configuration = null );
+
+        /// <summary>
         /// Applies a configuration. Configuration's type must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -55,6 +66,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is configured by the provided <paramref name="configuration"/>.
+        /// Configuration's type must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>

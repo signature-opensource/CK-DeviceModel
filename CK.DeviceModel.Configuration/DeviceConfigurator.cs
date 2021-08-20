@@ -24,7 +24,7 @@ namespace CK.DeviceModel
         readonly IConfigurationRoot _configurationRoot;
         readonly IDeviceHost[] _deviceHosts;
         readonly CancellationTokenSource _run;
-        IActivityMonitor _changeMonitor;
+        readonly IActivityMonitor _changeMonitor;
         IDisposable? _changeSubscription;
         readonly Channel<(IDeviceHost, IDeviceHostConfiguration)[]> _applyChannel;
 
@@ -156,8 +156,7 @@ namespace CK.DeviceModel
                                             foreach( var deviceConfig in items.GetChildren() )
                                             {
                                                 _changeMonitor.Debug( $"Handling Device item: {deviceConfig.Key}." );
-                                                Type tConfig = d.GetDeviceConfigurationType();
-                                                var configObject = (DeviceConfiguration)deviceConfig.Get( tConfig );
+                                                var configObject = (DeviceConfiguration)deviceConfig.Get( d.GetDeviceConfigurationType() );
                                                 configObject.Name = deviceConfig.Key;
                                                 config.Add( configObject );
                                             }

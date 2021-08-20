@@ -12,7 +12,7 @@ namespace CK.DeviceModel
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        DeviceCommandWithResult<DeviceApplyConfigurationResult> CreateReconfigureCommand( string name );
+        BaseConfigureDeviceCommand CreateConfigureCommand( string name, DeviceConfiguration? configuration );
 
         BaseStartDeviceCommand CreateStartCommand( string name );
 
