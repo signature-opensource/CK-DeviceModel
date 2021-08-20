@@ -3,6 +3,7 @@
   <SimpleGitVersion>
     <Branches>
       <Branch Name="develop" CIVersionMode="LastReleaseBased" VersionName="develop" />
+      <Branch Name="vNext" CIVersionMode="ZeroTimed" VersionName="vnext" />
     </Branches>
   </SimpleGitVersion>
 </RepositoryInfo>
