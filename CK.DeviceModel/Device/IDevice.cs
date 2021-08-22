@@ -74,11 +74,15 @@ namespace CK.DeviceModel
         PerfectEvent<DeviceLifetimeEvent> LifetimeEvent { get; }
 
         /// <summary>
-        /// Gets the current configuration status of this device.
-        /// Just like <see cref="IsRunning"/>, since a device lives in multi-threaded/concurrent contexts,
-        /// any sensible decision based on this "instant" status should be avoided.
+        /// Gets a clone of the actual current configuration.
+        /// This is NOT the actual configuration object reference that the device has received and
+        /// is using: configuration objects are cloned in order to isolate the running device of any change
+        /// in this publicly exposed configuration.
+        /// <para>
+        /// Even if changing this object is harmless, it should obviously not be changed.
+        /// </para>
         /// </summary>
-        DeviceConfigurationStatus ConfigurationStatus { get; }
+        DeviceConfiguration ExternalConfiguration { get; }
 
         /// <summary>
         /// Attempts to start this device.

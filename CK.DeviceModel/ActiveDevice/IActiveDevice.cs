@@ -16,7 +16,7 @@ namespace CK.DeviceModel
         /// typed <see cref="ActiveDevice{TConfiguration, TEvent}.DeviceEvent"/>.
         /// <para>
         /// Events are always raised on the event loop: LifeTimeEvent are marshalled to the
-        /// internal event channel so that this stream of generic events (for one device of course),
+        /// internal event channel so that this stream of all events (for one device of course),
         /// is guaranteed to be serialized.
         /// </para>
         /// </summary>

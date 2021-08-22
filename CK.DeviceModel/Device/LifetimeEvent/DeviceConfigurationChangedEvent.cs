@@ -16,7 +16,7 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Gets the new configuration.
+        /// Gets the new <see cref="IDevice.ExternalConfiguration"/>.
         /// </summary>
         public DeviceConfiguration Configuration { get; }
 

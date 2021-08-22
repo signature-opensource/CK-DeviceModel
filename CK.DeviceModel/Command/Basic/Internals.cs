@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace CK.DeviceModel
@@ -7,12 +8,12 @@ namespace CK.DeviceModel
     internal class InternalConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
         where TConfiguration : DeviceConfiguration
     {
-        public InternalConfigureDeviceCommand( Type hostType, string name, DeviceConfiguration? configuration )
-            : base( (TConfiguration?)configuration )
+        public InternalConfigureDeviceCommand( Type hostType, DeviceConfiguration? configuration, (string lockedName, string? controllerKey)? locked = null )
+            : base( (TConfiguration?)configuration, locked )
         {
             HostType = hostType;
-            DeviceName = name;
         }
+
         public override Type HostType { get; }
     }
 

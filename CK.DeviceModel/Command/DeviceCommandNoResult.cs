@@ -15,7 +15,9 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class DeviceCommandNoResult : BaseDeviceCommand, ICompletable
     {
-        private protected DeviceCommandNoResult()
+        /// <inheritdoc />
+        private protected DeviceCommandNoResult( (string lockedName, string? lockedControllerKey)? locked = null )
+            : base( locked )
         {
             Completion = new CompletionSource( this );
         }

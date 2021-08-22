@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Diagnostics;
 
 namespace CK.DeviceModel
 {
@@ -11,7 +12,8 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class BaseConfigureDeviceCommand : DeviceCommandWithResult<DeviceApplyConfigurationResult>, ICompletable<DeviceApplyConfigurationResult>
     {
-        private protected BaseConfigureDeviceCommand( DeviceConfiguration configuration )
+        private protected BaseConfigureDeviceCommand( DeviceConfiguration configuration, (string lockedName, string? lockedControllerKey)? locked = null )
+            : base( locked )
         {
             Configuration = configuration ?? throw new ArgumentNullException( nameof( configuration ) );
         }

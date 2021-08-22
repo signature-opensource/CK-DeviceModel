@@ -12,7 +12,7 @@ namespace CK.DeviceModel
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        BaseConfigureDeviceCommand CreateConfigureCommand( string name, DeviceConfiguration? configuration );
+        BaseConfigureDeviceCommand CreateLockedConfigureCommand( string name, string? controllerKey, DeviceConfiguration? configuration );
 
         BaseStartDeviceCommand CreateStartCommand( string name );
 
@@ -22,11 +22,9 @@ namespace CK.DeviceModel
 
         BaseSetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
 
-        bool OnDeviceConfigured( IActivityMonitor monitor, IDevice device, DeviceApplyConfigurationResult result, DeviceConfiguration externalConfig );
-
         bool OnDeviceDestroyed( IActivityMonitor monitor, IDevice device );
 
-        void OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor );
+        void OnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor );
 
         Task RaiseDevicesChangedEvent( IActivityMonitor monitor );
 

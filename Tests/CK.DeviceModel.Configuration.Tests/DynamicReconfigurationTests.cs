@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NUnit.Framework;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -211,13 +212,13 @@ namespace CK.DeviceModel.Configuration.Tests
                 Camera.TotalRunning.Should().Be( 0 );
                 LightController.TotalCount.Should().Be( 1 );
                 LightController.TotalRunning.Should().Be( 0 );
-                var c1 = CameraHost.TestInstance.GetConfiguredDevice( "C1" );
-                var c2 = CameraHost.TestInstance.GetConfiguredDevice( "C2" );
-                var l1 = LightControllerHost.Instance.GetConfiguredDevice( "L1" );
+                var c1 = CameraHost.TestInstance.Find( "C1" );
+                var c2 = CameraHost.TestInstance.Find( "C2" );
+                var l1 = LightControllerHost.Instance.Find( "L1" );
                 Debug.Assert( c1 != null && c2 != null && l1 != null );
-                c1.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
-                c2.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
-                l1.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
+                c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
+                c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
+                l1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
                 return Task.CompletedTask;
             } );
         }
@@ -245,36 +246,35 @@ namespace CK.DeviceModel.Configuration.Tests
                 var c2 = CameraHost.TestInstance.Find( "C2" );
                 var l1 = LightControllerHost.Instance.Find( "L1" );
                 var l2 = LightControllerHost.Instance.Find( "L2" );
-                Debug.Assert( c1 != null && c2 != null && l1 != null && l2 != null );
 
                 c1.IsRunning.Should().BeTrue();
-                c1.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.RunnableStarted );
+                c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.RunnableStarted );
 
                 c2.IsRunning.Should().BeTrue();
-                c2.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
+                c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
 
                 l1.IsRunning.Should().BeFalse();
-                l1.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Runnable );
+                l1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
 
                 l2.IsRunning.Should().BeFalse();
-                l2.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
+                l2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
 
                 (await c1.StopAsync( TestHelper.Monitor )).Should().BeTrue();
                 c1.IsRunning.Should().BeFalse();
-                c1.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.RunnableStarted );
+                c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.RunnableStarted );
                 (await c1.StopAsync( TestHelper.Monitor )).Should().BeTrue( "One can always stop an already stopped device." );
 
                 (await c2.StopAsync( TestHelper.Monitor )).Should().BeFalse( "c2 is AlwaysRunning." );
                 c2.IsRunning.Should().BeTrue();
-                c2.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
+                c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
 
                 (await l1.StartAsync( TestHelper.Monitor )).Should().BeTrue();
                 l1.IsRunning.Should().BeTrue();
-                l1.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Runnable );
+                l1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
 
                 (await l2.StartAsync( TestHelper.Monitor )).Should().BeFalse( "Disabled!" );
                 l2.IsRunning.Should().BeFalse();
-                l2.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
+                l2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
 
                 c1.IsDestroyed.Should().BeFalse();
                 c2.IsDestroyed.Should().BeFalse();
@@ -296,11 +296,50 @@ namespace CK.DeviceModel.Configuration.Tests
             } );
         }
 
-        static int DevicesChangedCount = 0;
-        static Task DevicesChanged_Async( IActivityMonitor monitor, IDeviceHost e )
+        class ChangeCounter : IDisposable
         {
-            Interlocked.Increment( ref DevicesChangedCount );
-            return Task.CompletedTask;
+            readonly IDeviceHost _host;
+
+            public int DevicesChangedCount { get; private set; }
+            public int DeviceConfigurationChangedCount => _devices.Values.Sum();
+
+            Dictionary<IDevice, int> _devices;
+
+            public ChangeCounter( IDeviceHost host )
+            {
+                _host = host;
+                _devices = new Dictionary<IDevice, int>();
+                RegisteDeviceLifetimeEvents();
+                host.DevicesChanged.Sync += ( m, h ) =>
+                {
+                    ++DevicesChangedCount;
+                    RegisteDeviceLifetimeEvents();
+                };
+            }
+
+            private void RegisteDeviceLifetimeEvents()
+            {
+                foreach( var d in _host.GetDevices() )
+                {
+                    if( _devices.TryAdd( d, 0 ) )
+                    {
+                        d.LifetimeEvent.Sync += OnDeviceEvent;
+                    }
+                }
+            }
+
+            void OnDeviceEvent( IActivityMonitor m, DeviceLifetimeEvent e )
+            {
+                _devices[e.Device] = _devices[e.Device] + 1;
+            }
+
+            public void Dispose()
+            {
+                foreach( var d in _devices.Keys )
+                {
+                    d.LifetimeEvent.Sync -= OnDeviceEvent;
+                }
+            }
         }
 
         [Test]
@@ -317,13 +356,14 @@ namespace CK.DeviceModel.Configuration.Tests
                 Debug.Assert( LightControllerHost.Instance != null );
 
                 CameraHost.TestInstance.Should().BeSameAs( services.GetRequiredService<CameraHost>() );
-                CameraHost.TestInstance.DevicesChanged.Async += DevicesChanged_Async; 
+                using var counter = new ChangeCounter( CameraHost.TestInstance );
 
                 Camera.TotalCount.Should().Be( 1 );
                 Camera.TotalRunning.Should().Be( 1 );
                 LightController.TotalCount.Should().Be( 0 );
                 LightController.TotalRunning.Should().Be( 0 );
-                DevicesChangedCount = 0;
+                counter.DevicesChangedCount.Should().Be( 0 );
+                counter.DeviceConfigurationChangedCount.Should().Be( 0 );
 
                 var c1 = CameraHost.TestInstance.Find( "C1" );
                 Debug.Assert( c1 != null );
@@ -334,7 +374,8 @@ namespace CK.DeviceModel.Configuration.Tests
                 await Task.Delay( 50 );
 
                 c1.IsRunning.Should().BeFalse();
-                DevicesChangedCount.Should().Be( 1 );
+                counter.DevicesChangedCount.Should().Be( 0 );
+                counter.DeviceConfigurationChangedCount.Should().Be( 2 );
 
                 config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "AlwaysRunning" );
                 config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "Disabled" );
@@ -360,16 +401,12 @@ namespace CK.DeviceModel.Configuration.Tests
                 // Setting IsPartialConfiguration to false: the C1 device doesn't exist anymore!
                 config.Provider.Set( "CK-DeviceModel:CameraHost:IsPartialConfiguration", "false" );
                 config.Provider.RaiseChanged();
-                await Task.Delay( 150 );
+                await Task.Delay( 50 );
 
                 c1.IsDestroyed.Should().BeTrue( "C1 is dead." );
                 c2.IsRunning.Should().BeTrue();
 
-                CameraHost.TestInstance.DevicesChanged.Async -= DevicesChanged_Async;
-                await CameraHost.TestInstance.ClearAsync( TestHelper.Monitor );
-
-                c1.IsDestroyed.Should().BeTrue();
-                c2.IsDestroyed.Should().BeTrue();
+                await c2.DestroyAsync( TestHelper.Monitor );
             } );
         }
 

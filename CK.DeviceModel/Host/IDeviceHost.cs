@@ -81,28 +81,15 @@ namespace CK.DeviceModel
         IDevice? Find( string deviceName );
 
         /// <summary>
-        /// Gets a device and its applied configuration by its name.
-        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
-        /// </summary>
-        /// <param name="deviceName">The device name to find.</param>
-        /// <returns>The device and its configuration or null if not found.</returns>
-        (IDevice, DeviceConfiguration)? GetConfiguredDevice( string deviceName );
-
-        /// <summary>
-        /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
-        /// Note that the configuration objects are copies of the ones that are used by the actual devices.
-        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
-        /// </summary>
-        /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
-        /// <returns>The snapshot of the configured devices.</returns>
-        IReadOnlyList<(IDevice, DeviceConfiguration)> GetConfiguredDevices( Func<IDevice, DeviceConfiguration, bool>? predicate = null );
-
-        /// <summary>
-        /// Gets a <see cref="PerfectEvent{IDeviceHost}"/> that is raised whenever the device list has changed
-        /// or any device's configuration has changed.
-        /// This event is not raised when devices are started or stopped or when their <see cref="IDevice.ControllerKey"/> changed.
+        /// Gets a <see cref="PerfectEvent{IDeviceHost}"/> that is raised whenever one or more devices appeared or disappeared.
         /// </summary>
         PerfectEvent<IDeviceHost> DevicesChanged { get; }
+
+        /// <summary>
+        /// Gets a snapshot of the current devices.
+        /// </summary>
+        /// <returns>A snapshot of the devices.</returns>
+        IDevice[] GetDevices();
 
         /// <summary>
         /// Sends the provided command to the device it targets.

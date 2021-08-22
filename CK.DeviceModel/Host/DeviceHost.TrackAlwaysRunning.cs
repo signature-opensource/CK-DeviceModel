@@ -17,14 +17,14 @@ namespace CK.DeviceModel
         /// This contains the devices for which a call to the <see cref="IDeviceAlwaysRunningPolicy.RetryStartAsync(IActivityMonitor, IDeviceHost, IDevice, int)"/>
         /// is planned. We lock it when reading or modifying it (instead of creating an extra lock object). 
         /// </summary>
-        readonly List<(IDevice Device, int Count, DateTime NextCall)> _alwayRunningStopped;
+        readonly List<(IInternalDevice Device, int Count, DateTime NextCall)> _alwayRunningStopped;
         DeviceHostDaemon? _daemon;
 
         /// <summary>
         /// This is a snapshot of the _alwayRunningStopped list.
         /// The daemon uses this without lock.
         /// </summary>
-        volatile (IDevice Device, int Count, DateTime NextCall)[] _alwayRunningStoppedSafe;
+        volatile (IInternalDevice Device, int Count, DateTime NextCall)[] _alwayRunningStoppedSafe;
 
         /// <summary>
         /// Extension point that enables this host to handle its own <see cref="DeviceConfigurationStatus.AlwaysRunning"/> retry policy.
@@ -52,7 +52,7 @@ namespace CK.DeviceModel
             _daemon = daemon;
         }
 
-        void IInternalDeviceHost.OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor )
+        void IInternalDeviceHost.OnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor )
         {
             using( monitor.OpenDebug( $"OnAlwaysRunningCheck for device '{d}'." ) )
             {
@@ -62,14 +62,14 @@ namespace CK.DeviceModel
                     if( idx >= 0 )
                     {
                         monitor.Debug( "Device is registered." );
-                        if( d.IsRunning || d.ConfigurationStatus != DeviceConfigurationStatus.AlwaysRunning )
+                        if( d.IsRunning || d.ConfigStatus != DeviceConfigurationStatus.AlwaysRunning )
                         {
                             _alwayRunningStopped.RemoveAt( idx );
                             CaptureAlwayRunningStoppedSafe( monitor, false );
                         }
                         else
                         {
-                            Debug.Assert( d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning );
+                            Debug.Assert( d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning );
                             // Let the NextCall unchanged: manual Starts are ignored.
                             _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count + 1, _alwayRunningStopped[idx].NextCall);
                             CaptureAlwayRunningStoppedSafe( monitor, true );
@@ -77,7 +77,7 @@ namespace CK.DeviceModel
                     }
                     else
                     {
-                        if( !d.IsRunning && d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning )
+                        if( !d.IsRunning && d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning )
                         {
                             // Next call (Count = 0) is asap.
                             _alwayRunningStopped.Add( (d, 0, DateTime.UtcNow) );
@@ -110,7 +110,7 @@ namespace CK.DeviceModel
                     var d = e.Device;
                     // Delta 0 means: the device should be removed from the _alwayRunningStopped list.
                     long delta = 0;
-                    if( !d.IsRunning && d.ConfigurationStatus == DeviceConfigurationStatus.AlwaysRunning )
+                    if( !d.IsRunning && d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning )
                     {
                         delta = (e.NextCall - now).Ticks;
                         if( delta <= 0 )
@@ -149,7 +149,7 @@ namespace CK.DeviceModel
                     if( idx >= 0 )
                     {
                         var delta = updatedDeltas[i];
-                        if( d.IsRunning || d.ConfigurationStatus != DeviceConfigurationStatus.AlwaysRunning ) delta = 0;
+                        if( d.IsRunning || d.ConfigStatus != DeviceConfigurationStatus.AlwaysRunning ) delta = 0;
                         if( delta > 0 )
                         {
                             changed = true;

@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,7 +14,9 @@ namespace CK.DeviceModel
     /// <typeparam name="TResult">The type of the command's result.</typeparam>
     public abstract class DeviceCommandWithResult<TResult> : BaseDeviceCommand, ICompletable<TResult>
     {
-        private protected DeviceCommandWithResult()
+        /// <inheritdoc />
+        private protected DeviceCommandWithResult( (string lockedName, string? lockedControllerKey)? locked = null )
+            : base( locked )
         {
             Completion = new CompletionSource<TResult>( this );
         }

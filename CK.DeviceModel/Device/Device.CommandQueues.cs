@@ -23,6 +23,7 @@ namespace CK.DeviceModel
         /// </summary>
         class CommandAwaker : BaseDeviceCommand
         {
+            public CommandAwaker() : base( (string.Empty,null) ) { }
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
@@ -38,6 +39,7 @@ namespace CK.DeviceModel
             {
                 while( _commandQueue.Reader.TryRead( out var c ) )
                 {
+                    Debug.Assert( c.Command.IsLocked );
                     c.Command.InternalCompletion.SetCanceled();
                     ++cRemoved;
                 }
@@ -85,6 +87,7 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         internal protected bool SendRoutedCommand( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
         {
+            command.Lock();
             return _commandQueue.Writer.TryWrite( (command, token, checkControllerKey ) );
         }
 
@@ -112,6 +115,7 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         internal protected bool SendRoutedCommandImmediate( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
         {
+            command.Lock();
             return _commandQueueImmediate.Writer.TryWrite( (command, token, checkControllerKey) ) && _commandQueue.Writer.TryWrite( (_commandAwaker, default, false) );
         }
 
@@ -127,10 +131,6 @@ namespace CK.DeviceModel
                 {
                     throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it. (For direct execution, you can use checkDeviceName: false parameter to skip this check or use UnsafeSendCommand.)", nameof( command ) );
                 }
-            }
-            else
-            {
-                command.DeviceName = Name;
             }
         }
 
@@ -174,7 +174,7 @@ namespace CK.DeviceModel
                     if( cmd == _commandAwaker ) continue;
                     wasStop = !IsRunning;
                     currentlyExecuting = cmd;
-
+                    Debug.Assert( cmd.IsLocked );
                     await HandleCommandAsync( cmd, token, checkKey, allowDefer: true ).ConfigureAwait( false );
                 }
                 catch( Exception ex )
