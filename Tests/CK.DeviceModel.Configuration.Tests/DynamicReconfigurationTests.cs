@@ -319,7 +319,7 @@ namespace CK.DeviceModel.Configuration.Tests
 
             private void RegisteDeviceLifetimeEvents()
             {
-                foreach( var d in _host.GetDevices() )
+                foreach( var d in _host.GetDevices().Values )
                 {
                     if( _devices.TryAdd( d, 0 ) )
                     {

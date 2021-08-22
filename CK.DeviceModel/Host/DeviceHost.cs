@@ -31,6 +31,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// This is the whole state of this Host. It is updated atomically (by setting a
         /// new dictionary instance). All Find methods (and RouteCommand) can use it lock-free.
+        /// It is exposed by GetDevices() methods.
         /// </summary>
         Dictionary<string, T> _devices;
 
@@ -167,27 +168,16 @@ namespace CK.DeviceModel
 
         IDevice? IDeviceHost.Find( string deviceName ) => Find( deviceName );
 
-        IDevice[] IDeviceHost.GetDevices() => _devices.Values.ToArray();
+        
+        IReadOnlyDictionary<string, IDevice> IDeviceHost.GetDevices() => _devices.AsIReadOnlyDictionary<string,T,IDevice>();
 
         /// <summary>
-        /// Gets a snapshot of the current devices.
+        /// Gets a snapshot of the current devices indexed by name.
+        /// This read only dictionary can be freely used (there is no concurrency issues), <see cref="DevicesChanged"/>
+        /// event can be used to monitor changes.
         /// </summary>
         /// <returns>A snapshot of the devices.</returns>
-        public T[] GetDevices() => _devices.Values.ToArray();
-
-        /// <summary>
-        /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
-        /// Note that these objects are a copy of the ones that are used by the actual devices.
-        /// See <see cref="ConfiguredDeviceSnapshot{T, TConfiguration}.Configuration"/>.
-        /// </summary>
-        /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
-        /// <returns>The snapshot of the configured devices.</returns>
-        public IReadOnlyList<ConfiguredDeviceSnapshot<T,TConfiguration>> GetDevices( Func<ConfiguredDeviceSnapshot<T,TConfiguration>, bool>? predicate = null )
-        {
-            var p = _devices.Values.Select( d => new ConfiguredDeviceSnapshot<T, TConfiguration>( d, d.ExternalConfiguration ) );
-            if( predicate != null ) p = p.Where( predicate );
-            return p.ToArray();
-        }
+        public IReadOnlyDictionary<string, T> GetDevices() => _devices;
 
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost> DevicesChanged => _devicesChanged.PerfectEvent;

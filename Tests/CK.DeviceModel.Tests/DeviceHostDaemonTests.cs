@@ -250,9 +250,9 @@ namespace CK.DeviceModel.Tests
             c3.Name = "D*2";
             (await host3.EnsureDeviceAsync( TestHelper.Monitor, c3 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
 
-            IDevice[] devices = ((IDeviceHost)host1).GetDevices()
-                                    .Concat( ((IDeviceHost)host2).GetDevices() )
-                                    .Concat( ((IDeviceHost)host3).GetDevices() )
+            IDevice[] devices = ((IDeviceHost)host1).GetDevices().Values
+                                    .Concat( ((IDeviceHost)host2).GetDevices().Values )
+                                    .Concat( ((IDeviceHost)host3).GetDevices().Values )
                                     .ToArray();
 
             foreach( var d in devices )

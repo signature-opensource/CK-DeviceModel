@@ -86,10 +86,12 @@ namespace CK.DeviceModel
         PerfectEvent<IDeviceHost> DevicesChanged { get; }
 
         /// <summary>
-        /// Gets a snapshot of the current devices.
+        /// Gets a snapshot of the current devices indexed by name.
+        /// This read only dictionary can be freely used (there is no concurrency issues), <see cref="DevicesChanged"/>
+        /// event can be used to monitor changes.
         /// </summary>
         /// <returns>A snapshot of the devices.</returns>
-        IDevice[] GetDevices();
+        IReadOnlyDictionary<string,IDevice> GetDevices();
 
         /// <summary>
         /// Sends the provided command to the device it targets.
