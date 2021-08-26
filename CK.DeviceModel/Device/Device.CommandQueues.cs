@@ -93,7 +93,7 @@ namespace CK.DeviceModel
         public bool SendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
         {
             CheckDirectCommandParameter( monitor, command, checkDeviceName );
-            monitor.Debug( $"SendCommandImmediate: {command}." );
+            monitor.Debug( $"SendCommandImmediate: '{command}'." );
             return SendRoutedCommandImmediate( command, token, checkControllerKey );
         }
 
@@ -101,7 +101,7 @@ namespace CK.DeviceModel
         public bool UnsafeSendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default )
         {
             CheckDirectCommandParameter( monitor, command, false );
-            monitor.Debug( $"UnsafeSendCommandImmediate: {command}." );
+            monitor.Debug( $"UnsafeSendCommandImmediate: '{command}'." );
             return SendRoutedCommandImmediate( command, token, false );
         }
 
@@ -175,8 +175,8 @@ namespace CK.DeviceModel
                         if( IsDestroyed ) break;
                     }
                     if( cmd == _commandAwaker ) continue;
-                    wasStop = !IsRunning;
                     currentlyExecuting = cmd;
+                    wasStop = !IsRunning;
 
                     await HandleCommandAsync( cmd, token, checkKey, allowDefer: true ).ConfigureAwait( false );
                 }
@@ -198,11 +198,14 @@ namespace CK.DeviceModel
                         {
                             _commandMonitor.Fatal( $"Device '{FullName}' OnCommandErrorAsync raised an error. Device will stop.", ex2 );
                         }
-                        if( mustStop && IsRunning )
+                        if( mustStop )
                         {
-                            // Fires and forget the StopCommand: the fact that the device stops
-                            // does not belong to the faulty command plan.
-                            _ = StopAsync( _commandMonitor, ignoreAlwaysRunning: true );
+                            if( IsRunning )
+                            {
+                                // Fires and forget the StopCommand: the fact that the device stops
+                                // does not belong to the faulty command plan.
+                                _ = StopAsync( _commandMonitor, ignoreAlwaysRunning: true );
+                            }
                         }
                     }
                 }
@@ -227,7 +230,7 @@ namespace CK.DeviceModel
 
         async Task HandleCommandAutoStartAsync( BaseDeviceCommand command, bool withStop, CancellationToken token )
         {
-            _commandMonitor.Debug( $"Starting device to handle command '{command}' and {(withStop ? "stopping it after" : "let it run")}." );
+            _commandMonitor.Debug( $"Starting command '{command}' handling and {(withStop ? "stopping it after" : "let it run")}." );
             Debug.Assert( !IsRunning );
             await HandleStartAsync( null, withStop ? DeviceStartedReason.SilentAutoStartAndStopStoppedBehavior : DeviceStartedReason.StartAndKeepRunningStoppedBehavior ).ConfigureAwait( false );
             if( IsRunning )
@@ -276,23 +279,23 @@ namespace CK.DeviceModel
             {
                 case BaseStopDeviceCommand stop:
                     if( checkKey && !CheckControllerKey( command ) ) return;
-                    await HandleStopAsync( stop, DeviceStoppedReason.StoppedCall );
+                    await HandleStopAsync( stop, DeviceStoppedReason.StoppedCall ).ConfigureAwait( false );
                     return;
                 case BaseStartDeviceCommand start:
                     if( checkKey && !CheckControllerKey( command ) ) return;
-                    await HandleStartAsync( start, DeviceStartedReason.StartCall );
+                    await HandleStartAsync( start, DeviceStartedReason.StartCall ).ConfigureAwait( false );
                     return;
                 case BaseReconfigureDeviceCommand<TConfiguration> config:
                     if( checkKey && !CheckControllerKey( command ) ) return;
-                    await HandleReconfigureAsync( config, token );
+                    await HandleReconfigureAsync( config, token ).ConfigureAwait( false );
                     return;
                 case BaseSetControllerKeyDeviceCommand setC:
                     if( checkKey && !CheckControllerKey( command ) ) return;
-                    await HandleSetControllerKeyAsync( setC );
+                    await HandleSetControllerKeyAsync( setC ).ConfigureAwait( false );
                     return;
                 case BaseDestroyDeviceCommand destroy:
                     if( checkKey && !CheckControllerKey( command ) ) return;
-                    await HandleDestroyAsync( destroy, false );
+                    await HandleDestroyAsync( destroy, false ).ConfigureAwait( false );
                     return;
                 default:
                 {
@@ -366,7 +369,7 @@ namespace CK.DeviceModel
                     using( _commandMonitor.OpenDebug( $"Handling command '{command}'." ) )
                     {
                         if( checkKey && !CheckControllerKey( command ) ) return;
-                        await DoHandleCommandAsync( _commandMonitor, command, token );
+                        await DoHandleCommandAsync( _commandMonitor, command, token ).ConfigureAwait( false );
                     }
                     break;
                 }
