@@ -202,9 +202,11 @@ namespace CK.DeviceModel
                         {
                             if( IsRunning )
                             {
+                                _commandMonitor.Warn( $"Sending a stop command to Device '{FullName}'." );
+                                Debug.Assert( _host != null );
                                 // Fires and forget the StopCommand: the fact that the device stops
                                 // does not belong to the faulty command plan.
-                                _ = StopAsync( _commandMonitor, ignoreAlwaysRunning: true );
+                                SendRoutedCommandImmediate( _host.CreateStopCommand( Name, ignoreAlwaysRunning: true ) );
                             }
                         }
                     }
