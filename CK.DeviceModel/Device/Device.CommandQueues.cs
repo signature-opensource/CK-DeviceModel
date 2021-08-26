@@ -289,7 +289,7 @@ namespace CK.DeviceModel
                     if( checkKey && !CheckControllerKey( command ) ) return;
                     await HandleStartAsync( start, DeviceStartedReason.StartCall ).ConfigureAwait( false );
                     return;
-                case BaseReconfigureDeviceCommand<TConfiguration> config:
+                case BaseConfigureDeviceCommand<TConfiguration> config:
                     if( checkKey && !CheckControllerKey( command ) ) return;
                     await HandleReconfigureAsync( config, token ).ConfigureAwait( false );
                     return;

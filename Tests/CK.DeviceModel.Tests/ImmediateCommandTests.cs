@@ -25,10 +25,18 @@ namespace CK.DeviceModel.Tests
             {
             }
 
-            public DConfiguration( DConfiguration other )
-                : base( other )
+            public DConfiguration( ICKBinaryReader r )
+                : base( r )
             {
-                Trace = other.Trace;
+                r.ReadByte();
+                Trace = r.ReadNullableString();
+            }
+
+            public override void Write( ICKBinaryWriter w )
+            {
+                base.Write( w );
+                w.Write( (byte)0 );
+                w.WriteNullableString( Trace );
             }
 
             public string? Trace { get; set; }
