@@ -153,6 +153,5 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True for a valid configuration, false otherwise.</returns>
         protected virtual bool DoCheckValidity( IActivityMonitor monitor ) => true;
-
     }
 }

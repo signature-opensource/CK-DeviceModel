@@ -14,11 +14,14 @@ namespace CK.DeviceModel
     /// <typeparam name="TResult">The type of the command's result.</typeparam>
     public abstract class DeviceCommandWithResult<TResult> : BaseDeviceCommand, ICompletable<TResult>
     {
+        readonly string _commandToString;
+
         /// <inheritdoc />
         private protected DeviceCommandWithResult( (string lockedName, string? lockedControllerKey)? locked = null )
             : base( locked )
         {
             Completion = new CompletionSource<TResult>( this );
+            _commandToString = GetType().Name + '<' + typeof( TResult ).Name + '>';
         }
 
         /// <summary>
@@ -32,12 +35,6 @@ namespace CK.DeviceModel
         ICompletion<TResult> ICompletable<TResult>.Completion => Completion;
 
         internal override ICompletionSource InternalCompletion => Completion;
-
-        /// <summary>
-        /// Overridden to return this type name and <see cref="Completion"/> status.
-        /// </summary>
-        /// <returns>This type name and current completion status.</returns>
-        public override string ToString() => GetType().Name + '<' + typeof( TResult ).Name + "> " + Completion.ToString();
 
         void ICompletable<TResult>.OnError( Exception ex, ref CompletionSource<TResult>.OnError result ) => OnError( ex, ref result );
         void ICompletable<TResult>.OnCanceled( ref CompletionSource<TResult>.OnCanceled result ) => OnCanceled( ref result );
@@ -56,5 +53,12 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="result">Captures the result: one of the 2 available methods must be called.</param>
         protected virtual void OnCanceled( ref CompletionSource<TResult>.OnCanceled result ) => result.SetCanceled();
+
+        /// <summary>
+        /// Overridden to return this type name and <see cref="Completion"/> status.
+        /// </summary>
+        /// <returns>This type name and current completion status.</returns>
+        public override string ToString() => $"{_commandToString}[{Completion}]";
+
     }
 }

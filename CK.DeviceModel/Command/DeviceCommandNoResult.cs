@@ -15,11 +15,14 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class DeviceCommandNoResult : BaseDeviceCommand, ICompletable
     {
+        readonly string _commandToString;
+        
         /// <inheritdoc />
         private protected DeviceCommandNoResult( (string lockedName, string? lockedControllerKey)? locked = null )
             : base( locked )
         {
             Completion = new CompletionSource( this );
+            _commandToString = GetType().Name;
         }
 
         /// <summary>
@@ -53,6 +56,6 @@ namespace CK.DeviceModel
         /// Overridden to return this type name and <see cref="Completion"/> status.
         /// </summary>
         /// <returns>This type name and current completion status.</returns>
-        public override string ToString() => GetType().Name + ' ' + Completion.ToString();
+        public override string ToString() => $"{_commandToString}[{Completion}]";
     }
 }

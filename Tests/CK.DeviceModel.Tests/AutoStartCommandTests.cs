@@ -146,10 +146,10 @@ namespace CK.DeviceModel.Tests
             }
 
             d.Traces.Should().BeEquivalentTo( "Start StartAndKeepRunningStoppedBehavior",
-                                            "Command STARTER!",
-                                            "Command n°0", "Command n°1", "Command n°2",
-                                            "Stop Destroyed",
-                                            "Destroy" );
+                                             "Command STARTER!",
+                                             "Command n°0", "Command n°1", "Command n°2",
+                                             "Stop Destroyed",
+                                             "Destroy" );
         }
 
         [Test]

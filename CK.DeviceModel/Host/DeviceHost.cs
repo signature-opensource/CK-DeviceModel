@@ -552,6 +552,7 @@ namespace CK.DeviceModel
             var (status, device) = ValidAndRouteCommand( monitor, command );
             if( status != DeviceHostCommandResult.Success ) return status;
             Debug.Assert( device != null );
+            monitor.Debug( $"{DeviceHostName}: sending '{command}' to '{device.Name}'." );
             if( !device.SendRoutedCommand( command, token, checkControllerKey ) )
             {
                 return DeviceHostCommandResult.DeviceDestroyed;
