@@ -263,14 +263,15 @@ namespace CK.DeviceModel
             // a device MAY depend on some of its configuration when in stopped state...
             // It's easier to consider that ControllerKey and Status are always applied and, in the rare case of a failing DoReconfigureAsync,
             // we update the current configurations with these updated fields.
-            
+
+            // Always applying BaseImmediateCommandLimit is easier to understand (as its documentation describes it).
+            // We use the same pattern as for ControllerKey and Status.
             bool baseImmediateCommandLimitChanged = _baseImmediateCommandLimit != config.BaseImmediateCommandLimit;
             if( baseImmediateCommandLimitChanged )
             {
                 _baseImmediateCommandLimit = config.BaseImmediateCommandLimit;
                 _immediateCommandLimitDirty = true;
             }
-
             
             bool configStatusChanged = _configStatus != config.Status;
             bool stopDone = false;
@@ -326,16 +327,16 @@ namespace CK.DeviceModel
             }
             // If the device's own configuration has no change but configuration Status or ControllerKey changed
             // then the whole configuration has (successfully) changed.
-            if( reconfigResult == DeviceReconfiguredResult.None && (configStatusChanged || controllerKeyChanged) )
+            if( reconfigResult == DeviceReconfiguredResult.None && (configStatusChanged || controllerKeyChanged || baseImmediateCommandLimitChanged) )
             {
                 reconfigResult = DeviceReconfiguredResult.UpdateSucceeded;
             }
             bool configActuallyChanged = reconfigResult == DeviceReconfiguredResult.UpdateSucceeded;
 
-            // Now handles the edge case: the configuration Status or ControllerKey changed but
+            // Now handles the edge case: the configuration Status, ControllerKey or BaseImmediateCommandLimit changed but
             // DoReconfigureAsync failed: we reuse the _currentConfiguration.  
             if( (reconfigResult == DeviceReconfiguredResult.UpdateFailed || reconfigResult == DeviceReconfiguredResult.UpdateFailedRestartRequired)
-                && (configStatusChanged || controllerKeyChanged) )
+                && (configStatusChanged || controllerKeyChanged || baseImmediateCommandLimitChanged) )
             {
                 Debug.Assert( !configActuallyChanged );
                 config = _currentConfiguration;
@@ -344,6 +345,7 @@ namespace CK.DeviceModel
 
             if( controllerKeyChanged ) config.ControllerKey = _controllerKey;
             if( configStatusChanged ) config.Status = _configStatus;
+            if( baseImmediateCommandLimitChanged ) config.BaseImmediateCommandLimit = _baseImmediateCommandLimit;
 
             // Updates the configuration objects if changed.
             if( configActuallyChanged )
@@ -371,7 +373,7 @@ namespace CK.DeviceModel
                 }
             }
             // If a start or a stop has been done:
-            //  - the Status has been updated (we skip the reconfigured result if it was a start: it's the last step).
+            //  - the DeviceStatus has been updated (we skip the reconfigured result if it was a start: it's the last step).
             //  - if nothing happened, it's a success (we correct the result for the caller).
             if( startDone || stopDone )
             {

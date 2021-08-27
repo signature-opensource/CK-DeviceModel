@@ -207,11 +207,12 @@ namespace CK.DeviceModel
                         }
                         if( IsDestroyed ) break;
                     }
-                    if( cmd == _commandAwaker )
+                    while( cmd == _commandAwaker )
                     {
-                        if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) continue;
+                        if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) break;
                         (cmd, token, checkKey) = oneRegular;
                     }
+                    if( cmd == _commandAwaker ) continue;
                     currentlyExecuting = cmd;
                     Debug.Assert( cmd.IsLocked );
                     wasStop = !IsRunning;

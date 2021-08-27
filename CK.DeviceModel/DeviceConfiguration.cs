@@ -36,7 +36,7 @@ namespace CK.DeviceModel
             _name = r.ReadString();
             Status = r.ReadEnum<DeviceConfigurationStatus>();
             ControllerKey = r.ReadNullableString();
-            BaseImmediateCommandLimit = source.BaseImmediateCommandLimit;
+            BaseImmediateCommandLimit = r.ReadInt32();
         }
 
         /// <summary>
@@ -54,6 +54,7 @@ namespace CK.DeviceModel
             w.Write( _name );
             w.WriteEnum( Status );
             w.WriteNullableString( ControllerKey );
+            w.Write( BaseImmediateCommandLimit );
         }
 
         /// <summary>
