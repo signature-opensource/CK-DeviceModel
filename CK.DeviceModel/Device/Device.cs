@@ -108,6 +108,8 @@ namespace CK.DeviceModel
             _commandQueueImmediate = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
             _deferredCommands = new Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>();
             _destroyed = new CancellationTokenSource();
+            _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
+            _immediateCommandLimitDirty = true;
             _ = Task.Run( CommandRunLoop );
         }
 
@@ -260,8 +262,16 @@ namespace CK.DeviceModel
             // One solution could be, when Disabled, to skip the DoReconfigureAsync (waiting for the next configuration) but
             // a device MAY depend on some of its configuration when in stopped state...
             // It's easier to consider that ControllerKey and Status are always applied and, in the rare case of a failing DoReconfigureAsync,
-            // with update the current configurations with these updated fields.
+            // we update the current configurations with these updated fields.
+            
+            bool baseImmediateCommandLimitChanged = _baseImmediateCommandLimit != config.BaseImmediateCommandLimit;
+            if( baseImmediateCommandLimitChanged )
+            {
+                _baseImmediateCommandLimit = config.BaseImmediateCommandLimit;
+                _immediateCommandLimitDirty = true;
+            }
 
+            
             bool configStatusChanged = _configStatus != config.Status;
             bool stopDone = false;
             if( configStatusChanged )

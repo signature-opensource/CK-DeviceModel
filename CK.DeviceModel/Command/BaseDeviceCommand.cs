@@ -45,13 +45,29 @@ namespace CK.DeviceModel
         /// <summary>
         /// Returns <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/> since most of the commands
         /// should not be executed while the device is stopped and this enables always running devices to be resilient to
-        /// unattended stops.
+        /// unattended stops (and subsequent restarts).
         /// <para>
         /// Some commands may override this, or the device can alter this behavior thanks to its
         /// <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, BaseDeviceCommand)"/> protected method.
         /// </para>
+        /// <para>
+        /// Whenever the command is sent to be "immediately" handled, 
+        /// </para>
         /// </summary>
         protected internal virtual DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel;
+
+        /// <summary>
+        /// Returns <see cref="DeviceImmediateCommandStoppedBehavior.Cancel"/> since most of the commands
+        /// should not be executed while the device is stopped.
+        /// <para>
+        /// Some commands may override this, or the device can alter this behavior thanks to its
+        /// <see cref="Device{TConfiguration}.OnStoppedDeviceImmediateCommand(IActivityMonitor, BaseDeviceCommand)"/> protected method.
+        /// </para>
+        /// <para>
+        /// Whenever the command is sent to be "immediately" handled, 
+        /// </para>
+        /// </summary>
+        protected internal virtual DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.Cancel;
 
         /// <summary>
         /// Gets or sets the target device name.

@@ -20,6 +20,7 @@ namespace CK.DeviceModel
         protected DeviceConfiguration()
         {
             _name = String.Empty;
+            BaseImmediateCommandLimit = 10;
         }
 
         /// <summary>
@@ -35,6 +36,7 @@ namespace CK.DeviceModel
             _name = r.ReadString();
             Status = r.ReadEnum<DeviceConfigurationStatus>();
             ControllerKey = r.ReadNullableString();
+            BaseImmediateCommandLimit = source.BaseImmediateCommandLimit;
         }
 
         /// <summary>
@@ -78,6 +80,30 @@ namespace CK.DeviceModel
         public string? ControllerKey { get; set; }
 
         /// <summary>
+        /// Gets or sets the maximum number of immediate commands that will be handled
+        /// before allowing one "normal" command to be handled.
+        /// Defaults to 10. Must be between 1 and 1000 (included).
+        /// <para>
+        /// The actual limit is the sum of this base and the <see cref="IDevice.ImmediateCommandLimitOffset"/>
+        /// and will always be between 1 and 1000.
+        /// </para>
+        /// <para>
+        /// When a configuration is applied, this BaseImmediateCommandLimit always takes effect:
+        /// <list type="bullet">
+        ///     <item>
+        ///     This configuration is orthogonal to any other ones.
+        ///     </item>
+        ///     <item>
+        ///     It's an advanced configuration that may be used "dynamically" to
+        ///     fix a starvation issue in a running system: whether the actual device's
+        ///     reconfiguration succeeds or not is not relevant to this change.
+        ///     </item>
+        /// </list>
+        /// </para>
+        /// </summary>
+        public int BaseImmediateCommandLimit { get; set; }
+
+        /// <summary>
         /// Checks whether this configuration is valid.
         /// This checks that the <see cref="Name"/> is not empty and calls the protected <see cref="DoCheckValid(IActivityMonitor)"/>
         /// that can handle specialized checks.
@@ -90,6 +116,11 @@ namespace CK.DeviceModel
             if( String.IsNullOrWhiteSpace( Name ) )
             {
                 monitor.Error( "Configuration name must be a non empty string." );
+                return false;
+            }
+            if( BaseImmediateCommandLimit <= 0 || BaseImmediateCommandLimit > 1000 )
+            {
+                monitor.Error( "BaseImmediateCommandLimit must be between 1 and 1000." );
                 return false;
             }
             return DoCheckValid( monitor );

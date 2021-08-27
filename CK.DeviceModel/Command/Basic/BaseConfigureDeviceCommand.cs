@@ -30,9 +30,16 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>: the configuration can obviously be executed while the device is stopped.
+        /// Returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>: the configuration can obviously be applied while the device is stopped.
+        /// Note that this is not used: basic commands are always run by design.
         /// </summary>
         protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+
+        /// <summary>
+        /// Returns <see cref="DeviceImmediateCommandStoppedBehavior.RunAnyway"/>: the configuration can obviously be applied while the device is stopped.
+        /// Note that this is not used: basic commands are always run by design.
+        /// </summary>
+        protected internal override DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
 
         /// <summary>
         /// Gets the configuration to apply.

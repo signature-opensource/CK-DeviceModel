@@ -12,6 +12,10 @@ namespace CK.DeviceModel
     /// <para>
     /// The default <see cref="BaseDeviceCommand.StoppedBehavior"/> is <see cref="WaitForNextStartWhenAlwaysRunningOrCancel"/>.
     /// </para>
+    /// <para>
+    /// For commands that are sent to be "immediately" handled (via <see cref="IDevice.SendCommandImmediate(IActivityMonitor, BaseDeviceCommand, bool, bool, CancellationToken)"/>
+    /// for instance), the possibilities are defined by <see cref="DeviceImmediateCommandStoppedBehavior"/>.
+    /// </para>
     /// </summary>
     public enum DeviceCommandStoppedBehavior
     {

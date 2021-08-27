@@ -25,6 +25,11 @@ namespace CK.DeviceModel
         /// </summary>
         protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
 
+        /// <summary>
+        /// Returns <see cref="DeviceImmediateCommandStoppedBehavior.RunAnyway"/>: the controller key can obviously be changed while the device is stopped.
+        /// Note that this is not used: basic commands are always run by design.
+        /// </summary>
+        protected internal override DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
 
     }
 
