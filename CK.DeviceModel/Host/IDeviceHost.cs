@@ -112,5 +112,17 @@ namespace CK.DeviceModel
         /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
         public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default );
 
+        /// <summary>
+        /// Sends the provided command to the device it targets and executes it immediately.
+        /// This is the same as <see cref="SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/> except that
+        /// the command will be handled as soon as possible, before any regular commands.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command to validate, route and send.</param>
+        /// <param name="checkControllerKey">True to check the controller key right before executing the command.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
+        public DeviceHostCommandResult SendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default );
+
     }
 }

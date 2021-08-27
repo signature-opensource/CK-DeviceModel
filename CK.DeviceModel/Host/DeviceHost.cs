@@ -591,6 +591,20 @@ namespace CK.DeviceModel
             return DeviceHostCommandResult.Success;
         }
 
+        /// <inheritdoc />
+        public DeviceHostCommandResult SendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default )
+        {
+            var (status, device) = ValidAndRouteCommand( monitor, command );
+            if( status != DeviceHostCommandResult.Success ) return status;
+            Debug.Assert( device != null );
+            monitor.Debug( $"{DeviceHostName}: sending immediate '{command}' to '{device.Name}'." );
+            if( !device.SendRoutedCommandImmediate( command, token, checkControllerKey ) )
+            {
+                return DeviceHostCommandResult.DeviceDestroyed;
+            }
+            return DeviceHostCommandResult.Success;
+        }
+
 
         /// <summary>
         /// Helper that checks and routes a command to its device.
