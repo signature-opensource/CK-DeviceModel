@@ -24,8 +24,15 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>: the device can obviously be destroyed while stopped.
+        /// Note that this is not used: basic commands are always run by design.
         /// </summary>
         protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+
+        /// <summary>
+        /// Returns <see cref="DeviceImmediateCommandStoppedBehavior.RunAnyway"/>: the device can obviously be destroyed while stopped.
+        /// Note that this is not used: basic commands are always run by design.
+        /// </summary>
+        protected internal override DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
 
     }
 

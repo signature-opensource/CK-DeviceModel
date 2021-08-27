@@ -90,6 +90,8 @@ namespace CK.DeviceModel
             _commandQueueImmediate = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
             _deferredCommands = new Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>();
 
+            _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
+            _immediateCommandLimitDirty = true;
             _ = Task.Run( CommandRunLoop );
         }
 
@@ -214,6 +216,13 @@ namespace CK.DeviceModel
 
             Debug.Assert( _host != null );
 
+            bool baseImmediateCommandLimitChanged = _baseImmediateCommandLimit != config.BaseImmediateCommandLimit;
+            if( baseImmediateCommandLimitChanged )
+            {
+                _baseImmediateCommandLimit = config.BaseImmediateCommandLimit;
+                _immediateCommandLimitDirty = true;
+            }
+
             bool specialCaseOfDisabled = false;
             bool configStatusChanged = _configStatus != config.Status;
             if( _isRunning && config.Status == DeviceConfigurationStatus.Disabled )
@@ -281,7 +290,7 @@ namespace CK.DeviceModel
             {
                 await _statusChanged.SafeRaiseAsync( _commandMonitor, this ).ConfigureAwait( false );
             }
-            if( specialCaseOfDisabled && applyResult == DeviceApplyConfigurationResult.None )
+            if( (specialCaseOfDisabled || baseImmediateCommandLimitChanged) && applyResult == DeviceApplyConfigurationResult.None )
             {
                 applyResult = DeviceApplyConfigurationResult.UpdateSucceeded;
             }

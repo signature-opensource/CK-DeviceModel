@@ -28,8 +28,15 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/> (will be a no-op) since it must obviously not be deferred until the next start.
+        /// Note that this is not used: basic commands are always run by design.
         /// </summary>
         protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+
+        /// <summary>
+        /// Returns <see cref="DeviceImmediateCommandStoppedBehavior.RunAnyway"/> (will be a no-op).
+        /// Note that this is not used: basic commands are always run by design.
+        /// </summary>
+        protected internal override DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
 
     }
 

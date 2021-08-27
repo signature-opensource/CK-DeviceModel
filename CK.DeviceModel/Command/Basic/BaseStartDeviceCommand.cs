@@ -23,8 +23,15 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Obviously returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>.
+        /// Note that this is not used: basic commands are always run by design.
         /// </summary>
         protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+
+        /// <summary>
+        /// Obviously returns <see cref="DeviceImmediateCommandStoppedBehavior.RunAnyway"/>.
+        /// Note that this is not used: basic commands are always run by design.
+        /// </summary>
+        protected internal override DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
 
     }
 

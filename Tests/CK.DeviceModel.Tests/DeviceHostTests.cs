@@ -379,7 +379,7 @@ namespace CK.DeviceModel.Tests
             {
                 return mode == "UseSendCommandImmediate"
                         ? d.SendCommandImmediate( TestHelper.Monitor, c, checkDeviceName, checkControllerKey )
-                        : d.SendCommandImmediate( TestHelper.Monitor, c, checkDeviceName, checkControllerKey );
+                        : d.SendCommand( TestHelper.Monitor, c, checkDeviceName, checkControllerKey );
             }
 
             int flashLastColor = 0;
@@ -396,6 +396,7 @@ namespace CK.DeviceModel.Tests
             SendCommand( cmdSet );
             SendCommand( cmdRaiseFlash );
 
+            (await cmdSet.Completion).Should().Be( 78 );
             await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 6 );
 

@@ -60,6 +60,13 @@ namespace CK.DeviceModel
         DeviceConfigurationStatus ConfigurationStatus { get; }
 
         /// <summary>
+        /// Gets or sets an offset to the <see cref="DeviceConfiguration.BaseImmediateCommandLimit"/>.
+        /// This can be changed at anytime by any thread, the actual limit (the sum of the two) will be
+        /// between 1 and 1000.
+        /// </summary>
+        int ImmediateCommandLimitOffset { get; set; }
+
+        /// <summary>
         /// Attempts to start this device.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
