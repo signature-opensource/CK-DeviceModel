@@ -580,31 +580,18 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default )
         {
-            var (status, device) = ValidAndRouteCommand( monitor, command );
+            var (status, device) = ValidateAndRouteCommand( monitor, command );
             if( status != DeviceHostCommandResult.Success ) return status;
             Debug.Assert( device != null );
-            monitor.Debug( $"{DeviceHostName}: sending '{command}' to '{device.Name}'." );
-            if( !device.SendRoutedCommand( command, token, checkControllerKey ) )
+            monitor.Debug( $"{DeviceHostName}: sending {(command.ImmediateSending ? "immediate" : "")} '{command}' to '{device.Name}'." );
+            if( !(command.ImmediateSending
+                    ? device.SendRoutedCommandImmediate( command, token, checkControllerKey )
+                    : device.SendRoutedCommand( command, token, checkControllerKey )) )
             {
                 return DeviceHostCommandResult.DeviceDestroyed;
             }
             return DeviceHostCommandResult.Success;
         }
-
-        /// <inheritdoc />
-        public DeviceHostCommandResult SendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default )
-        {
-            var (status, device) = ValidAndRouteCommand( monitor, command );
-            if( status != DeviceHostCommandResult.Success ) return status;
-            Debug.Assert( device != null );
-            monitor.Debug( $"{DeviceHostName}: sending immediate '{command}' to '{device.Name}'." );
-            if( !device.SendRoutedCommandImmediate( command, token, checkControllerKey ) )
-            {
-                return DeviceHostCommandResult.DeviceDestroyed;
-            }
-            return DeviceHostCommandResult.Success;
-        }
-
 
         /// <summary>
         /// Helper that checks and routes a command to its device.
@@ -612,7 +599,7 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command.</param>
         /// <returns>The status and the device if found.</returns>
-        protected (DeviceHostCommandResult,T?) ValidAndRouteCommand( IActivityMonitor monitor, BaseDeviceCommand command )
+        protected (DeviceHostCommandResult,T?) ValidateAndRouteCommand( IActivityMonitor monitor, BaseDeviceCommand command )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( command == null ) throw new ArgumentNullException( nameof( command ) );

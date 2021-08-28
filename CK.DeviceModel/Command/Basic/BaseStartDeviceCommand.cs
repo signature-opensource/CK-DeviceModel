@@ -16,6 +16,7 @@ namespace CK.DeviceModel
     {
         private protected BaseStartDeviceCommand()
         {
+            ImmediateSending = true;
         }
 
         void ICompletable<bool>.OnError( Exception ex, ref CompletionSource<bool>.OnError result ) => result.SetResult( false );

@@ -14,6 +14,7 @@ namespace CK.DeviceModel
     {
         private protected BaseReconfigureDeviceCommand()
         {
+            ImmediateSending = true;
         }
 
         void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )

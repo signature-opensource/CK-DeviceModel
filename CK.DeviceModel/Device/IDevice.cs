@@ -181,46 +181,6 @@ namespace CK.DeviceModel
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         bool UnsafeSendCommand( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default );
-
-        /// <summary>
-        /// Same as <see cref="SendCommand(IActivityMonitor, BaseDeviceCommand, bool, bool, CancellationToken)"/> except that the command
-        /// is executed immediately.
-        /// <para>
-        /// Note that any <see cref="BaseDeviceCommand.StoppedBehavior"/> that may wait for the next start is ignored in this mode (deferring an
-        /// "immediate" command doesn't make a lot of sense). This applies to <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/>
-        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetUnavailableDeviceException"/> and
-        /// <see cref="DeviceCommandStoppedBehavior.AlwaysWaitForNextStart"/> (a <see cref="UnavailableDeviceException"/> is set).
-        /// </para>
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute.</param>
-        /// <param name="checkDeviceName">
-        /// By default, the <see cref="BaseDeviceCommand.DeviceName"/> must be this <see cref="Name"/> otherwise an <see cref="ArgumentException"/> is thrown.
-        /// Using false here allows any command name to be executed.
-        /// </param>
-        /// <param name="checkControllerKey">
-        /// By default, the <see cref="BaseDeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
-        /// Using false here skips this check.
-        /// </param>
-        /// <param name="token">Optional cancellation token.</param>
-        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
-        bool SendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
-
-        /// <summary>
-        /// Same as <see cref="UnsafeSendCommand(IActivityMonitor, BaseDeviceCommand, CancellationToken)"/> except that the command
-        /// is executed immediately.
-        /// <para>
-        /// Note that any <see cref="BaseDeviceCommand.StoppedBehavior"/> that may wait for the next start is ignored in this mode (deferring an
-        /// "immediate" command doesn't make a lot of sense). This applies to <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/>
-        /// (the command is canceled), <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetUnavailableDeviceException"/> and
-        /// <see cref="DeviceCommandStoppedBehavior.AlwaysWaitForNextStart"/> (a <see cref="UnavailableDeviceException"/> is set).
-        /// </para>
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="command">The command to execute.</param>
-        /// <param name="token">Optional cancellation token.</param>
-        /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
-        bool UnsafeSendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default );
     }
 
 }

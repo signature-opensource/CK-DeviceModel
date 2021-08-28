@@ -53,6 +53,12 @@ namespace CK.DeviceModel
         protected internal virtual DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.Cancel;
 
         /// <summary>
+        /// Gets or sets whether this command must be sent and handled immediately.
+        /// Defaults to false.
+        /// </summary>
+        public bool ImmediateSending { get; set; }
+
+        /// <summary>
         /// Gets or sets the target device name.
         /// <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/> requires this name to
         /// be the one of the device (see <see cref="IDevice.Name"/>) otherwise the command is ignored.

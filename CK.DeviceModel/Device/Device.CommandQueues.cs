@@ -17,6 +17,11 @@ namespace CK.DeviceModel
         readonly Channel<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)> _commandQueueImmediate;
 
         int _immediateCommandLimitOffset;
+        // Updated by HandleReconfigureAsync (don't trust the actually mutable configuration for security).
+        int _baseImmediateCommandLimit;
+        volatile bool _immediateCommandLimitDirty;
+        // Read & Updated only by the Command loop.
+        int _currentImmediateCommandLimit;
 
         /// <inheritdoc />
         public int ImmediateCommandLimitOffset
@@ -28,14 +33,6 @@ namespace CK.DeviceModel
                 _immediateCommandLimitDirty = true;
             }
         }
-
-        // Updated by HandleReconfigureAsync (don't trust the actually mutable configuration for security).
-        int _baseImmediateCommandLimit;
-        volatile bool _immediateCommandLimitDirty;
-
-        // Read & Updated only by the Command loop.
-        int _currentImmediateCommandLimit;
-
 
         /// <summary>
         /// Dummy command that is used to awake the command loop.
@@ -88,16 +85,20 @@ namespace CK.DeviceModel
         public bool SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
         {
             CheckDirectCommandParameter( monitor, command, checkDeviceName );
-            monitor.Debug( $"SendCommand: {command}." );
-            return SendRoutedCommand( command, token, checkControllerKey );
+            monitor.Debug( $"Sending {(command.ImmediateSending ? "immediate" : "")} command '{command}'." );
+            return command.ImmediateSending
+                            ? SendRoutedCommandImmediate( command, token, checkControllerKey )
+                            : SendRoutedCommand( command, token, checkControllerKey );
         }
 
         /// <inheritdoc />
         public bool UnsafeSendCommand( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default )
         {
             CheckDirectCommandParameter( monitor, command, false );
-            monitor.Debug( $"UnsafeSendCommand: {command}." );
-            return SendRoutedCommand( command, token, false );
+            monitor.Debug( $"Unsafe sending {(command.ImmediateSending ? "immediate" : "")} command '{command}'." );
+            return command.ImmediateSending
+                            ? SendRoutedCommandImmediate( command, token, false )
+                            : SendRoutedCommand( command, token, false );
         }
 
         /// <summary>
@@ -113,22 +114,6 @@ namespace CK.DeviceModel
             return _commandQueue.Writer.TryWrite( (command, token, checkControllerKey ) );
         }
 
-        /// <inheritdoc />
-        public bool SendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default )
-        {
-            CheckDirectCommandParameter( monitor, command, checkDeviceName );
-            monitor.Debug( $"SendCommandImmediate: '{command}'." );
-            return SendRoutedCommandImmediate( command, token, checkControllerKey );
-        }
-
-        /// <inheritdoc />
-        public bool UnsafeSendCommandImmediate( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default )
-        {
-            CheckDirectCommandParameter( monitor, command, false );
-            monitor.Debug( $"UnsafeSendCommandImmediate: '{command}'." );
-            return SendRoutedCommandImmediate( command, token, false );
-        }
-
         /// <summary>
         /// Sends the given command directly for immediate execution.
         /// This is to be used for low level internal commands, typically initiated by timers.
@@ -139,7 +124,8 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         internal protected bool SendRoutedCommandImmediate( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
         {
-            return _commandQueueImmediate.Writer.TryWrite( (command, token, checkControllerKey) ) && _commandQueue.Writer.TryWrite( (_commandAwaker, default, false) );
+            return _commandQueueImmediate.Writer.TryWrite( (command, token, checkControllerKey) )
+                   && _commandQueue.Writer.TryWrite( (_commandAwaker, default, false) );
         }
 
         void CheckDirectCommandParameter( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName )
@@ -164,6 +150,7 @@ namespace CK.DeviceModel
         async Task CommandRunLoop()
         {
             bool wasStop = true;
+            UpdateImmediateCommandLimit();
             while( !IsDestroyed )
             {
                 BaseDeviceCommand? currentlyExecuting = null;
@@ -173,6 +160,11 @@ namespace CK.DeviceModel
                     (cmd, token, checkKey) = await _commandQueue.Reader.ReadAsync().ConfigureAwait( false );
                     if( _commandQueueImmediate.Reader.TryRead( out var immediate ) )
                     {
+                        // Because of the currentlyExecuting that captures the command so that the
+                        // single factorized try/catch clause can do its job, this loop cannot be
+                        // factorized (currentlyExecuting would be a ref that is not possible in an
+                        // async method or this would require a callback).
+                        // Deferred commands loop below need to duplicate this code.
                         if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
                         int maxCount = _currentImmediateCommandLimit;
                         do
@@ -187,24 +179,48 @@ namespace CK.DeviceModel
                         // Even when the "queue tracking" will be implemented (via Interlocked.Inc/Decrement since channels have no way to tell us how many items
                         // they have), logging here would not be really interesting. It's better to find a way to collect and represents the metrics and let
                         // the limit here do its job silently: the metrics itself must show the status' of the queues.
-                        if( IsDestroyed ) break;
                     }
 
                     // Captures the reference (since it can be replaced by CancelAllPendingCommands).
+                    // Executing deferred commands is a subordinated loop that alternates deferred and immediate commands: both loops are
+                    // constrained by their respective limits.
                     var deferred = _deferredCommands;
                     if( wasStop && IsRunning && deferred.Count > 0 )
                     {
-                        using( _commandMonitor.OpenDebug( $"Device started: executing {deferred.Count} deferred commands." ) )
+                        Debug.Assert( !IsDestroyed );
+                        using( _commandMonitor.OpenInfo( $"Device started: executing {deferred.Count} deferred commands." ) )
                         {
                             while( IsRunning && deferred.TryDequeue( out var ct ) )
                             {
                                 currentlyExecuting = ct.Command;
                                 _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been deferred. Handling it now." );
                                 await HandleCommandAsync( currentlyExecuting, ct.Token, ct.CheckKey, allowDefer: false, isImmediate: false ).ConfigureAwait( false );
+                                if( !IsDestroyed && _commandQueueImmediate.Reader.TryRead( out immediate ) )
+                                {
+                                    if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
+                                    int maxCount = _currentImmediateCommandLimit;
+                                    do
+                                    {
+                                        currentlyExecuting = immediate.Command;
+                                        _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been sent as Immediate. Handling it now." );
+                                        await HandleCommandAsync( currentlyExecuting, immediate.Token, immediate.CheckKey, allowDefer: false, isImmediate: true ).ConfigureAwait( false );
+                                    }
+                                    while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate ) );
+                                }
                             }
                         }
-                        if( IsDestroyed ) break;
                     }
+                    if( IsDestroyed )
+                    {
+                        if( cmd != _commandAwaker )
+                        {
+                            _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (about to be handled)." );
+                            cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
+                        }
+                        // Breaks the loop: let the queues be flushed below.
+                        break;
+                    }
+                    // Flushes any command awaker before an actual command.
                     while( cmd == _commandAwaker )
                     {
                         if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) break;
@@ -221,6 +237,7 @@ namespace CK.DeviceModel
                     Debug.Assert( currentlyExecuting != null );
                     using( _commandMonitor.OpenError( $"Unhandled error in '{FullName}' while processing '{currentlyExecuting}'.", ex ) )
                     {
+                        // Always complete the command.
                         if( !currentlyExecuting.InternalCompletion.TrySetException( ex ) )
                         {
                             _commandMonitor.Warn( $"Command has already been completed. Unable to set the error." );
@@ -253,15 +270,21 @@ namespace CK.DeviceModel
             _commandMonitor.Info( $"Ending device loop, flushing command queues by signaling a UnavailableDeviceException." );
             while( _commandQueueImmediate.Reader.TryRead( out var cmd ) )
             {
+                _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd.Command} (from immediate queue)." );
                 cmd.Command.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd.Command ) );
             }
             while( _deferredCommands.TryDequeue( out var cmd ) )
             {
+                _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd.Command} (from deferred queue)." );
                 cmd.Command.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd.Command ) );
             }
             while( _commandQueue.Reader.TryRead( out var cmd ) )
             {
-                cmd.Command.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd.Command ) );
+                if( cmd.Command != _commandAwaker )
+                {
+                    _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd.Command} (from command queue)." );
+                    cmd.Command.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd.Command ) );
+                }
             }
             _commandMonitor.MonitorEnd();
         }
@@ -328,7 +351,7 @@ namespace CK.DeviceModel
         {
             if( token.IsCancellationRequested )
             {
-                _commandMonitor.Debug( "Canceling command because token.IsCancellationRequested." );
+                _commandMonitor.Debug( "Canceling command because of command's token.IsCancellationRequested." );
                 command.InternalCompletion.TrySetCanceled();
                 return;
             }
@@ -512,6 +535,9 @@ namespace CK.DeviceModel
         /// Extension point that can be overridden to avoid calling <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> (that ignores
         /// the <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration), when the handling of a command raised an exception,
         /// and/or to emit an event (typically an UnexpectedErrorEvent).
+        /// <para>
+        /// The faulty <paramref name="command"/> is already completed (at least with the exception): this cannot be undone.
+        /// </para>
         /// <para>
         /// This default implementation returns always true: the device is stopped by default.
         /// </para>

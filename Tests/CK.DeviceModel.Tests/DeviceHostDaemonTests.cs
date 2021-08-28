@@ -82,7 +82,7 @@ namespace CK.DeviceModel.Tests
             if( mode == "UseDestroyCommandImmediate" )
             {
                 var destroy = new DestroyDeviceCommand<MachineHost>() { DeviceName = "M" };
-                d.SendCommandImmediate( TestHelper.Monitor, destroy );
+                d.SendCommand( TestHelper.Monitor, destroy );
                 await destroy.Completion.Task;
             }
             if( mode == "UseDestroyCommand" )
@@ -175,8 +175,8 @@ namespace CK.DeviceModel.Tests
             d1.SendCommand( TestHelper.Monitor, stopD1 ).Should().BeTrue();
 
             d2.UnsafeSendCommand( TestHelper.Monitor, stopD2NoName ).Should().BeTrue();
-            d3.SendCommandImmediate( TestHelper.Monitor, stopD3 ).Should().BeTrue();
-            d4.UnsafeSendCommandImmediate( TestHelper.Monitor, stopD4NoName ).Should().BeTrue();
+            d3.SendCommand( TestHelper.Monitor, stopD3 ).Should().BeTrue();
+            d4.UnsafeSendCommand( TestHelper.Monitor, stopD4NoName ).Should().BeTrue();
 
             await Task.WhenAll( stopD1.Completion.Task, stopD2NoName.Completion.Task, stopD3.Completion.Task, stopD4NoName.Completion.Task );
 
