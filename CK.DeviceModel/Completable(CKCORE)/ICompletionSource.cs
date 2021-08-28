@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace CK.Core
+namespace CK.DeviceModel
 {
     /// <summary>
     /// Unifies <see cref="CompletionSource"/> and <see cref="CompletionSource{TResult}"/>.

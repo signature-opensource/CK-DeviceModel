@@ -16,6 +16,7 @@ namespace CK.DeviceModel
             : base( locked )
         {
             Configuration = configuration ?? throw new ArgumentNullException( nameof( configuration ) );
+            ImmediateSending = true;
         }
 
         void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )

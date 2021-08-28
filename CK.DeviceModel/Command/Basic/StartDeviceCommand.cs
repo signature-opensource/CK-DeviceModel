@@ -6,6 +6,7 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Command to start a device.
+    /// This command is by default (like the other basic commands), sent immediately (<see cref="BaseDeviceCommand.ImmediateSending"/> is true).
     /// </summary>
     /// <typeparam name="THost">The device host type.</typeparam>
     public class StartDeviceCommand<THost> : BaseStartDeviceCommand where THost : IDeviceHost

@@ -1,6 +1,6 @@
 using System;
 
-namespace CK.Core
+namespace CK.DeviceModel
 {
     /// <summary>
     /// Abstraction of a completable (typically a command) with a result that

@@ -376,9 +376,8 @@ namespace CK.DeviceModel.Tests
 
             bool SendCommand( BaseDeviceCommand c, bool checkDeviceName = true, bool checkControllerKey = true )
             {
-                return mode == "UseSendCommandImmediate"
-                        ? d.SendCommandImmediate( TestHelper.Monitor, c, checkDeviceName, checkControllerKey )
-                        : d.SendCommand( TestHelper.Monitor, c, checkDeviceName, checkControllerKey );
+                c.ImmediateSending = mode == "UseSendCommandImmediate";
+                return d.SendCommand( TestHelper.Monitor, c, checkDeviceName, checkControllerKey );
             }
 
             int flashLastColor = 0;

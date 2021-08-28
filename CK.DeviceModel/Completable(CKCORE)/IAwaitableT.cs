@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace CK.Core
+namespace CK.DeviceModel
 {
     /// <summary>
     /// An awaitable covariant result holder.

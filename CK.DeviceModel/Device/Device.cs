@@ -242,7 +242,7 @@ namespace CK.DeviceModel
             {
                 return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
             }
-            if( !UnsafeSendCommandImmediate( monitor, cmd, token ) )
+            if( !UnsafeSendCommand( monitor, cmd, token ) )
             {
                 return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
             }
@@ -435,7 +435,7 @@ namespace CK.DeviceModel
         Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
         {
             var cmd = _host?.CreateSetControllerKeyDeviceCommand( Name, current, key );
-            if( cmd == null || !SendCommandImmediate( monitor, cmd, false, checkCurrent, default ) )
+            if( cmd == null || !SendCommand( monitor, cmd, false, checkCurrent, default ) )
             {
                 return Task.FromResult( false );
             }
@@ -478,7 +478,7 @@ namespace CK.DeviceModel
                 return Task.FromResult( preCheck.Value );
             }
             var cmd = _host?.CreateStartCommand( Name );
-            if( cmd == null || !UnsafeSendCommandImmediate( monitor, cmd ) )
+            if( cmd == null || !UnsafeSendCommand( monitor, cmd ) )
             {
                 monitor.Error( $"Starting a destroyed device '{FullName}' is not possible." );
                 return Task.FromResult( false );
@@ -564,7 +564,7 @@ namespace CK.DeviceModel
                 return Task.FromResult( r.Value );
             }
             var cmd = _host?.CreateStopCommand( Name, ignoreAlwaysRunning );
-            if( cmd == null || !UnsafeSendCommandImmediate( monitor, cmd ) )
+            if( cmd == null || !UnsafeSendCommand( monitor, cmd ) )
             {
                 monitor.Warn( $"Stopping an already destroyed device '{FullName}'." );
                 return Task.FromResult( true );
@@ -658,7 +658,7 @@ namespace CK.DeviceModel
                 return HandleDestroyAsync( null, true );
             }
             var cmd = _host?.CreateDestroyCommand( Name );
-            if( cmd == null || !UnsafeSendCommandImmediate( monitor, cmd ) )
+            if( cmd == null || !UnsafeSendCommand( monitor, cmd ) )
             {
                 monitor.Info( $"Destroying an already destroyed device '{FullName}'." );
                 return Task.CompletedTask;

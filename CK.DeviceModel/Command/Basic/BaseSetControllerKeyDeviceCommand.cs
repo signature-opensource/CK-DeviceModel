@@ -13,7 +13,10 @@ namespace CK.DeviceModel
     /// </remarks>
     public abstract class BaseSetControllerKeyDeviceCommand : DeviceCommandWithResult<bool>
     {
-        private protected BaseSetControllerKeyDeviceCommand() { }
+        private protected BaseSetControllerKeyDeviceCommand()
+        {
+            ImmediateSending = true;
+        }
 
         /// <summary>
         /// Gets or sets the new key <see cref="IDevice.ControllerKey"/>.

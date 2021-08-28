@@ -135,10 +135,11 @@ namespace CK.DeviceModel.Tests
                     {
                         DeviceName = "First",
                         Trace = $"Immediate n°{++immediateNumber}",
-                        ExecutionTime = random.Next( 30 )
+                        ExecutionTime = random.Next( 30 ),
+                        ImmediateSending = true
                     };
                     commands.Add( c );
-                    d.SendCommandImmediate( TestHelper.Monitor, c ).Should().BeTrue();
+                    d.SendCommand( TestHelper.Monitor, c ).Should().BeTrue();
                 }
                 await Task.Delay( random.Next( 200 ) );
             }
@@ -153,10 +154,10 @@ namespace CK.DeviceModel.Tests
         }
 
 
-        [TestCase( 40, 7784 )]
-        public async Task BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works( int nb, int seed )
+        [TestCase( 30 )]
+        public async Task BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works( int nb )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_immediate_commands_does_not_block_the_loop )}-{nb}-{seed}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works )}-{nb}" );
 
             static List<DCommand> SendCommands( IDevice d, int nb )
             {
@@ -167,10 +168,11 @@ namespace CK.DeviceModel.Tests
                     {
                         DeviceName = "D",
                         Trace = $"I°{i}",
-                        ExecutionTime = i == 0 ? 50 : 0
+                        ExecutionTime = i == 0 ? 50 : 0,
+                        ImmediateSending = true
                     };
                     commands.Add( cI );
-                    d.SendCommandImmediate( TestHelper.Monitor, cI ).Should().BeTrue();
+                    d.SendCommand( TestHelper.Monitor, cI ).Should().BeTrue();
                     var cRegular1 = new DCommand()
                     {
                         DeviceName = "D",
@@ -237,7 +239,7 @@ namespace CK.DeviceModel.Tests
             CheckCommandTraces( d.Traces, 1, nb );
 
             d.Traces.Clear();
-            // Limit is 7 since configuration corrects it.
+            // Limit is now 7 since configuration corrects it.
             config.BaseImmediateCommandLimit = 13 + 7;
             (await d.ReconfigureAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
             d.Traces.Should().BeEquivalentTo( "Reconfigure " );

@@ -16,6 +16,7 @@ namespace CK.DeviceModel
     {
         private protected BaseDestroyDeviceCommand()
         {
+            ImmediateSending = true;
         }
 
         void ICompletable.OnError( Exception ex, ref CompletionSource.OnError result) => result.SetResult();
