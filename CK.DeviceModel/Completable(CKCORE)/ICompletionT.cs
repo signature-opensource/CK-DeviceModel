@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace CK.Core
+namespace CK.DeviceModel
 {
 
     /// <summary>

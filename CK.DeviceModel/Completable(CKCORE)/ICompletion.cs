@@ -2,7 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace CK.Core
+namespace CK.DeviceModel
 {
     /// <summary>
     /// Read only aspect of the <see cref="ICompletionSource"/> that unifies <see cref="CompletionSource"/>
