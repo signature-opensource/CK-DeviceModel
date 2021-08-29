@@ -1,16 +1,28 @@
 # Commands
 
 All device commands must inherit from [DeviceCommand](DeviceCommand&lt;THost&gt;.cs) or [DeviceCommand&lt;THost,TResult&gt;](DeviceCommandT.cs)
-if the command generates a result.
-
-Commands are sent to a device and are executed asynchronously by each device's command loop: developers are isolated from
-any concurrency issues since all commands (including the [5 basic commands](Basic)) are handled sequentially.
+if the command generates a result. All commands ultimately specialize [BaseDeviceCommand](BaseDeviceCommand.cs).
 
 ## Command sending
 
+Commands are sent to a device and instantly queued. They are executed asynchronously, in the order of the queue, by each
+device's command loop: developers are isolated from any concurrency issues since all commands (including
+the [5 basic commands](Basic)) are handled sequentially.
+
+Commands are normally executed one after the others. However, sometimes a command should be handled as soon as possible,
+without waiting for the current pending commands to be handled. Such commands only need to have their `ImmediateSending`
+property sets to true.
+   
+This shortcuts the "regular" queue and there is still NO concurrency to handle, the "immediate commands" will be handled
+immediately or right after the end of the currently executing command (if any).
+*Immediate* commands are simply enqueued in a high priority queue.
+
+Another internal queue exists: the queue of the deferred commands that contains the commands that cannot be handled
+by a stopped device. These deferred commands are automatically executed as soon as a device restarts.
+
 ### On the Device
 
-Commands can be sent to a device by using the 4 available methods directly on any [IDevice](../Device/IDevice.cs) object:
+Commands can be sent to a device by using the 2 available methods directly on any [IDevice](../Device/IDevice.cs) object:
 
 ```csharp
 bool SendCommand( IActivityMonitor monitor,
@@ -22,43 +34,21 @@ bool SendCommand( IActivityMonitor monitor,
 bool UnsafeSendCommand( IActivityMonitor monitor,
                         BaseDeviceCommand command,
                         CancellationToken token = default );
-
-bool SendCommandImmediate( IActivityMonitor monitor,
-                           BaseDeviceCommand command,
-                           bool checkDeviceName = true,
-                           bool checkControllerKey = true,
-                           CancellationToken token = default );
-
-bool UnsafeSendCommandImmediate( IActivityMonitor monitor,
-                                 BaseDeviceCommand command,
-                                 CancellationToken token = default );
 ```
-These methods return `false` if the device is destroyed and cannot receive commands anymore throw an `ArgumentException`
-if the command is null or if its `CheckValidity` method returns `false`.
+These methods return `false` if the device is destroyed and cannot receive commands anymore. They throw an `ArgumentException`
+if the command is null or if its `CheckValidity` method returns `false`: command validity MUST be checked before sending it.
 
 #### Safe vs. Unsafe
 
-By default, the `BaseDeviceCommand.DeviceName` MUST match the device's name (this is checked when the command is sent
-and raises an `ArgumentException` is raise),
-and the `BaseDeviceCommand.ControllerKey` must match the device's current `ControllerKey` (or the latter is null).
+By default, the `BaseDeviceCommand.DeviceName` MUST match the device's name, and the `BaseDeviceCommand.ControllerKey` must match the device's
+current `ControllerKey` (or the latter is null). This is checked when the command is sent
+and may raise an `ArgumentException`.
 
-The controller key is not checked when the command is sent but when right before the command execution (this is because a previously
-sent command can change the controller key). If the controller key doesn't match, an [InvalidControllerKeyException](../Device/InvalidControllerKeyException.cs)
+The controller key is not checked when the command is sent but right before the command execution (this is because a previously
+handled command can change the controller key). If the controller key doesn't match, an [InvalidControllerKeyException](../Device/InvalidControllerKeyException.cs)
 is set on the command completion.
 
-This (safe) behavior can be amended thanks to the SendCommand or SendCommandImmediate parameters or by calling the Unsafe methods.
-
-#### Immediate or not
-
-By default, commands are queued and are executed one after the others: there is NO concurrency to handle. However, the
-`SendCommandImmediate` and `UnsafeSendCommandImmediate` can be used to skip any waiting commands and to execute
-the command immediately (after having wait for the end of the currently executing command).
-Once the immediate command is executed, queued commands continue to execute.
-
-Think to this *immediate* as a higher priority queue.
-
-> The 5 [basic `IDevice` methods](Basic) (`SetControllerKeyAsync`, `StartAsync`, `StopAsync`, `ReconfigureAsync`
->  and `DestroyAsync`) are just helpers that send such immediate commands.
+This (safe) behavior can be amended thanks to the SendCommand parameters or by calling the UnsafeSendCommand method.
 
 ### Through the DeviceHost
 
@@ -88,8 +78,7 @@ protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor,
 When `DoHandleCommandAsync` is called, the command has been validated:
 
 - The `BaseDeviceCommand.CheckValidity` has been successfully executed.
-- The `BaseDeviceCommand.DeviceName` matches this `IDevice.Name" (or Device.UnsafeSendCommand or Device.UnsafeSendCommandImmediate 
-has been used). 
+- The `BaseDeviceCommand.DeviceName` matches this `IDevice.Name" (or Device.UnsafeSendCommand has been used). 
 - The `BaseDeviceCommand.ControllerKey` is either null or match the current `IDevice.ControllerKey` (or an Unsafe send has been used).
 - `BaseDeviceCommand.StoppedBehavior` is coherent with this current `IsRunning` state.
 
@@ -101,8 +90,10 @@ or `DeviceCommandWithResult<TResult>.Completion` is eventually resolved
 by calling `SetResult`, `SetCanceled` or `SetException` on the Completion otherwise the caller 
 may indefinitely wait for the command completion.
 
-## DeviceCommandStoppedBehavior
+## StoppedBehavior and ImmediateStoppedBehavior
 
-Each Command has an overridable `StoppedBehavior` that specifies how it should be handled when the device is stopped.
-The [DeviceCommandStoppedBehavior](DeviceCommandStoppedBehavior.cs) enumeration describes th 8 available options.
+Each Command has an overridable `StoppedBehavior` and `ImmediateStoppedBehavior` that specify how it should be handled when the device is stopped.
+The [DeviceCommandStoppedBehavior](DeviceCommandStoppedBehavior.cs) enumeration describes the 8 available options.
+For "immediate" commands, [DeviceImmediateCommandStoppedBehavior](DeviceImmediateCommandStoppedBehavior.cs) there is only 3 options since
+immediate commands cannot be deferred.
 
