@@ -1,7 +1,8 @@
 # Commands
 
+All commands ultimately specialize [BaseDeviceCommand](BaseDeviceCommand.cs).
 All device commands must inherit from [DeviceCommand](DeviceCommand&lt;THost&gt;.cs) or [DeviceCommand&lt;THost,TResult&gt;](DeviceCommandT.cs)
-if the command generates a result. All commands ultimately specialize [BaseDeviceCommand](BaseDeviceCommand.cs).
+if the command generates a result. 
 
 ## Command sending
 

@@ -5,8 +5,8 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Base class for <see cref="DeviceStatusChangedEvent"/>, <see cref="DeviceControllerKeyChangedEvent"/>
-    /// and <see cref="DeviceConfigurationChangedEvent"/>.
+    /// Base class for <see cref="DeviceLifetimeEvent"/> (<see cref="DeviceStatusChangedEvent"/>, <see cref="DeviceControllerKeyChangedEvent"/>
+    /// and <see cref="DeviceConfigurationChangedEvent"/>) and all <see cref="ActiveDeviceEvent{TDevice}"/>.
     /// </summary>
     public abstract class BaseDeviceEvent
     {

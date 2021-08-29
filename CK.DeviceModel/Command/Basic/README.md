@@ -4,9 +4,9 @@ The 5 basic commands follow the same pattern:
 
 - The BaseXXX cannot be specialized outside of the CK.DeviceModel internals.
 
-- The StoppedBehavior and  is "RunAnyway" (they can run on a stopped device).
+- The StoppedBehavior and ImmediateStoppedBehavior is "RunAnyway" (they can run on a stopped device).
 
-- They can be sent via SendCommand or SendCommandImmediate or are simply useless since the 5 device's methods: 
+- They can be sent via SendCommand or are simply useless since the 5 device's methods: 
 SetControllerKeyAsync, StartAsync, StopAsync, ReconfigureAsync or DestroyAsync (see [IDevice](../../Device/IDevice.cs))
 can send them immediately.
 
