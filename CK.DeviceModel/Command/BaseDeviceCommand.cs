@@ -71,7 +71,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets or sets whether this command must be sent and handled immediately.
-        /// Defaults to false.
+        /// Defaults to false, except for the 5 basic commands (Start, Stop, Configure, SetControllerKey and Destroy).
         /// </summary>
         public bool ImmediateSending { get; set; }
 
