@@ -214,35 +214,36 @@ namespace CK.DeviceModel
         }
 
         #region Reconfigure
+        Task<DeviceApplyConfigurationResult> IDevice.ReconfigureAsync( IActivityMonitor monitor, DeviceConfiguration configuration, CancellationToken token )
+        {
+            return ReconfigureAsync( monitor, (TConfiguration)configuration, token );
+        }
 
         /// <summary>
         /// Applies a new configuration to this device.
         /// The configuration will be cloned and isolated from the external world.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="config">The configuration object.</param>
+        /// <param name="configuration">The configuration object.</param>
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>The configuration result.</returns>
-        public Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, TConfiguration config, CancellationToken token = default )
+        public Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, TConfiguration configuration, CancellationToken token = default )
         {
-            if( config == null ) throw new ArgumentNullException( nameof( config ) );
-            if( !config.CheckValid( monitor ) )
+            if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
+            if( !configuration.CheckValid( monitor ) )
             {
                 return Task.FromResult( DeviceApplyConfigurationResult.InvalidConfiguration );
             }
-            return InternalReconfigureAsync( monitor, config.DeepClone(), token );
+            return InternalReconfigureAsync( monitor, configuration, configuration.DeepClone(), token );
         }
 
         internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
+                                                                                TConfiguration config,
                                                                                 TConfiguration clonedconfig,
-                                                                                CancellationToken token = default )
+                                                                                CancellationToken token )
         {
-            var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, clonedconfig );
-            if( cmd == null )
-            {
-                return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
-            }
-            if( !UnsafeSendCommand( monitor, cmd, token ) )
+            var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, config, clonedconfig );
+            if( cmd == null || !UnsafeSendCommand( monitor, cmd, token ) )
             {
                 return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
             }

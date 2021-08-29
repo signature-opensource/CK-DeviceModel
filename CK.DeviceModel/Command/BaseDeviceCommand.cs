@@ -15,9 +15,9 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class BaseDeviceCommand
     {
-        bool _isLocked;
         private string _deviceName;
         private string? _controllerKey;
+        bool _isLocked;
 
         /// <summary>
         /// Initialize a new locked command if <paramref name="locked"/> is provided.
@@ -90,8 +90,11 @@ namespace CK.DeviceModel
             set
             {
                 if( value == null ) throw new ArgumentNullException( nameof( DeviceName ) );
-                ThrowOnLocked();
-                _deviceName = value;
+                if( value != _deviceName )
+                {
+                    ThrowOnLocked();
+                    _deviceName = value;
+                }
             }
         }
 

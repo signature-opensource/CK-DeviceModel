@@ -115,6 +115,15 @@ namespace CK.DeviceModel
         Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false );
 
         /// <summary>
+        /// Reconfigures the device.
+        /// Configuration's type must match the actual configuration type otherwise an <see cref="InvalidCastException"/> is thrown.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="configuration">The configuration to apply.</param>
+        /// <returns>the result of the device configuration.</returns>
+        Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, DeviceConfiguration configuration, CancellationToken token = default );
+
+        /// <summary>
         /// Destroys this device.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
