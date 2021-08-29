@@ -12,11 +12,12 @@ namespace CK.DeviceModel
     public abstract class BaseConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand
         where TConfiguration : DeviceConfiguration
     {
-        private protected BaseConfigureDeviceCommand( TConfiguration? configuration, (string lockedName, string? lockedControllerKey)? locked = null )
+        private protected BaseConfigureDeviceCommand( TConfiguration? configuration, TConfiguration? clonedConfiguration, (string lockedName, string? lockedControllerKey)? locked = null )
             : base( configuration ?? Activator.CreateInstance<TConfiguration>(), locked )
         {
             Debug.Assert( IsLocked == (locked != null) );
-            if( IsLocked ) ClonedConfig = Configuration.DeepClone();
+            Debug.Assert( IsLocked == (configuration != null) );
+            if( IsLocked ) ClonedConfig = clonedConfiguration ?? Configuration.DeepClone();
         }
 
         internal TConfiguration? ClonedConfig { get; private set; }

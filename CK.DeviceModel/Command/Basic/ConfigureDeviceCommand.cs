@@ -28,7 +28,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="configuration">The existing configuration or null to instantiate a new empty configuration object.</param>
         public ConfigureDeviceCommand( TConfiguration? configuration )
-            : base( configuration )
+            : base( configuration, null )
         {
         }
 

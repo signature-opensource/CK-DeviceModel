@@ -66,7 +66,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is configured by the provided <paramref name="configuration"/>.
-        /// Configuration's type must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
+        /// Configuration's type must match the actual configuration type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>

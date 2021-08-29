@@ -125,7 +125,7 @@ namespace CK.DeviceModel
 
         Type IDeviceHost.GetDeviceConfigurationType() => typeof( TConfiguration );
 
-        BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name, string? controllerKey, DeviceConfiguration? configuration ) => new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, ( name, controllerKey ) );
+        BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name, string? controllerKey, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration ) => new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, clonedConfiguration, ( name, controllerKey ) );
 
         BaseStartDeviceCommand IInternalDeviceHost.CreateStartCommand( string name ) => new InternalStartDeviceCommand( GetType(), name );
 
@@ -270,7 +270,7 @@ namespace CK.DeviceModel
 
         BaseConfigureDeviceCommand IDeviceHost.CreateConfigureCommand( DeviceConfiguration? configuration )
         {
-            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration );
+            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, null );
         }
 
 
@@ -372,7 +372,7 @@ namespace CK.DeviceModel
                         {
                             foreach( var (idx,d) in toReconfigure )
                             {
-                                DeviceApplyConfigurationResult r = await d.InternalReconfigureAsync( monitor, safeConfig.Items[idx] ).ConfigureAwait( false );
+                                DeviceApplyConfigurationResult r = await d.InternalReconfigureAsync( monitor, configuration.Items[idx], safeConfig.Items[idx], default ).ConfigureAwait( false );
                                 results[idx] = r;
                                 success &= (r == DeviceApplyConfigurationResult.UpdateSucceeded || r == DeviceApplyConfigurationResult.None);
                             }
