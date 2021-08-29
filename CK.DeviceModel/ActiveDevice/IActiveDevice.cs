@@ -22,5 +22,15 @@ namespace CK.DeviceModel
         /// </summary>
         PerfectEvent<BaseDeviceEvent> AllEvent { get; }
 
+        /// <summary>
+        /// Posts an event in this device's event queue.
+        /// This should be used with care and can be used to mimic a running device.
+        /// <para>
+        /// Event's type must match the actual <see cref="ActiveDeviceEvent{TDevice}"/> type otherwise an <see cref="InvalidCastException"/> is thrown.
+        /// </para>
+        /// </summary>
+        /// <param name="e">The event to inject.</param>
+        void DebugPostEvent( BaseActiveDeviceEvent e );
+
     }
 }

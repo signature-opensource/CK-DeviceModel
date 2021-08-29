@@ -5,14 +5,11 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Base class for all active device events.
+    /// Strongly typed base class for active device events.
     /// </summary>
-    public abstract class ActiveDeviceEvent<TDevice> : BaseDeviceEvent where TDevice : IActiveDevice
+    public abstract class ActiveDeviceEvent<TDevice> : BaseActiveDeviceEvent where TDevice : IActiveDevice
     {
-        /// <summary>
-        /// Initializes a new <see cref="ActiveDeviceEvent"/> with its originating device.
-        /// </summary>
-        /// <param name="device">The device that raised this event.</param>
+        /// <inheritdoc />
         protected ActiveDeviceEvent( TDevice device )
             : base( device )
         {

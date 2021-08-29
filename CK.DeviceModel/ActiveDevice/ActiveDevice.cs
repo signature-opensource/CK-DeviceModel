@@ -10,13 +10,16 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Specialized <see cref="Device{TConfiguration}"/> that implements an independent event loop
-    /// with its own monitor and can raise events thanks to its <see cref="DeviceEvent"/>.
+    /// with its own monitor and can raise events thanks to its <see cref="DeviceEvent"/> and <see cref="AllEvent"/>.
     /// </summary>
     /// <typeparam name="TConfiguration">The device's configuration type.</typeparam>
-    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <typeparam name="TEvent">
+    /// The event type.
+    /// Each active device should be associated to a specialized <see cref="ActiveDeviceEvent{TDevice}"/>
+    /// </typeparam>
     public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>, IActiveDevice, ActiveDevice<TConfiguration,TEvent>.IEventLoop
         where TConfiguration : DeviceConfiguration
-        where TEvent : BaseDeviceEvent
+        where TEvent : BaseActiveDeviceEvent
     {
         readonly Channel<object> _events;
         readonly ActivityMonitor _eventMonitor;
@@ -49,9 +52,11 @@ namespace CK.DeviceModel
             return base.SafeRaiseLifetimeEventAsync( e );
         }
 
+        void IActiveDevice.DebugPostEvent( BaseActiveDeviceEvent e ) => DoPost( (TEvent)e );
+
         /// <summary>
         /// Posts an event in this device's event queue.
-        /// This can be used to mimic a running device.
+        /// This should be used with care and can be used to mimic a running device.
         /// </summary>
         /// <param name="e">The event to inject.</param>
         public void DebugPostEvent( TEvent e ) => DoPost( e );
