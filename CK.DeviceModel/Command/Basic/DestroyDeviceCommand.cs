@@ -9,7 +9,7 @@ namespace CK.DeviceModel
     /// This command is by default (like the other basic commands), sent immediately (<see cref="BaseDeviceCommand.ImmediateSending"/> is true).
     /// </summary>
     /// <typeparam name="THost">The device host type.</typeparam>
-    public class DestroyDeviceCommand<THost> : BaseDestroyDeviceCommand where THost : IDeviceHost
+    public sealed class DestroyDeviceCommand<THost> : BaseDestroyDeviceCommand where THost : IDeviceHost
     {
         /// <summary>
         /// Initializes a new <see cref="DestroyDeviceCommand{THost}"/>.

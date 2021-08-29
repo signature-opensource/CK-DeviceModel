@@ -11,7 +11,7 @@ namespace CK.DeviceModel
     /// </summary>
     /// <typeparam name="THost">The type of the device host.</typeparam>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public class ConfigureDeviceCommand<THost, TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
+    public sealed class ConfigureDeviceCommand<THost, TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
         where THost : IDeviceHost
         where TConfiguration : DeviceConfiguration
     {
