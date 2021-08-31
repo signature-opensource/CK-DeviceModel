@@ -49,7 +49,7 @@ The controller key is not checked when the command is sent but right before the 
 handled command can change the controller key). If the controller key doesn't match, an [InvalidControllerKeyException](../Device/InvalidControllerKeyException.cs)
 is set on the command completion.
 
-This (safe) behavior can be amended thanks to the SendCommand parameters or by calling the UnsafeSendCommand method.
+This (safe) behavior can be amended thanks to the `SendCommand` parameters or by calling the `UnsafeSendCommand` method.
 
 ### Through the DeviceHost
 

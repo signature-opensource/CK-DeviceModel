@@ -2,7 +2,7 @@
 
 The [DeviceHostDaemon](DeviceHostDaemon.cs) is an automatically started background service (ISingletonAutoService, IHostedService).
 
-All available hosts are injected ([IDeviceHost](../Host/IDeviceHost.cs) are marked with [IsMultiple]): it
+All available hosts are injected ([IDeviceHost](../Host/IDeviceHost.cs) is marked with `[IsMultiple]`): it
 manages all the [devices](../Device) of all the hosts by watching the devices that are Stopped whereas their configured Status
 is `AlwaysRunning`.
 

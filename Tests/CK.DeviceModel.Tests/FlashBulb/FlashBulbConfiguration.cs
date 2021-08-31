@@ -5,6 +5,9 @@ namespace CK.DeviceModel.Tests
 
     public class FlashBulbConfiguration : DeviceConfiguration
     {
+        /// <summary>
+        /// A default public constructor is required.
+        /// </summary>
         public FlashBulbConfiguration()
         {
         }
@@ -56,7 +59,6 @@ namespace CK.DeviceModel.Tests
             w.Write( FlashColor );
             w.Write( FlashRate );
         }
-
     }
 
 }
