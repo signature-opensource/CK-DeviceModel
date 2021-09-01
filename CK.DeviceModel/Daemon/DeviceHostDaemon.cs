@@ -16,13 +16,17 @@ namespace CK.DeviceModel
     /// <summary>
     /// This is the "restarter daemon" that allows devices with <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration
     /// to be monitored and automatically restarted when stopped. See <see cref="IDeviceAlwaysRunningPolicy"/>.
+    /// <para>
+    /// This daemon can also destroy device when stopped (see <see cref="ClearAllHostsOnStopped"/>).
+    /// </para>
     /// </summary>
     public sealed class DeviceHostDaemon : ISingletonAutoService, IHostedService
     {
         readonly IInternalDeviceHost[] _deviceHosts;
         readonly IDeviceAlwaysRunningPolicy _alwaysRunningPolicy;
-        readonly CancellationTokenSource _run;
+        readonly CancellationTokenSource _stoppedTokenSource;
 
+        Task? _runLoop;
         volatile TaskCompletionSource<bool> _signal;
         IActivityMonitor? _daemonMonitor;
 
@@ -33,7 +37,7 @@ namespace CK.DeviceModel
         /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
         public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
         {
-            _run = new CancellationTokenSource();
+            _stoppedTokenSource = new CancellationTokenSource();
             // See here https://stackoverflow.com/questions/28321457/taskcontinuationoptions-runcontinuationsasynchronously-and-stack-dives
             // why RunContinuationsAsynchronously is crucial.
             _signal = new TaskCompletionSource<bool>( TaskCreationOptions.RunContinuationsAsynchronously );
@@ -41,18 +45,30 @@ namespace CK.DeviceModel
             _alwaysRunningPolicy = alwaysRunningPolicy ?? throw new ArgumentNullException( nameof( alwaysRunningPolicy ) );
         }
 
+        /// <summary>
+        /// Gets or sets whether when this service stops, all devices of all hosts must be destroyed.
+        /// Defaults to <see cref="OnStoppedDaemonBehavior.None"/>.
+        /// </summary>
+        public OnStoppedDaemonBehavior StoppedBehavior { get; set; }
+
+        /// <summary>
+        /// Gets a cancellation token that will be signaled when this service is stopping.
+        /// </summary>
+        public CancellationToken StoppedToken => _stoppedTokenSource.Token;
+
         Task IHostedService.StartAsync( CancellationToken cancellationToken )
         {
             if( _deviceHosts.Length > 0 )
             {
                 _daemonMonitor = new ActivityMonitor( nameof( DeviceHostDaemon ) );
-                // We don't wait for the actual termination of the loop: we don't need to capture the loop task.
-                _ = Task.Run( TheLoop );
+                _runLoop = TheLoop();
             }
             return Task.CompletedTask;
         }
 
-
+        /// <summary>
+        /// Triggers the current source after having initiated the next one.
+        /// </summary>
         internal void Signal()
         {
             var s = _signal;
@@ -68,7 +84,7 @@ namespace CK.DeviceModel
                 h.SetDaemon( this );
             }
             _daemonMonitor.Debug( "Daemon loop started." );
-            while( !_run.IsCancellationRequested )
+            while( !_stoppedTokenSource.IsCancellationRequested )
             {
                 var signalTask = _signal.Task;
                 using( _daemonMonitor.OpenDebug( "Checking always running devices." ) )
@@ -77,7 +93,7 @@ namespace CK.DeviceModel
                     long wait = Int64.MaxValue;
                     foreach( var h in _deviceHosts )
                     {
-                        var delta = await h.DaemonCheckAlwaysRunningAsync( _daemonMonitor, _alwaysRunningPolicy, now );
+                        var delta = await h.DaemonCheckAlwaysRunningAsync( _daemonMonitor, _alwaysRunningPolicy, now ).ConfigureAwait( false );
                         Debug.Assert( delta > 0 );
                         if( wait > delta ) wait = delta;
                     }
@@ -89,27 +105,57 @@ namespace CK.DeviceModel
                     {
                         int w = (int)(wait / TimeSpan.TicksPerMillisecond);
                         _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a host's signal." );
-                        await Task.WhenAny( Task.Delay( w ), signalTask );
+                        await Task.WhenAny( Task.Delay( w ), signalTask ).ConfigureAwait( false );
                     }
                     else
                     {
                         _daemonMonitor.CloseGroup( $"Waiting for a host's signal." );
-                        await signalTask;
+                        await signalTask.ConfigureAwait( false );
+                    }
+                }
+            }
+            if( StoppedBehavior != OnStoppedDaemonBehavior.None )
+            {
+                using( _daemonMonitor.OpenInfo( $"End of Daemon loop: StoppedBehavior is '{StoppedBehavior}'." ) )
+                {
+                    // We may catch a OperationCanceledException here.
+                    try
+                    {
+                        if( StoppedBehavior == OnStoppedDaemonBehavior.ClearAllHosts )
+                        {
+                            foreach( var h in _deviceHosts )
+                            {
+                                await h.ClearAsync( _daemonMonitor, waitForDeviceDestroyed: false ).ConfigureAwait( false );
+                            }
+                        }
+                        else
+                        {
+                            Task[] all = new Task[_deviceHosts.Length];
+                            for( int i = 0; i < _deviceHosts.Length; ++i )
+                            {
+                                all[i] = _deviceHosts[i].ClearAsync( _daemonMonitor, waitForDeviceDestroyed: true );
+                            }
+                            await Task.WhenAll( all ).ConfigureAwait( false );
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        _daemonMonitor.Error( ex );
                     }
                 }
             }
             _daemonMonitor.MonitorEnd();
         }
 
-        Task IHostedService.StopAsync( CancellationToken cancellationToken )
+        async Task IHostedService.StopAsync( CancellationToken cancellationToken )
         {
             if( _deviceHosts.Length > 0 )
             {
-                Debug.Assert( _daemonMonitor != null );
-                _run.Cancel();
+                Debug.Assert( _runLoop != null );
+                _stoppedTokenSource.Cancel();
                 Signal();
+                await _runLoop.WaitAsync( Timeout.Infinite, cancellationToken );
             }
-            return Task.CompletedTask;
         }
     }
 }

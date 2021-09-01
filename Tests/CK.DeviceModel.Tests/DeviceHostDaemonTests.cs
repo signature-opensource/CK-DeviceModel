@@ -219,19 +219,21 @@ namespace CK.DeviceModel.Tests
 
 
             await ((IHostedService)daemon).StopAsync( default );
-            await host.ClearAsync( TestHelper.Monitor );
+            await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
         }
 
-        [Test]
-        public async Task multiple_hosts_handling()
+        [TestCase( OnStoppedDaemonBehavior.ClearAllHosts )]
+        [TestCase( OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed )]
+        public async Task multiple_hosts_handling_and_OnStoppedDaemonBehavior( OnStoppedDaemonBehavior behavior )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_hosts_handling) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_hosts_handling_and_OnStoppedDaemonBehavior )}-{behavior}" );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1 };
             var host1 = new MachineHost();
             var host2 = new FlashBulbHost();
             var host3 = new OtherMachineHost();
             var daemon = new DeviceHostDaemon( new IDeviceHost[] { host1, host2, host3 }, policy );
+            daemon.StoppedBehavior = behavior;
 
             await ((IHostedService)daemon).StartAsync( default );
 
@@ -269,15 +271,15 @@ namespace CK.DeviceModel.Tests
             await Task.Delay( 300 );
             devices.Count( d => d.IsRunning ).Should().Be( 6 );
 
-            // Must destroy the cameras because they are counted!
-            await host2.Find( "D1" )!.DestroyAsync( TestHelper.Monitor );
-            await host2.Find( "D*2" )!.DestroyAsync( TestHelper.Monitor );
-
             await ((IHostedService)daemon).StopAsync( default );
-
-            await host1.ClearAsync( TestHelper.Monitor );
-            await host2.ClearAsync( TestHelper.Monitor );
-            await host3.ClearAsync( TestHelper.Monitor );
+            if( behavior == OnStoppedDaemonBehavior.ClearAllHosts )
+            {
+                TestHelper.Monitor.Trace( "*** Wait ***" );
+                await Task.Delay( 300 );
+            }
+            host1.Count.Should().Be( 0 );
+            host2.Count.Should().Be( 0 );
+            host3.Count.Should().Be( 0 );
         }
 
         [Test]

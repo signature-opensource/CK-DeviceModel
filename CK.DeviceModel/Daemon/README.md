@@ -1,16 +1,26 @@
-# The Daemon and the IDeviceAlwaysRunningPolicy service
+# The Daemon
 
 The [DeviceHostDaemon](DeviceHostDaemon.cs) is an automatically started background service (ISingletonAutoService, IHostedService).
 
-All available hosts are injected ([IDeviceHost](../Host/IDeviceHost.cs) is marked with `[IsMultiple]`): it
-manages all the [devices](../Device) of all the hosts by watching the devices that are Stopped whereas their configured Status
+It has 4 responsibilities:
+- It instantiates all the host when itself is instantiated: all available hosts are injected as a `IEnumerable<IDeviceHost>` 
+([IDeviceHost](../Host/IDeviceHost.cs) is marked with `[IsMultiple]`) and since it concretizes the enumerable, all hosts are instantiated.
+- It manages the "AlwaysRunning" configuration status of the devices.
+- [FUTURE]It collects the health status of all the devices.
+- It can optionally destroy all the devices when stopped (instead of let them die with the process) by 
+setting the `DaemonHostDevice.StoppedBehavior` property to [OnStoppedDaemonBehavior](OnStoppedDaemonBehavior.cs)`.ClearAllHosts`
+or `ClearAllHostsAndWaitForDevicesDestroyed`.
+
+## The AlwaysRunning and IDeviceAlwaysRunningPolicy
+
+The daemon monitors all the [devices](../Device) of all the hosts by reacting to devices that are Stopped whereas their configured Status
 is `AlwaysRunning`.
 
-The global [IDeviceAlwaysRunningPolicy](IDeviceAlwaysRunningPolicy.cs) service that is in charge of trying to restart the devices
-is also injected.
+The daemon relies on the global [IDeviceAlwaysRunningPolicy](IDeviceAlwaysRunningPolicy.cs) service that is in charge of trying to restart
+the devices (it's a constructor dependency).
 
 The [DefaultDeviceAlwaysRunningPolicy](DefaultDeviceAlwaysRunningPolicy.cs) is a simple default global implementation. Being a ISingletonAutoService,
-it can easily be specialized or replaced with any specific implementation.
+it can easily be specialized or replaced with any specific implementation (it has been designed to be easily specialized).
 
 This global policy applies to all the devices regardless of the their host. But each [DeviceHost](../Host/DeviceHost.TrackAlwaysRunning.cs)
 can override the following method to handle the restart of its devices if needed:

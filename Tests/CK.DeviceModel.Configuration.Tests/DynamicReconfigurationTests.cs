@@ -281,8 +281,8 @@ namespace CK.DeviceModel.Configuration.Tests
                 l1.IsDestroyed.Should().BeFalse();
                 l2.IsDestroyed.Should().BeFalse();
 
-                await CameraHost.TestInstance.ClearAsync( TestHelper.Monitor );
-                await LightControllerHost.Instance.ClearAsync( TestHelper.Monitor );
+                await CameraHost.TestInstance.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
+                await LightControllerHost.Instance.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
 
                 c1.IsRunning.Should().BeFalse();
                 c2.IsRunning.Should().BeFalse();
@@ -410,6 +410,41 @@ namespace CK.DeviceModel.Configuration.Tests
             } );
         }
 
+        [Test]
+        public async Task DeviceHostDaemon_is_configured_by_optional_Daemon_section()
+        {
+            using var _ = TestHelper.Monitor.OpenInfo( nameof( DeviceHostDaemon_is_configured_by_optional_Daemon_section ) );
+
+            var config = DynamicConfiguration.Create();
+            config.Provider.Set( "CK-DeviceModel:Daemon:StoppedBehavior", "not a valid name." );
+
+            await RunHost( config, async services =>
+            {
+                var daemon = services.GetRequiredService<DeviceHostDaemon>();
+
+                daemon.StoppedBehavior.Should().Be( OnStoppedDaemonBehavior.None );
+
+                config.Provider.Set( "CK-DeviceModel:Daemon:StoppedBehavior", OnStoppedDaemonBehavior.ClearAllHosts.ToString() );
+                config.Provider.RaiseChanged();
+                await Task.Delay( 50 );
+
+                daemon.StoppedBehavior.Should().Be( OnStoppedDaemonBehavior.ClearAllHosts );
+
+                config.Provider.Set( "CK-DeviceModel:Daemon:StoppedBehavior", OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed.ToString() );
+                config.Provider.RaiseChanged();
+                await Task.Delay( 50 );
+
+                daemon.StoppedBehavior.Should().Be( OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed );
+
+                config.Provider.Set( "CK-DeviceModel:Daemon:StoppedBehavior", OnStoppedDaemonBehavior.None.ToString() );
+                config.Provider.RaiseChanged();
+                await Task.Delay( 50 );
+
+                daemon.StoppedBehavior.Should().Be( OnStoppedDaemonBehavior.None );
+
+            } );
+        }
+
 
         async Task RunHost( DynamicConfiguration config, Func<IServiceProvider,Task> running, [CallerMemberName] string? caller = null )
         {
@@ -434,6 +469,7 @@ namespace CK.DeviceModel.Configuration.Tests
                                             services.TryAddEnumerable( ServiceDescriptor.Singleton<IDeviceHost, CameraHost>( sp => sp.GetRequiredService<CameraHost>() ) );
                                             services.AddHostedService<DeviceHostDaemon>();
                                             services.AddSingleton<IDeviceAlwaysRunningPolicy, DefaultDeviceAlwaysRunningPolicy>();
+                                            services.AddSingleton<DeviceHostDaemon>();
                                             services.AddHostedService<DeviceConfigurator>();
                                         } )
                                         .Build() )

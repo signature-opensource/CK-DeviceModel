@@ -21,10 +21,11 @@ namespace CK.DeviceModel
     public class DeviceConfigurator : ISingletonAutoService, IHostedService
     {
         readonly IConfigurationSection _configuration;
-        readonly IConfigurationRoot _configurationRoot;
+        readonly IConfiguration _configurationRoot;
         readonly IDeviceHost[] _deviceHosts;
         readonly CancellationTokenSource _run;
         readonly IActivityMonitor _changeMonitor;
+        readonly DeviceHostDaemon _daemon;
         IDisposable? _changeSubscription;
         readonly Channel<(IDeviceHost, IDeviceHostConfiguration)[]> _applyChannel;
 
@@ -33,14 +34,17 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="configuration">The global configuration.</param>
         /// <param name="deviceHosts">The available hosts.</param>
-        public DeviceConfigurator( IConfigurationRoot configuration, IEnumerable<IDeviceHost> deviceHosts )
+        public DeviceConfigurator( DeviceHostDaemon daemon, IConfiguration configuration, IEnumerable<IDeviceHost> deviceHosts )
         {
+            _daemon = daemon;
             _configurationRoot = configuration;
             _changeMonitor = new ActivityMonitor( "CK-DeviceModel Configurator (Initializing)" );
             _run = new CancellationTokenSource();
             _configuration = configuration.GetSection( "CK-DeviceModel" );
             _deviceHosts = deviceHosts.ToArray();
             _applyChannel = Channel.CreateUnbounded<(IDeviceHost, IDeviceHostConfiguration)[]>( new UnboundedChannelOptions() { SingleReader = true, SingleWriter = true } );
+            // If the daemon is stopped before us, we preemptively stops the watch.
+            daemon.StoppedToken.Register( DoStop );
         }
 
         async Task IHostedService.StartAsync( CancellationToken cancellationToken )
@@ -57,13 +61,13 @@ namespace CK.DeviceModel
 
         async Task TheLoop()
         {
-            Debug.Assert( _changeMonitor != null );
             var tRun = _run.Token;
             while( !_run.IsCancellationRequested )
             {
                 var toApply = await _applyChannel.Reader.ReadAsync( tRun );
                 await ApplyOnceAsync( _changeMonitor, toApply, tRun );
             }
+            _changeMonitor.MonitorEnd();
         }
 
         async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply, CancellationToken cancellationToken )
@@ -105,6 +109,11 @@ namespace CK.DeviceModel
                     (IDeviceHost, IDeviceHostConfiguration)[]? toApply = null;
                     foreach( var c in _configuration.GetChildren() )
                     {
+                        if( c.Key == "Daemon" )
+                        {
+                            HandleDaemonConfiguration( c );
+                            continue;
+                        }
                         var d = _deviceHosts.FirstOrDefault( h => h.DeviceHostName == c.Key );
                         if( d == null )
                         {
@@ -185,6 +194,31 @@ namespace CK.DeviceModel
             }
         }
 
+        void HandleDaemonConfiguration( IConfigurationSection daemonSection )
+        {
+            Debug.Assert( nameof( DeviceHostDaemon.StoppedBehavior ) == "StoppedBehavior", "This should not be changed since it's used in configuration!" );
+            foreach( var daemonConfig in daemonSection.GetChildren() )
+            {
+                if( daemonConfig.Key == "StoppedBehavior" )
+                {
+                    if( !Enum.TryParse<OnStoppedDaemonBehavior>( daemonConfig.Value, out var behavior ) )
+                    {
+                        var validNames = string.Join( ", ", Enum.GetNames( typeof( OnStoppedDaemonBehavior ) ) );
+                        _changeMonitor.Warn( $"Invalid Daemon.StoppedBehavior configuration '{daemonConfig.Value}'. Keeping current '{_daemon.StoppedBehavior}' behavior. Valid values are: {validNames}." );
+                    }
+                    else if( _daemon.StoppedBehavior != behavior )
+                    {
+                        _changeMonitor.Trace( $"Daemon.StoppedBehavior set to '{_daemon.StoppedBehavior}'." );
+                        _daemon.StoppedBehavior = behavior;
+                    }
+                }
+                else
+                {
+                    _changeMonitor.Warn( $"Skipped invalid Daemon configuration key '{daemonSection.Key}'. Valid keys are 'StoppedBehavior'." );
+                }
+            }
+        }
+
         class NoItemsSectionWrapper : IConfigurationSection
         {
             class Empty : IConfigurationSection
@@ -248,11 +282,14 @@ namespace CK.DeviceModel
 
         Task IHostedService.StopAsync( CancellationToken cancellationToken )
         {
-            Debug.Assert( _changeMonitor != null );
+            DoStop();
+            return Task.CompletedTask;
+        }
+
+        void DoStop()
+        {
             _run.Cancel();
             _changeSubscription?.Dispose();
-            _changeMonitor.MonitorEnd();
-            return Task.CompletedTask;
         }
     }
 }

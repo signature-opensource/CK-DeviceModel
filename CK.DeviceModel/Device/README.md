@@ -59,9 +59,20 @@ are basic, Poco-like, mutable objects that must be binary serializable. Thanks t
 deep cloned: we use this to isolate the actual running configuration (that can be accessed through the protected `CurrentConfiguration`
 property from device's code) and the device's publicly exposed `ExternalConfiguration` that is an independent clone.
 
-Any device must define a concrete DeviceConfiguration specialization. A typical configuration looks like the following:
-````
-public class FlashBulbConfiguration : DeviceConfiguration
+Any device must define a concrete DeviceConfiguration specialization:
+- It must be in the same namespace and assembly as the Device.
+- Its name must end with `Configuration`. 
+- Default constructor and binary serialization support are required.
+- The `DoCheckValid` method is optional but highly recommended since this avoid dealing with buggy configurations
+in the `DoReconfigureAsync` method (and centralizes potentially complex code).
+
+A typical configuration looks like the following:
+
+- The device's configuration: its name MUST end with `Configuration` (and be in the same namespace and assembly). 
+The `DoCheckValid` method is optional but default constructor and binary serialization support are required:
+
+```csharp
+public sealed class FlashBulbConfiguration : DeviceConfiguration
 {
     /// <summary>
     /// A default public constructor is required.
@@ -122,7 +133,52 @@ public class FlashBulbConfiguration : DeviceConfiguration
 
 Whenever a device's configuration changes,
 a [DeviceConfigurationChangedEvent&lt;TConfiguration&gt;](LifetimeEvent/DeviceConfigurationChangedEvent.cs)
-lifetime event is raised.
+lifetime event is raised (this is a typed event: its base class is non-generic and expose the base `DeviceConfiguration`).
+
+It is up to the device to accept or reject a new configuration:
+```csharp
+  /// <summary>
+  /// Defines a subset of <see cref="DeviceApplyConfigurationResult"/> valid for a device reconfiguration:
+  /// see <see cref="Device{TConfiguration}.DoReconfigureAsync(IActivityMonitor, TConfiguration)"/>.
+  /// </summary>
+  public enum DeviceReconfiguredResult
+  {
+      /// <summary>
+      /// No reconfiguration happened.
+      /// </summary>
+      None = DeviceApplyConfigurationResult.None,
+
+      /// <summary>
+      /// The reconfiguration is successful.
+      /// </summary>
+      UpdateSucceeded = DeviceApplyConfigurationResult.UpdateSucceeded,
+
+      /// <summary>
+      /// The reconfiguration failed.
+      /// </summary>
+      UpdateFailed = DeviceApplyConfigurationResult.UpdateFailed,
+
+      /// <summary>
+      /// The updated configuration cannot be applied while the device is running.
+      /// </summary>
+      UpdateFailedRestartRequired = DeviceApplyConfigurationResult.UpdateFailedRestartRequired
+  }
+
+  /// <summary>
+  /// Reconfigures this device. This can be called when this device is started (<see cref="IsRunning"/> can be true) and
+  /// if reconfiguration while running is not possible or supported, <see cref="DeviceReconfiguredResult.UpdateFailedRestartRequired"/>
+  /// should be returned.
+  /// <para>
+  /// It is perfectly valid for this method to return <see cref="DeviceReconfiguredResult.None"/> if nothing happened instead of
+  /// <see cref="DeviceReconfiguredResult.UpdateSucceeded"/>. When None is returned, we may avoid a useless raise of the
+  /// <see cref="DeviceConfigurationChangedEvent"/>.
+  /// </para>
+  /// </summary>
+  /// <param name="monitor">The monitor to use.</param>
+  /// <param name="config">The configuration to apply.</param>
+  /// <returns>The reconfiguration result.</returns>
+  protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
+````
 
 ## Runtime properties
 

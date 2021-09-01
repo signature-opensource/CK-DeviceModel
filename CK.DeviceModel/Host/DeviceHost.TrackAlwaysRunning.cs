@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -19,6 +20,11 @@ namespace CK.DeviceModel
         /// </summary>
         readonly List<(IInternalDevice Device, int Count, DateTime NextCall)> _alwayRunningStopped;
         DeviceHostDaemon? _daemon;
+
+        /// <summary>
+        /// Gets the <see cref="DeviceHostDaemon.StoppedToken"/>.
+        /// </summary>
+        public CancellationToken DaemonStoppedToken => _daemon != null ? _daemon.StoppedToken : CancellationToken.None;
 
         /// <summary>
         /// This is a snapshot of the _alwayRunningStopped list.

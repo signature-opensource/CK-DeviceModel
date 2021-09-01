@@ -152,6 +152,18 @@ namespace CK.DeviceModel
             }
         }
 
+        Task IInternalDeviceHost.OnDeviceDestroyedAsync( IActivityMonitor monitor, IDevice device ) => OnDeviceDestroyedAsync( monitor, (T)device );
+
+        /// <summary>
+        /// Called when a device has been removed (its configuration disappeared or <see cref="IDevice.DestroyAsync(IActivityMonitor)"/> has been called).
+        /// There is no way to prevent the device to be destroyed when its configuration disappeared and this is by design.
+        /// This method does nothing at this level.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="device">The device that has been removed.</param>
+        /// <returns>The awaitable.</returns>
+        protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device ) => Task.CompletedTask;
+
         /// <summary>
         /// Gets a device by its name.
         /// </summary>
@@ -282,7 +294,7 @@ namespace CK.DeviceModel
         /// <param name="configuration">The configuration to apply.</param>
         /// <param name="allowEmptyConfiguration">By default, an empty configuration is considered as an error.</param>
         /// <returns>The composite result of the potentially multiple configurations.</returns>
-        public async Task<ConfigurationResult> ApplyConfigurationAsync( IActivityMonitor monitor, THostConfiguration configuration, bool allowEmptyConfiguration = false )
+        public virtual async Task<ConfigurationResult> ApplyConfigurationAsync( IActivityMonitor monitor, THostConfiguration configuration, bool allowEmptyConfiguration = false )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
@@ -357,6 +369,9 @@ namespace CK.DeviceModel
                                 var d = Find( n );
                                 if( d != null && !d.IsDestroyed )
                                 {
+                                    // We wait for the device to be destroyed here:
+                                    // resources from a destroyed devices may require an exclusive access
+                                    // that a reconfigured or started device (handled below) need.
                                     await d.DestroyAsync( monitor ).ConfigureAwait( false );
                                 }
                                 else
@@ -419,19 +434,29 @@ namespace CK.DeviceModel
             }
         }
 
-        Task RaiseDevicesChangedEvent( IActivityMonitor monitor ) => _devicesChanged.SafeRaiseAsync( monitor, this );
+        Task RaiseDevicesChangedEvent( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
+                                                                        ? Task.CompletedTask
+                                                                        : _devicesChanged.SafeRaiseAsync( monitor, this );
+
         Task IInternalDeviceHost.RaiseDevicesChangedEvent( IActivityMonitor monitor ) => RaiseDevicesChangedEvent( monitor );
 
         /// <inheritdoc />
-        public Task ClearAsync( IActivityMonitor monitor )
+        public async Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed )
         {
-            THostConfiguration hostConfig = _hostConfigFactory();
-            hostConfig.IsPartialConfiguration = false;
-            return ApplyConfigurationAsync( monitor, hostConfig, true );
+            var d = _devices;
+            using( monitor.OpenInfo( $"Clearing '{DeviceHostName}'. Destroying {d.Count} devices." ) )
+            {
+                foreach( var device in d.Values ) await device.DestroyAsync( monitor, waitForDeviceDestroyed );
+            }
         }
 
         T? SafeCreateDevice( IActivityMonitor monitor, TConfiguration config, TConfiguration externalConfig )
         {
+            if( DaemonStoppedToken.IsCancellationRequested )
+            {
+                monitor.Trace( "System is shutting down. Skipping new device creation." );
+                return null;
+            }
             try
             {
                 var device = CreateDevice( monitor, config, externalConfig );
@@ -535,16 +560,6 @@ namespace CK.DeviceModel
             }
             return InstantiateDevice( tDevice, monitor, config, externalConfig );
         }
-
-        /// <summary>
-        /// Called when a device has been removed (its configuration disappeared or <see cref="IDevice.DestroyAsync(IActivityMonitor)"/> has been called).
-        /// There is no way to prevent the device to be destroyed when its configuration disappeared and this is by design.
-        /// This method does nothing at this level.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="device">The device that has been removed.</param>
-        /// <returns>The awaitable.</returns>
-        protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device ) => Task.CompletedTask;
 
         /// <inheritdoc />
         public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default )

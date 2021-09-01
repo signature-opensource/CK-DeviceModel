@@ -15,6 +15,7 @@ namespace CK.DeviceModel
         readonly int _status;
         readonly byte _last;
         readonly bool _running;
+        readonly bool _systemShutdown;
 
         /// <summary>
         /// Gets whether the device has started.
@@ -35,6 +36,17 @@ namespace CK.DeviceModel
         /// Gets whether the device is currently running.
         /// </summary>
         public bool IsRunning => _running;
+
+        /// <summary>
+        /// Gets whether the system is currently shutting down
+        /// (the <see cref="DeviceHostDaemon.StoppedToken"/> has been signaled).
+        /// </summary>
+        /// <remarks>
+        /// This property can be used to skip any further process. It is for informations
+        /// and is not considered when testing whether the status has changed (it is ignored
+        /// by <see cref="Equals(DeviceStatus)"/>).
+        /// </remarks>
+        public bool IsSystemShutdown => _systemShutdown;
 
         /// <summary>
         /// Gets whether the device has been destroyed.
@@ -100,27 +112,30 @@ namespace CK.DeviceModel
         public static bool operator !=( DeviceStatus s1, DeviceStatus s2 ) => !s1.Equals( s2 );
 #pragma warning restore 1591
 
-        internal DeviceStatus( DeviceReconfiguredResult r, bool isRunning )
+        internal DeviceStatus( DeviceReconfiguredResult r, bool isRunning, bool systemShutdown )
         {
             _status = (int)r;
             _last = 3;
             _running = isRunning;
+            _systemShutdown = systemShutdown;
             Debug.Assert( !HasStarted && !HasStopped && HasBeenReconfigured );
         }
 
-        internal DeviceStatus( DeviceStartedReason r )
+        internal DeviceStatus( DeviceStartedReason r, bool systemShutdown )
         {
             _status = (int)r;
             _last = 1;
             _running = true;
+            _systemShutdown = systemShutdown;
             Debug.Assert( HasStarted && !HasStopped && !HasBeenReconfigured );
         }
 
-        internal DeviceStatus( DeviceStoppedReason r )
+        internal DeviceStatus( DeviceStoppedReason r, bool systemShutdown )
         {
             _status = (int)r;
             _last = 2;
             _running = false;
+            _systemShutdown = systemShutdown;
             Debug.Assert( !HasStarted && HasStopped && !HasBeenReconfigured );
         }
 

@@ -227,17 +227,17 @@ namespace CK.DeviceModel
         /// <param name="configuration">The configuration object.</param>
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>The configuration result.</returns>
-        public Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, TConfiguration configuration, CancellationToken token = default )
+        public async Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, TConfiguration configuration, CancellationToken token = default )
         {
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
             if( !configuration.CheckValid( monitor ) )
             {
-                return Task.FromResult( DeviceApplyConfigurationResult.InvalidConfiguration );
+                return DeviceApplyConfigurationResult.InvalidConfiguration;
             }
-            return InternalReconfigureAsync( monitor, configuration, configuration.DeepClone(), token );
+            return await InternalReconfigureAsync( monitor, configuration, configuration.DeepClone(), token ).ConfigureAwait( false );
         }
 
-        internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
+        internal async Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
                                                                                 TConfiguration config,
                                                                                 TConfiguration clonedconfig,
                                                                                 CancellationToken token )
@@ -245,9 +245,9 @@ namespace CK.DeviceModel
             var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, config, clonedconfig );
             if( cmd == null || !UnsafeSendCommand( monitor, cmd, token ) )
             {
-                return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
+                return DeviceApplyConfigurationResult.DeviceDestroyed;
             }
-            return cmd.Completion.Task;
+            return await cmd.Completion.Task.ConfigureAwait( false );
         }
 
         async Task HandleReconfigureAsync( BaseConfigureDeviceCommand<TConfiguration> cmd, CancellationToken token )
@@ -389,14 +389,14 @@ namespace CK.DeviceModel
                     && reconfigResult != DeviceReconfiguredResult.UpdateSucceeded
                     && reconfigResult != DeviceReconfiguredResult.None )
                 {
-                    await SetDeviceStatusAsync( new DeviceStatus( reconfigResult, _isRunning ) ).ConfigureAwait( false );
+                    await SetDeviceStatusAsync( new DeviceStatus( reconfigResult, _isRunning, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
                 }
             }
             else
             {
                 if( reconfigResult != DeviceReconfiguredResult.None )
                 {
-                    await SetDeviceStatusAsync( new DeviceStatus( reconfigResult, _isRunning ) ).ConfigureAwait( false );
+                    await SetDeviceStatusAsync( new DeviceStatus( reconfigResult, _isRunning, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
                 }
             }
             if( controllerKeyChanged )
@@ -417,8 +417,8 @@ namespace CK.DeviceModel
         /// should be returned.
         /// <para>
         /// It is perfectly valid for this method to return <see cref="DeviceReconfiguredResult.None"/> if nothing happened instead of
-        /// <see cref="DeviceReconfiguredResult.UpdateSucceeded"/>. When None is returned, we may avoid a useless update of the <see cref="IDeviceHost"/>
-        /// set of configured devices.
+        /// <see cref="DeviceReconfiguredResult.UpdateSucceeded"/>. When None is returned, we may avoid a useless raise of the
+        /// <see cref="DeviceConfigurationChangedEvent"/>.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -433,14 +433,14 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key ) => SetControllerKeyAsync( monitor, true, current, key );
 
-        Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
+        async Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
         {
             var cmd = _host?.CreateSetControllerKeyDeviceCommand( Name, current, key );
             if( cmd == null || !SendCommand( monitor, cmd, false, checkCurrent, default ) )
             {
-                return Task.FromResult( false );
+                return false;
             }
-            return cmd.Completion.Task;
+            return await cmd.Completion.Task.ConfigureAwait( false );
         }
 
         async Task HandleSetControllerKeyAsync( BaseSetControllerKeyDeviceCommand cmd )
@@ -467,24 +467,25 @@ namespace CK.DeviceModel
         #region Start
 
         /// <inheritdoc />
-        public Task<bool> StartAsync( IActivityMonitor monitor )
+        public async Task<bool> StartAsync( IActivityMonitor monitor )
         {
             if( monitor.Output == _commandMonitor.Output )
             {
-                return HandleStartAsync( null, DeviceStartedReason.SelfStart ).ContinueWith( _ => _isRunning );
+                await HandleStartAsync( null, DeviceStartedReason.SelfStart ).ConfigureAwait( false );
+                return _isRunning;
             }
             var preCheck = SyncStateStartCheck( monitor );
             if( preCheck.HasValue )
             {
-                return Task.FromResult( preCheck.Value );
+                return preCheck.Value;
             }
             var cmd = _host?.CreateStartCommand( Name );
             if( cmd == null || !UnsafeSendCommand( monitor, cmd ) )
             {
                 monitor.Error( $"Starting a destroyed device '{FullName}' is not possible." );
-                return Task.FromResult( false );
+                return false;
             }
-            return cmd.Completion.Task;
+            return await cmd.Completion.Task.ConfigureAwait( false );
         }
 
         bool? SyncStateStartCheck( IActivityMonitor monitor )
@@ -528,7 +529,7 @@ namespace CK.DeviceModel
                 }
                 if( _isRunning && reason != DeviceStartedReason.SilentAutoStartAndStopStoppedBehavior )
                 {
-                    await SetDeviceStatusAsync( new DeviceStatus( reason ) ).ConfigureAwait( false );
+                    await SetDeviceStatusAsync( new DeviceStatus( reason, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
                 }
                 if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                 {
@@ -552,25 +553,25 @@ namespace CK.DeviceModel
         #region Stop
 
         /// <inheritdoc />
-        public Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false )
+        public async Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false )
         {
             if( monitor.Output == _commandMonitor.Output )
             {
-                return HandleStopAsync( null, ignoreAlwaysRunning ? DeviceStoppedReason.SelfStoppedForceCall : DeviceStoppedReason.SelfStoppedCall )
-                        .ContinueWith( t => !_isRunning );
+                await HandleStopAsync( null, ignoreAlwaysRunning ? DeviceStoppedReason.SelfStoppedForceCall : DeviceStoppedReason.SelfStoppedCall ).ConfigureAwait( false );
+                return !_isRunning;
             }
             var r = SyncStateStopCheck( monitor, ignoreAlwaysRunning );
             if( r.HasValue )
             {
-                return Task.FromResult( r.Value );
+                return r.Value;
             }
             var cmd = _host?.CreateStopCommand( Name, ignoreAlwaysRunning );
             if( cmd == null || !UnsafeSendCommand( monitor, cmd ) )
             {
                 monitor.Warn( $"Stopping an already destroyed device '{FullName}'." );
-                return Task.FromResult( true );
+                return true;
             }
-            return cmd.Completion.Task;
+            return await cmd.Completion.Task.ConfigureAwait( false );
         }
 
         bool? SyncStateStopCheck( IActivityMonitor monitor, bool ignoreAlwaysRunnig )
@@ -621,7 +622,7 @@ namespace CK.DeviceModel
                         && reason != DeviceStoppedReason.SelfDestroyed
                         && reason != DeviceStoppedReason.SilentAutoStartAndStopStoppedBehavior )
                     {
-                        await SetDeviceStatusAsync( new DeviceStatus( reason ) ).ConfigureAwait( false );
+                        await SetDeviceStatusAsync( new DeviceStatus( reason, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
                     }
                     if( isAlwaysRunning )
                     {
@@ -647,24 +648,25 @@ namespace CK.DeviceModel
 
         #region Destroy
 
-        /// <summary>
-        /// Destroys this device.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The awaitable.</returns>
-        public Task DestroyAsync( IActivityMonitor monitor )
+        /// <inheritdoc />
+        public async Task DestroyAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed = true )
         {
             if( monitor.Output == _commandMonitor.Output )
             {
-                return HandleDestroyAsync( null, true );
+                await HandleDestroyAsync( null, true );
             }
-            var cmd = _host?.CreateDestroyCommand( Name );
-            if( cmd == null || !UnsafeSendCommand( monitor, cmd ) )
+            else
             {
-                monitor.Info( $"Destroying an already destroyed device '{FullName}'." );
-                return Task.CompletedTask;
+                var cmd = _host?.CreateDestroyCommand( Name );
+                if( cmd == null || !UnsafeSendCommand( monitor, cmd ) )
+                {
+                    monitor.Info( $"Destroying an already destroyed device '{FullName}'." );
+                }
+                else
+                {
+                    if( waitForDeviceDestroyed ) await cmd.Completion.Task.ConfigureAwait( false );
+                }
             }
-            return cmd.Completion.Task;
         }
 
         async Task HandleDestroyAsync( BaseDestroyDeviceCommand? cmd, bool autoDestroy )
@@ -691,9 +693,10 @@ namespace CK.DeviceModel
             {
                 await h.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
             }
-            await SetDeviceStatusAsync( new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ) ).ConfigureAwait( false );
+            await SetDeviceStatusAsync( new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed, h.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
             cmd?.Completion.SetResult();
             _lifetimeChanged.RemoveAll();
+            await h.OnDeviceDestroyedAsync( _commandMonitor, this ).ConfigureAwait( false );
         }
 
         #endregion

@@ -124,11 +124,13 @@ namespace CK.DeviceModel
         Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, DeviceConfiguration configuration, CancellationToken token = default );
 
         /// <summary>
-        /// Destroys this device.
+        /// Destroys this device by sending an immediate <see cref="BaseDestroyDeviceCommand"/> and either returns <see cref="Task.CompletedTask"/>
+        /// or the command completion's task depending on <paramref name="waitForDeviceDestroyed"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
+        /// <param name="waitForDeviceDestroyed">False to send the command and not wait for its completion.</param>
         /// <returns>The awaitable.</returns>
-        Task DestroyAsync( IActivityMonitor monitor );
+        Task DestroyAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed = true );
 
         /// <summary>
         /// Cancels all the commands that are waiting to be handled, either because they have been queued

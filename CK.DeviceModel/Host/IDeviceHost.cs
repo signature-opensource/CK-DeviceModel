@@ -17,6 +17,9 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets the host name that SHOULD identify this host instance unambiguously in a running context.
         /// (this should be used as the configuration key name for instance).
+        /// <para>
+        /// This is by default the type name (without namespace) of this host's type.
+        /// </para>
         /// </summary>
         string DeviceHostName { get; }
 
@@ -24,25 +27,6 @@ namespace CK.DeviceModel
         /// Gets the number of devices.
         /// </summary>
         int Count { get; }
-
-        /// <summary>
-        /// Clears this host by stopping and destroying all existing devices.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The awaitable.</returns>
-        Task ClearAsync( IActivityMonitor monitor );
-
-        /// <summary>
-        /// Gets the type of the object that configures this host (the <see cref="DeviceHostConfiguration{TConfiguration}"/> that is used).
-        /// </summary>
-        /// <returns>The type of the host configurations.</returns>
-        Type GetDeviceHostConfigurationType();
-
-        /// <summary>
-        /// Gets the type of the object that configures the device.
-        /// </summary>
-        /// <returns>The type of the device configuration.</returns>
-        Type GetDeviceConfigurationType();
 
         /// <summary>
         /// Creates a <see cref="BaseConfigureDeviceCommand"/> with an existing or new empty Configuration
@@ -112,5 +96,28 @@ namespace CK.DeviceModel
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
         public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default );
+
+        /// <summary>
+        /// Clears this host by stopping and destroying all existing devices.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="waitForDeviceDestroyed">
+        /// True to wait for the device destruction, false to only
+        /// send the destroy command to each device, not waiting for their destruction.
+        /// </param>
+        /// <returns>The awaitable.</returns>
+        Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed );
+
+        /// <summary>
+        /// Gets the type of the object that configures this host (the <see cref="DeviceHostConfiguration{TConfiguration}"/> that is used).
+        /// </summary>
+        /// <returns>The type of the host configurations.</returns>
+        Type GetDeviceHostConfigurationType();
+
+        /// <summary>
+        /// Gets the type of the object that configures the device.
+        /// </summary>
+        /// <returns>The type of the device configuration.</returns>
+        Type GetDeviceConfigurationType();
     }
 }

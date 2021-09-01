@@ -116,7 +116,7 @@ namespace CK.DeviceModel.Tests
             measures[1].Should().BeGreaterThan( measures[0] );
             measures[1].Should().BeGreaterThan( measures[2] );
 
-            await host.ClearAsync( TestHelper.Monitor );
+            await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
         }
 
         [Test]
@@ -158,7 +158,7 @@ namespace CK.DeviceModel.Tests
             await Task.Delay( 50 * config.PhysicalRate );
             scale.IsRunning.Should().BeTrue( "The device has been started from the event loop!" );
 
-            await host.ClearAsync( TestHelper.Monitor );
+            await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
         }
 
     }

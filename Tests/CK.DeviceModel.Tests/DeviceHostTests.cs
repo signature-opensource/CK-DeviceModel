@@ -93,7 +93,7 @@ namespace CK.DeviceModel.Tests
             host.Find( "Another" ).Should().BeSameAs( c2 );
             host.Find( "YetAnother" ).Should().BeNull();
 
-            await host.ClearAsync( TestHelper.Monitor );
+            await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
             FlashBulb.TotalCount.Should().Be( 0 );
             FlashBulb.TotalRunning.Should().Be( 0 );
 
