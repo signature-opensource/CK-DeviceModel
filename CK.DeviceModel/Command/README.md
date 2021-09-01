@@ -103,5 +103,5 @@ that cancels the command (calling `SetCanceled` on the command's completion) if 
 Another useful behavior is `RunAnyway`: all the basic commands (Destroy, Reconfigure, SetControllerKey, Start and Stop) uses this
 behavior since they must obviously do their job even if the device is stopped (the Stop does nothing when the device is already stopped).
 
-For "immediate" commands, [DeviceImmediateCommandStoppedBehavior](DeviceImmediateCommandStoppedBehavior.cs) there is only 3 options since
+For "immediate" commands, [DeviceImmediateCommandStoppedBehavior](DeviceImmediateCommandStoppedBehavior.cs) has only 3 options since
 immediate commands cannot be deferred.
