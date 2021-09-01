@@ -36,8 +36,13 @@ bool UnsafeSendCommand( IActivityMonitor monitor,
                         BaseDeviceCommand command,
                         CancellationToken token = default );
 ```
-These methods return `false` if the device is destroyed and cannot receive commands anymore. They throw an `ArgumentException`
-if the command is null or if its `CheckValidity` method returns `false`: command validity MUST be checked before sending it.
+These methods throw an `ArgumentException` if the command is null or if its `CheckValidity` method returns `false`:
+command validity MUST be checked before sending it.
+
+These methods return `false` if the device is destroyed and cannot receive commands anymore: the command completion has been
+called with an `UnavailableDeviceException` (that, depending on the command, may have been transformed into a canceled or successful
+command task's result - see below).
+
 
 #### Safe vs. Unsafe
 
@@ -90,6 +95,43 @@ command handling **MUST** ensure that the `DeviceCommandNoResult.Completion`
 or `DeviceCommandWithResult<TResult>.Completion` is eventually resolved 
 by calling `SetResult`, `SetCanceled` or `SetException` on the Completion otherwise the caller 
 may indefinitely wait for the command completion.
+
+Error management is never simple. Consider the Destroy command for instance: can it fail? Actually not:
+- First, when destroying a device, any error that occurred must not prevent the device to be destroyed.
+- Second, this is an idempotent action: regardless of any race condition or concurrency issues, destroying an already destroyed
+device is fine.
+
+Of course, this doesn't prevent a buggy device to hang forever (there is currently no timeout on the destroy) or to leave opened
+resources (handles, pipes, etc.), but the developer that uses a device has almost none possibilities to handle these.
+
+Commands and their Completion offer a solid way to handle this scenario: Commands can hook the error and/or canceled case and
+transform their task's result according to their semantics. The destroy command for instance does just that
+(in [BaseDestroyDeviceCommand](Basic/BaseDestroyDeviceCommand.cs)):
+
+```csharp
+    void ICompletable.OnError( Exception ex, ref CompletionSource.OnError result) => result.SetResult();
+
+    void ICompletable.OnCanceled( ref CompletionSource.OnCanceled result ) => result.SetResult();
+```
+
+The configuration command is even more interesting since this command has a result that can express the error or canceled issues
+(in [BaseConfigureDeviceCommand](Basic/BaseConfigureDeviceCommand.cs)):
+
+```csharp
+    void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
+    {
+        if( ex is InvalidControllerKeyException ) result.SetResult( DeviceApplyConfigurationResult.InvalidControllerKey );
+        else result.SetResult( DeviceApplyConfigurationResult.UnexpectedError );
+    }
+
+    void ICompletable<DeviceApplyConfigurationResult>.OnCanceled( ref CompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
+    {
+        result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
+    }
+```
+
+If it is needed, the original exception or the fact that the command has actually been canceled is available on the `ICompletion` (that comes from
+CK.Core assembly).
 
 ## StoppedBehavior and ImmediateStoppedBehavior
 

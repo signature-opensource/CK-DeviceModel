@@ -173,7 +173,7 @@ namespace CK.DeviceModel
         Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key );
 
         /// <summary>
-        /// Sends a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>.
+        /// Tries to send a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>.
         /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
         ///     <item><see cref="BaseDeviceCommand.HostType"/> is not compatible with this device's host type;</item>
@@ -181,6 +181,10 @@ namespace CK.DeviceModel
         ///     <item>or the <see cref="BaseDeviceCommand.DeviceName"/> doesn't match this device's name;</item>
         /// </list>
         /// The last check can be suppressed thanks to the <paramref name="checkDeviceName"/>.
+        /// <para>
+        /// Note that when this method returns false, the command completion has been called with an <see cref="UnavailableDeviceException"/> (and recall that
+        /// depending on the command that may be transformed into a canceled or successful command task's result).
+        /// </para>
         /// <para>
         /// The <see cref="ControllerKey"/> check is done at the time when the command is executed: if the check fails, an <see cref="InvalidControllerKeyException"/>
         /// will be set on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>. The <paramref name="checkControllerKey"/> parameter

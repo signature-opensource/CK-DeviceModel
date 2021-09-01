@@ -443,11 +443,35 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed )
         {
-            var d = _devices;
-            using( monitor.OpenInfo( $"Clearing '{DeviceHostName}'. Destroying {d.Count} devices." ) )
+            if( waitForDeviceDestroyed )
             {
-                foreach( var device in d.Values ) await device.DestroyAsync( monitor, waitForDeviceDestroyed );
+                await Task.WhenAll( ParrallelStartDestroy( monitor ) ).ConfigureAwait( false );
             }
+            else
+            {
+                var d = _devices;
+                monitor.Info( $"Clearing '{DeviceHostName}': {d.Count} devices will be eventually destroyed." );
+                foreach( var device in d.Values )
+                {
+                    await device.DestroyAsync( monitor, waitForDeviceDestroyed: false ).ConfigureAwait( false );
+                }
+            }
+        }
+
+        Task[] ParrallelStartDestroy( IActivityMonitor monitor )
+        {
+            Type thisType = GetType();
+            var d = _devices;
+            monitor.Info( $"Clearing '{DeviceHostName}': destroying {d.Count} devices." );
+            int i = 0;
+            Task[] all = new Task[d.Count];
+            foreach( var device in d.Values )
+            {
+                var cmd = new InternalDestroyDeviceCommand( thisType, device.Name );
+                device.UnsafeSendCommand( monitor, cmd );
+                all[i++] = cmd.Completion.Task;
+            }
+            return all;
         }
 
         T? SafeCreateDevice( IActivityMonitor monitor, TConfiguration config, TConfiguration externalConfig )

@@ -88,9 +88,15 @@ namespace CK.DeviceModel
         {
             CheckDirectCommandParameter( monitor, command, checkDeviceName );
             monitor.Debug( $"Sending {(command.ImmediateSending ? "immediate" : "")} command '{command}'." );
-            return command.ImmediateSending
+            bool sent = command.ImmediateSending
                             ? SendRoutedCommandImmediate( command, token, checkControllerKey )
                             : SendRoutedCommand( command, token, checkControllerKey );
+            if( !sent )
+            {
+                monitor.Trace( $"Setting UnavailableDeviceException on {command} (while sending)." );
+                command.InternalCompletion.TrySetException( new UnavailableDeviceException( this, command ) );
+            }
+            return sent;
         }
 
         /// <inheritdoc />
