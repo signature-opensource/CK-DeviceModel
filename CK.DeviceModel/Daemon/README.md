@@ -27,10 +27,9 @@ can override the following method to handle the restart of its devices if needed
 
 ```csharp
 /// <summary>
-/// Extension point that enables this host to handle its own <see cref="DeviceConfigurationStatus.AlwaysRunning"/> retry policy.
+/// Extension point that enables this host to handle its own DeviceConfigurationStatus.AlwaysRunning retry policy.
 /// <para>
-/// This default implementation is a simple relay to the <paramref name="global"/> <see cref="IDeviceAlwaysRunningPolicy.RetryStartAsync"/>
-/// method.
+/// This default implementation is a simple relay to the global RetryStartAsync method.
 /// </para>
 /// </summary>
 /// <param name="monitor">The monitor to use.</param>
@@ -41,7 +40,10 @@ can override the following method to handle the restart of its devices if needed
 /// For the very first attempt, this is 0. 
 /// </param>
 /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
-protected virtual Task<int> TryAlwaysRunningRestart( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, IDevice device, int retryCount )
+protected virtual Task<int> TryAlwaysRunningRestart( IActivityMonitor monitor,
+                                                     IDeviceAlwaysRunningPolicy global,
+                                                     IDevice device,
+                                                     int retryCount )
 {
     return global.RetryStartAsync( monitor, this, device, retryCount );
 }
