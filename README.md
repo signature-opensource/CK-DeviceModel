@@ -1,7 +1,7 @@
 # CK-DeviceModel
 
 [Devices](CK.DeviceModel/Device) are like micro hosted services with a name.
-They can be running or not (Started/Stopped) and configured dynamically.
+They can be running or not (Started/Stopped) and (re)configured dynamically.
 
 Device implementation heavily relies on [Commands](CK.DeviceModel/Command). Their execution is isolated in an asynchronous loop.
 
