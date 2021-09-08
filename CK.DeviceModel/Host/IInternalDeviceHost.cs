@@ -36,7 +36,7 @@ namespace CK.DeviceModel
 
         void OnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor );
 
-        Task RaiseDevicesChangedEvent( IActivityMonitor monitor );
+        Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor );
 
         void SetDaemon( DeviceHostDaemon daemon );
 

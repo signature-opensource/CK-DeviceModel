@@ -691,7 +691,7 @@ namespace CK.DeviceModel
             _destroyed.Cancel();
             if( h.OnDeviceDestroyed( _commandMonitor, this ) )
             {
-                await h.RaiseDevicesChangedEvent( _commandMonitor ).ConfigureAwait( false );
+                await h.RaiseDevicesChangedEventAsync( _commandMonitor ).ConfigureAwait( false );
             }
             await SetDeviceStatusAsync( new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed, h.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
             cmd?.Completion.SetResult();
@@ -706,7 +706,7 @@ namespace CK.DeviceModel
         /// Specializations that expose events should call the <c>RemoveAll()</c> methods on all the exposed events.
         /// <para>
         /// Note that it is not possible to cancel/reject the destruction of the device: as long as it has no more configuration,
-        /// or if <see cref="DestroyAsync(IActivityMonitor)"/> is called, a device is necessarily stopped and destroyed.
+        /// or if <see cref="DestroyAsync"/> is called, a device is necessarily stopped and destroyed.
         /// </para>
         /// <para>
         /// Any exception raised by this method will be logged as a warning.

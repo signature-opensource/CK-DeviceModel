@@ -61,7 +61,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets or sets whether this is a partial configuration: <see cref="Items"/> will be applied 
-        /// but existing devices without configurations are let as-is.
+        /// but existing devices without configurations are left as-is.
         /// Defaults to true.
         /// <para>
         /// When set to false, this configuration destroys all devices for which no configuration exists in the <see cref="Items"/>.

@@ -32,6 +32,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a new <see cref="DeviceConfigurator"/>.
         /// </summary>
+        /// <param name="daemon">The daemon.</param>
         /// <param name="configuration">The global configuration.</param>
         /// <param name="deviceHosts">The available hosts.</param>
         public DeviceConfigurator( DeviceHostDaemon daemon, IConfiguration configuration, IEnumerable<IDeviceHost> deviceHosts )

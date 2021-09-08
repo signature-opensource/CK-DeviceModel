@@ -148,6 +148,7 @@ namespace CK.DeviceModel
                 var devices = new Dictionary<string, T>( _devices );
                 devices.Remove( device.Name );
                 _devices = devices;
+                // Returning true will call RaiseDevicesChangedEventAsync.
                 return true;
             }
         }
@@ -155,7 +156,7 @@ namespace CK.DeviceModel
         Task IInternalDeviceHost.OnDeviceDestroyedAsync( IActivityMonitor monitor, IDevice device ) => OnDeviceDestroyedAsync( monitor, (T)device );
 
         /// <summary>
-        /// Called when a device has been removed (its configuration disappeared or <see cref="IDevice.DestroyAsync(IActivityMonitor)"/> has been called).
+        /// Called when a device has been removed (its configuration disappeared or <see cref="IDevice.DestroyAsync(IActivityMonitor, bool)"/> has been called).
         /// There is no way to prevent the device to be destroyed when its configuration disappeared and this is by design.
         /// This method does nothing at this level.
         /// </summary>
@@ -298,6 +299,7 @@ namespace CK.DeviceModel
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
+            Debug.Assert( _daemon != null );
 
             var safeConfig = configuration.DeepClone();
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );
@@ -428,17 +430,17 @@ namespace CK.DeviceModel
                     _applyConfigAsynclock.Leave( monitor );
                     if( _reconfiguringDevicesChanged )
                     {
-                        await RaiseDevicesChangedEvent( monitor ).ConfigureAwait( false );
+                        await RaiseDevicesChangedEventAsync( monitor ).ConfigureAwait( false );
                     }
                 }
             }
         }
 
-        Task RaiseDevicesChangedEvent( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
-                                                                        ? Task.CompletedTask
-                                                                        : _devicesChanged.SafeRaiseAsync( monitor, this );
+        Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
+                                                                            ? Task.CompletedTask
+                                                                            : _devicesChanged.SafeRaiseAsync( monitor, this );
 
-        Task IInternalDeviceHost.RaiseDevicesChangedEvent( IActivityMonitor monitor ) => RaiseDevicesChangedEvent( monitor );
+        Task IInternalDeviceHost.RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => RaiseDevicesChangedEventAsync( monitor );
 
         /// <inheritdoc />
         public async Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed )
@@ -559,7 +561,7 @@ namespace CK.DeviceModel
         /// Creates a <typeparamref name="T"/> device based on a <typeparamref name="TConfiguration"/> instance.
         /// This default implementation uses the protected virtual <see cref="FindDeviceTypeByConvention(IActivityMonitor, Type)"/> to
         /// locate the device type (based on <typeparamref name="TConfiguration"/> first and then the actual <paramref name="config"/>'s type)
-        /// and then (if found) instantiates it by calling the other helper <see cref="InstantiateDevice(Type, IActivityMonitor, TConfiguration)"/>.
+        /// and then (if found) instantiates it by calling the other helper <see cref="InstantiateDevice"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="config">The actual configuration (safe clone).</param>

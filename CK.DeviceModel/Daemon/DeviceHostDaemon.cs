@@ -17,7 +17,7 @@ namespace CK.DeviceModel
     /// This is the "restarter daemon" that allows devices with <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration
     /// to be monitored and automatically restarted when stopped. See <see cref="IDeviceAlwaysRunningPolicy"/>.
     /// <para>
-    /// This daemon can also destroy device when stopped (see <see cref="ClearAllHostsOnStopped"/>).
+    /// This daemon can also destroy device when stopped (see <see cref="StoppedBehavior"/>).
     /// </para>
     /// </summary>
     public sealed class DeviceHostDaemon : ISingletonAutoService, IHostedService
@@ -37,12 +37,17 @@ namespace CK.DeviceModel
         /// <param name="alwaysRunningPolicy">The policy that handles AlwaysRunning devices that stop.</param>
         public DeviceHostDaemon( IEnumerable<IDeviceHost> deviceHosts, IDeviceAlwaysRunningPolicy alwaysRunningPolicy )
         {
+            _alwaysRunningPolicy = alwaysRunningPolicy ?? throw new ArgumentNullException( nameof( alwaysRunningPolicy ) );
             _stoppedTokenSource = new CancellationTokenSource();
             // See here https://stackoverflow.com/questions/28321457/taskcontinuationoptions-runcontinuationsasynchronously-and-stack-dives
             // why RunContinuationsAsynchronously is crucial.
             _signal = new TaskCompletionSource<bool>( TaskCreationOptions.RunContinuationsAsynchronously );
            _deviceHosts = deviceHosts.Cast<IInternalDeviceHost>().ToArray();
-            _alwaysRunningPolicy = alwaysRunningPolicy ?? throw new ArgumentNullException( nameof( alwaysRunningPolicy ) );
+            // Don't wait for the Start: associate the daemon right now to each and every hosts.
+            foreach( var h in _deviceHosts )
+            {
+                h.SetDaemon( this );
+            }
         }
 
         /// <summary>
@@ -79,10 +84,6 @@ namespace CK.DeviceModel
         async Task TheLoop()
         {
             Debug.Assert( _daemonMonitor != null );
-            foreach( var h in _deviceHosts )
-            {
-                h.SetDaemon( this );
-            }
             _daemonMonitor.Debug( "Daemon loop started." );
             while( !_stoppedTokenSource.IsCancellationRequested )
             {

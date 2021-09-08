@@ -100,17 +100,11 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Attempts to stop this device if it is running.
-        /// The only reason a device cannot be stopped (and this method to return false) is because <see cref="ConfigurationStatus"/>
+        /// The only reason a device cannot be stopped (and this method to return false) is because its <see cref="DeviceConfiguration.Status"/>
         /// is <see cref="DeviceConfigurationStatus.AlwaysRunning"/> and <paramref name="ignoreAlwaysRunning"/> is false.
         /// </summary>
-        /// <remarks>
-        /// When the device is forced to stop (<paramref name="ignoreAlwaysRunning"/> is true), note that the <see cref="ConfigurationStatus"/> is left
-        /// unchanged: the state of the system is what it should be: a device that has been configured to be always running is actually stopped.
-        /// It is up to the <see cref="DeviceHostDaemon"/> to apply the <see cref="IDeviceAlwaysRunningPolicy"/> so that the device can be
-        /// started again.
-        /// </remarks>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="ignoreAlwaysRunning">True to stop even if <see cref="ConfigurationStatus"/> states that this device must always run.</param>
+        /// <param name="ignoreAlwaysRunning">True to stop even if <see cref="DeviceConfiguration.Status"/> states that this device must always run.</param>
         /// <returns>Always true except if <paramref name="ignoreAlwaysRunning"/> is false and the configuration is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.</returns>
         Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false );
 
@@ -120,6 +114,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>
+        /// <param name="token">Optional cancellation token.</param>
         /// <returns>the result of the device configuration.</returns>
         Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, DeviceConfiguration configuration, CancellationToken token = default );
 
