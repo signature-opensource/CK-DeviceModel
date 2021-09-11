@@ -106,7 +106,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Checks whether this configuration is valid.
-        /// This checks that the <see cref="Name"/> is not empty and calls the protected <see cref="DoCheckValid(IActivityMonitor)"/>
+        /// This checks that the <see cref="Name"/> is not empty and always calls the protected <see cref="DoCheckValid(IActivityMonitor)"/>
         /// that can handle specialized checks.
         /// </summary>
         /// <param name="monitor">The monitor to log errors or warnings or information.</param>
@@ -114,22 +114,27 @@ namespace CK.DeviceModel
         public bool CheckValid( IActivityMonitor monitor )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            bool success = true;
             if( String.IsNullOrWhiteSpace( Name ) )
             {
                 monitor.Error( "Configuration name must be a non empty string." );
-                return false;
+                success = false;
             }
             if( BaseImmediateCommandLimit <= 0 || BaseImmediateCommandLimit > 1000 )
             {
                 monitor.Error( "BaseImmediateCommandLimit must be between 1 and 1000." );
-                return false;
+                success = false;
             }
-            return DoCheckValid( monitor );
+            return DoCheckValid( monitor ) && success;
         }
 
         /// <summary>
-        /// Optional extension point to check for validity.
+        /// Optional extension point to check for validity that is aways called by CheckValid (even if
+        /// <see cref="Name"/> or <see cref="BaseImmediateCommandLimit"/> are invalid) so that the whole
+        /// configuration can be checked.
+        /// <para>
         /// Always returns true by default.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to log error, warnings or other.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
