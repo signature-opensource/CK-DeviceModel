@@ -42,7 +42,7 @@ namespace CK.DeviceModel
         Destroyed,
 
         /// <summary>
-        /// The device has stopped because of a call to <see cref="IDevice.DestroyAsync(Core.IActivityMonitor)"/>,
+        /// The device has stopped because of a call to <see cref="IDevice.DestroyAsync(Core.IActivityMonitor, bool)"/>,
         /// while it is handling a command.
         /// </summary>
         SelfDestroyed,

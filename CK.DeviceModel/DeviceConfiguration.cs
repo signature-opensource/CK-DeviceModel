@@ -43,7 +43,7 @@ namespace CK.DeviceModel
         /// Writes this configuration to the binary writer.
         /// This method MUST be overridden and MUST start with:
         /// <list type="bullet">
-        ///     <item>A call to <c>base.Write( w );</item>
+        ///     <item>A call to <c>base.Write( w );</c></item>
         ///     <item>Writing its version number (typically a byte).</item>
         /// </list>
         /// </summary>

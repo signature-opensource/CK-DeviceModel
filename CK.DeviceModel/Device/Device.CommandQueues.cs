@@ -551,7 +551,7 @@ namespace CK.DeviceModel
         /// </para>
         /// <para>
         /// Specialized implementations can call <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> (or even
-        /// <see cref="IDevice.DestroyAsync(IActivityMonitor)"/>) directly if needed.
+        /// <see cref="IDevice.DestroyAsync(IActivityMonitor, bool)"/>) directly if needed.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>

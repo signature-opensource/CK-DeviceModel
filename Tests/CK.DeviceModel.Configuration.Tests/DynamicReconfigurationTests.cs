@@ -246,6 +246,7 @@ namespace CK.DeviceModel.Configuration.Tests
                 var c2 = CameraHost.TestInstance.Find( "C2" );
                 var l1 = LightControllerHost.Instance.Find( "L1" );
                 var l2 = LightControllerHost.Instance.Find( "L2" );
+                Debug.Assert( c1 != null && c2 != null && l1 != null && l2 != null );
 
                 c1.IsRunning.Should().BeTrue();
                 c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.RunnableStarted );

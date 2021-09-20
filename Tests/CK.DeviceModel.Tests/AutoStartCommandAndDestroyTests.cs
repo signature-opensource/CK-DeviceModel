@@ -239,7 +239,7 @@ namespace CK.DeviceModel.Tests
                     await c.Completion;
                     // This is expected.
                 }
-                catch( UnavailableDeviceException ex )
+                catch( UnavailableDeviceException  )
                 {
                     // This is expected.
                 }
