@@ -299,7 +299,6 @@ namespace CK.DeviceModel
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
-            Debug.Assert( _daemon != null );
 
             var safeConfig = configuration.DeepClone();
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );

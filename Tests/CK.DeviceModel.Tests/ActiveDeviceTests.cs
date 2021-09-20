@@ -51,7 +51,7 @@ namespace CK.DeviceModel.Tests
         [TestCase( "StoppedReset", "UseLifetimeAndDeviceEvent" )]
         public async Task collecting_lifetime_reset_and_measure_events_shows_that_Reset_command_has_a_RunAnyway_stopped_behavior( string mode, string useAllEvent )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( collecting_lifetime_reset_and_measure_events_shows_that_Reset_command_has_a_RunAnyway_stopped_behavior ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( collecting_lifetime_reset_and_measure_events_shows_that_Reset_command_has_a_RunAnyway_stopped_behavior )}-{mode}-{useAllEvent}" );
             var host = new SimpleScaleHost();
 
             var config = new SimpleScaleConfiguration()
