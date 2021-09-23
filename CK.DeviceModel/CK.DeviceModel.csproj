@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="14.2.0" />
-    <PackageReference Include="CK.StObj.Model" Version="17.0.0" />
+    <PackageReference Include="CK.StObj.Model" Version="17.0.1" />
     <PackageReference Include="Nullable" Version="1.3.0" />
     <PackageReference Include="CK.PerfectEvent" Version="14.2.0" />
     <PackageReference Include="System.Threading.Channels" Version="4.7.1" />
