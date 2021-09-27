@@ -11,7 +11,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Models the event loop API available inside an ActiveDevice.
         /// </summary>
-        protected interface IEventLoop
+        public interface IEventLoop
         {
             /// <summary>
             /// Sends a device event into <see cref="DeviceEvent"/>.

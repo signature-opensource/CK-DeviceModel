@@ -355,6 +355,7 @@ namespace CK.DeviceModel
                 _commandMonitor.Debug( "Failed to start. Canceling the AutoStarting command." );
             }
         }
+
         async Task HandleCommandAsync( BaseDeviceCommand command, CancellationToken token, bool checkKey, bool allowDefer, bool isImmediate )
         {
             if( token.IsCancellationRequested )

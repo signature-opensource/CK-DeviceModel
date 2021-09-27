@@ -8,23 +8,22 @@ namespace CK.DeviceModel
     /// <summary>
     /// Non-generic active device interface that exposes an untyped <see cref="AllEvent"/> event
     /// that merges device's life time events and active device's specific events.
+    /// <para>
+    /// This applies to <see cref="SimpleActiveDevice{TConfiguration, TEvent}"/> and <see cref="ActiveDevice{TConfiguration, TEvent}"/>.
+    /// </para>
     /// </summary>
     public interface IActiveDevice : IDevice
     {
         /// <summary>
         /// Untyped event that merges <see cref="Device{TConfiguration}.LifetimeEvent"/> and
-        /// typed <see cref="ActiveDevice{TConfiguration, TEvent}.DeviceEvent"/>.
-        /// <para>
-        /// Events are always raised on the event loop: LifeTimeEvent are marshalled to the
-        /// internal event channel so that this stream of all events (for one device of course),
-        /// is guaranteed to be serialized.
-        /// </para>
+        /// typed <see cref="IActiveDevice{TEvent}.DeviceEvent"/>.
         /// </summary>
         PerfectEvent<BaseDeviceEvent> AllEvent { get; }
 
         /// <summary>
         /// Posts an event in this device's event queue.
-        /// This should be used with care and can be used to mimic a running device.
+        /// Can be used to mimic or emulate a running device.
+        /// This should be used with care. 
         /// <para>
         /// Event's type must match the actual <see cref="ActiveDeviceEvent{TDevice}"/> type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </para>

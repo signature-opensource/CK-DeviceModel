@@ -9,15 +9,15 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Specialized <see cref="Device{TConfiguration}"/> that implements an independent event loop
-    /// with its own monitor and can raise events thanks to its <see cref="DeviceEvent"/> and <see cref="AllEvent"/>.
+    /// Specialized <see cref="Device{TConfiguration}"/> that supports <see cref="IActiveDevice{TEvent}"/> and
+    /// implements an independent event loop with its own monitor.
     /// </summary>
     /// <typeparam name="TConfiguration">The device's configuration type.</typeparam>
     /// <typeparam name="TEvent">
     /// The event type.
     /// Each active device should be associated to a specialized <see cref="ActiveDeviceEvent{TDevice}"/>
     /// </typeparam>
-    public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>, IActiveDevice, ActiveDevice<TConfiguration,TEvent>.IEventLoop
+    public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>, IActiveDevice<TEvent>, ActiveDevice<TConfiguration,TEvent>.IEventLoop
         where TConfiguration : DeviceConfiguration
         where TEvent : BaseActiveDeviceEvent
     {
@@ -44,12 +44,17 @@ namespace CK.DeviceModel
         public PerfectEvent<TEvent> DeviceEvent => _deviceEvent.PerfectEvent;
 
         /// <inheritdoc />
+        /// <remarks>
+        /// Events are always raised on the event loop: LifeTimeEvent are marshalled to the
+        /// internal event channel so that this stream of all events (for one device of course),
+        /// is guaranteed to be serialized.
+        /// </remarks>
         public PerfectEvent<BaseDeviceEvent> AllEvent => _allEvent.PerfectEvent;
 
-        private protected override Task SafeRaiseLifetimeEventAsync( DeviceLifetimeEvent e )
+        private protected override Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
         {
             DoPost( e );
-            return base.SafeRaiseLifetimeEventAsync( e );
+            return base.SafeRaiseLifetimeEventAsync( monitor, e );
         }
 
         void IActiveDevice.DebugPostEvent( BaseActiveDeviceEvent e ) => DoPost( (TEvent)e );

@@ -43,7 +43,9 @@ namespace CK.DeviceModel
         /// <summary>
         /// This can be overridden only by ActiveDevice (this is not available to regular devices).
         /// </summary>
-        private protected virtual Task SafeRaiseLifetimeEventAsync( DeviceLifetimeEvent e ) => _lifetimeChanged.SafeRaiseAsync( _commandMonitor, e );
+        /// <param name="monitor">The command loop monitor.</param>
+        /// <param name="e">The lifetime event to raise.</param>
+        private protected virtual Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e ) => _lifetimeChanged.SafeRaiseAsync( monitor, e );
 
         /// <summary>
         /// Factory information (opaque token).
@@ -208,7 +210,7 @@ namespace CK.DeviceModel
             if( _status != status )
             {
                 _status = status;
-                return SafeRaiseLifetimeEventAsync( new DeviceStatusChangedEvent( this, status ) );
+                return SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceStatusChangedEvent( this, status ) );
             }
             return Task.CompletedTask;
         }
@@ -401,11 +403,11 @@ namespace CK.DeviceModel
             }
             if( controllerKeyChanged )
             {
-                await SafeRaiseLifetimeEventAsync( new DeviceControllerKeyChangedEvent( this, _controllerKey ) );
+                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, _controllerKey ) );
             }
             if( configActuallyChanged )
             {
-                await SafeRaiseLifetimeEventAsync( new DeviceConfigurationChangedEvent( this, _externalConfiguration ) );
+                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceConfigurationChangedEvent( this, _externalConfiguration ) );
             }
             cmd.Completion.SetResult( applyResult );
         }
@@ -457,7 +459,7 @@ namespace CK.DeviceModel
                 }
                 _commandMonitor.Trace( $"Device {FullName}: controller key changed from '{_controllerKey}' to '{key}'." );
                 _controllerKey = key;
-                await SafeRaiseLifetimeEventAsync( new DeviceControllerKeyChangedEvent( this, key ) ).ConfigureAwait( false );
+                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, key ) ).ConfigureAwait( false );
             }
             cmd.Completion.SetResult( true );
         }
