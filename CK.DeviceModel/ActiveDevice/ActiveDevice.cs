@@ -77,15 +77,15 @@ namespace CK.DeviceModel
         void DoPost( Func<IActivityMonitor, Task> o ) => _events.Writer.TryWrite( o );
 
         void IEventLoop.RaiseEvent( TEvent e ) => DoPost( e );
-        void IEventLoop.Execute( Action<IActivityMonitor> action ) => DoPost( action );
-        void IEventLoop.Execute( Func<IActivityMonitor,Task> action ) => DoPost( action );
-        void IEventLoop.LogError( string msg ) => DoPost( m => m.Error( msg ) );
-        void IEventLoop.LogError( string msg, Exception ex ) => DoPost( m => m.Error( msg, ex ) );
-        void IEventLoop.LogWarn( string msg ) => DoPost( m => m.Warn( msg ) );
-        void IEventLoop.LogWarn( string msg, Exception ex ) => DoPost( m => m.Warn( msg, ex ) );
-        void IEventLoop.LogInfo( string msg ) => DoPost( m => m.Info( msg ) );
-        void IEventLoop.LogTrace( string msg ) => DoPost( m => m.Trace( msg ) );
-        void IEventLoop.LogDebug( string msg ) => DoPost( m => m.Debug( msg ) );
+        void IMonitoredWorker.Execute( Action<IActivityMonitor> action ) => DoPost( action );
+        void IMonitoredWorker.Execute( Func<IActivityMonitor,Task> action ) => DoPost( action );
+        void IMonitoredWorker.LogError( string msg ) => DoPost( m => m.Error( msg ) );
+        void IMonitoredWorker.LogError( string msg, Exception ex ) => DoPost( m => m.Error( msg, ex ) );
+        void IMonitoredWorker.LogWarn( string msg ) => DoPost( m => m.Warn( msg ) );
+        void IMonitoredWorker.LogWarn( string msg, Exception ex ) => DoPost( m => m.Warn( msg, ex ) );
+        void IMonitoredWorker.LogInfo( string msg ) => DoPost( m => m.Info( msg ) );
+        void IMonitoredWorker.LogTrace( string msg ) => DoPost( m => m.Trace( msg ) );
+        void IMonitoredWorker.LogDebug( string msg ) => DoPost( m => m.Debug( msg ) );
 
         async Task RunEventLoop()
         {

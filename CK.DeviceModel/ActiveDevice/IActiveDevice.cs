@@ -30,6 +30,5 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="e">The event to inject.</param>
         void DebugPostEvent( BaseActiveDeviceEvent e );
-
     }
 }
