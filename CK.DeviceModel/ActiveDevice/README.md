@@ -58,8 +58,8 @@ to safely communicate with the external world:
         /// <summary>
         /// Sends a device event into <see cref="DeviceEvent"/>.
         /// </summary>
-        /// <param name="e">The event to send.</param>
-        void RaiseEvent( TEvent e );
+        /// <returns>The event.</returns>
+        TEvent RaiseEvent( TEvent e );
     }
 ```
 

@@ -76,7 +76,12 @@ namespace CK.DeviceModel
         void DoPost( Action<IActivityMonitor> o ) => _events.Writer.TryWrite( o );
         void DoPost( Func<IActivityMonitor, Task> o ) => _events.Writer.TryWrite( o );
 
-        void IEventLoop.RaiseEvent( TEvent e ) => DoPost( e );
+        TEvent IEventLoop.RaiseEvent( TEvent e )
+        {
+            DoPost( e );
+            return e;
+        }
+
         void IMonitoredWorker.Execute( Action<IActivityMonitor> action ) => DoPost( action );
         void IMonitoredWorker.Execute( Func<IActivityMonitor,Task> action ) => DoPost( action );
         void IMonitoredWorker.LogError( string msg ) => DoPost( m => m.Error( msg ) );
