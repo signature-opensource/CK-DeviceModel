@@ -46,7 +46,7 @@ can be done with the `AllEvent`.
 
 ## The ActiveDevice.IEventLoop interface
 
-The specialized device's code use the `protected IDeviceLoop EventLoop { get; }` property
+Specialized device's code use the `protected IDeviceLoop EventLoop { get; }` property
 to safely communicate with the external world: 
 
 ```csharp
@@ -142,4 +142,13 @@ Thanks to the `void Execute( Action<IActivityMonitor> action )` and `void Execut
 methods, any actions (synchronous as well as asynchronous) can be posted to be executed in the context of the event loop:
 any visible side-effect of a running device should go through this loop.
 
+*Note:* The `EventLoop` property is protected. Often, it must be exposed to its whole assembly:
 
+```csharp
+  public sealed class SignatureDevice : ActiveDevice<SignatureDeviceConfiguration,SignatureDeviceEvent>
+  {
+    ... 
+    internal new IEventLoop EventLoop => base.EventLoop;
+    ...
+  }  
+```

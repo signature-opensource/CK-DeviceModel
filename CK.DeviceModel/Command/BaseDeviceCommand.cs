@@ -51,7 +51,7 @@ namespace CK.DeviceModel
         /// <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, BaseDeviceCommand)"/> protected method.
         /// </para>
         /// <para>
-        /// Whenever the command is sent to be "immediately" handled, 
+        /// When <see cref="ImmediateSending"/> is true, <see cref="ImmediateStoppedBehavior"/> applies and this property is ignored.
         /// </para>
         /// </summary>
         protected internal virtual DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel;
@@ -64,7 +64,7 @@ namespace CK.DeviceModel
         /// <see cref="Device{TConfiguration}.OnStoppedDeviceImmediateCommand(IActivityMonitor, BaseDeviceCommand)"/> protected method.
         /// </para>
         /// <para>
-        /// Whenever the command is sent to be "immediately" handled, 
+        /// This applies when <see cref="ImmediateSending"/> is true. See <see cref="StoppedBehavior"/> otherwise.
         /// </para>
         /// </summary>
         protected internal virtual DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.Cancel;
