@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Testing;
-using CK.Text;
 using FluentAssertions;
 using Microsoft.Extensions.Hosting;
 using NUnit.Framework;

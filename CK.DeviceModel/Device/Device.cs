@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
 using CK.PerfectEvent;
-using CK.Text;
 using System.Threading.Channels;
 namespace CK.DeviceModel
 {

@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -182,11 +181,7 @@ namespace CK.DeviceModel
         {
             Debug.Assert( System.Threading.Monitor.IsEntered( _alwayRunningStopped ) );
             _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
-            if( monitor.ShouldLogLine( LogLevel.Debug ) )
-            {
-                monitor.UnfilteredLog( null, LogLevel.Debug|LogLevel.IsFiltered, $"Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall.ToString( "HH:mm.ss.ff" )})" ).Concatenate( ", (" )}).", monitor.NextLogTime(), null );
-                monitor.UnfilteredLog( null, LogLevel.Debug|LogLevel.IsFiltered, signalHost ? "Host signaled!" : "(no signal.)", monitor.NextLogTime(), null );
-            }
+            monitor.Debug( $"{(signalHost ? "Host signaled!" : "(no signal.)")}. Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall.ToString( "HH:mm.ss.ff" )})" ).Concatenate( ", (" )})." );
             if( signalHost ) _daemon?.Signal();
         }
     }

@@ -289,13 +289,13 @@ namespace CK.DeviceModel.Tests
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );
 
-            d.Awaiting( _ => _.DestroyAsync( TestHelper.Monitor ) ).Should().NotThrow();
+            await d.Awaiting( _ => _.DestroyAsync( TestHelper.Monitor ) ).Should().NotThrowAsync();
         }
 
         [Test]
-        public async Task executing_commands_from_the_host_without_ControllerKey()
+        public async Task executing_commands_from_the_host_without_ControllerKey_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( executing_commands_from_the_host_without_ControllerKey ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( executing_commands_from_the_host_without_ControllerKey_Async ) );
 
             Camera.TotalCount.Should().Be( 0 );
             Camera.TotalRunning.Should().Be( 0 );
@@ -340,7 +340,7 @@ namespace CK.DeviceModel.Tests
             await d.SetControllerKeyAsync( TestHelper.Monitor, null, "The controlling key." );
             cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Controller key will fail!", Color = 3712 };
             host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
-            FluentActions.Awaiting( () => cmdS.Completion.Task ).Should().Throw<InvalidControllerKeyException>();
+            await FluentActions.Awaiting( () => cmdS.Completion.Task ).Should().ThrowAsync<InvalidControllerKeyException>();
 
             cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "The controlling key.", Color = 3712 };
             host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
@@ -422,7 +422,7 @@ namespace CK.DeviceModel.Tests
 
             cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1" };
             SendCommand( cmdRaiseFlash ).Should().BeTrue();
-            FluentActions.Awaiting( () => cmdRaiseFlash.Completion.Task ).Should().Throw<InvalidControllerKeyException>();
+            await FluentActions.Awaiting( () => cmdRaiseFlash.Completion.Task ).Should().ThrowAsync<InvalidControllerKeyException>();
 
             flashLastColor.Should().Be( 6 );
 

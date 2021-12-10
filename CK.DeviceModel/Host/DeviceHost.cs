@@ -1,12 +1,9 @@
 using CK.Core;
 using CK.PerfectEvent;
-using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;

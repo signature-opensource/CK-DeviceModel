@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Primitives;
