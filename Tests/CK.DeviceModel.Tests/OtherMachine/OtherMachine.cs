@@ -11,15 +11,10 @@ namespace CK.DeviceModel.Tests
         public static int TotalCount;
         public static int TotalRunning;
 
-        // A device can keep a reference to the current configuration:
-        // this configuration is an independent clone that is accessible only to the Device.
-        readonly OtherMachineConfiguration _configRef;
-
         public OtherMachine( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
         {
             Interlocked.Increment( ref TotalCount );
-            _configRef = info.Configuration;
         }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, OtherMachineConfiguration config )

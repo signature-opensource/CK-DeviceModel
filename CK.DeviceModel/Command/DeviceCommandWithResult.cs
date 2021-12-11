@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Diagnostics;
 
 namespace CK.DeviceModel
 {
@@ -12,7 +13,9 @@ namespace CK.DeviceModel
     {
         readonly string _commandToString;
 
-        private protected DeviceCommandWithResult()
+        /// <inheritdoc />
+        private protected DeviceCommandWithResult( (string lockedName, string? lockedControllerKey)? locked = null )
+            : base( locked )
         {
             Completion = new CompletionSource<TResult>( this );
             _commandToString = GetType().Name + '<' + typeof( TResult ).Name + '>';

@@ -9,7 +9,11 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Default implementation of a host device configuration.
-    /// This class can be specialized if needed.
+    /// This class can be specialized if needed (recall to implement its binary serialization/deserialization).
+    /// <para>
+    /// Just like DeviceCofiguration, concrete DeviceHostConfiguration classes should be sealed since simple
+    /// binary de/serialization and auto configuration don't support polymorphism.
+    /// </para>
     /// </summary>
     /// <typeparam name="TConfiguration"></typeparam>
     public class DeviceHostConfiguration<TConfiguration> : IDeviceHostConfiguration where TConfiguration : DeviceConfiguration
@@ -25,19 +29,39 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Copy constructor implements the required Clone method:
-        /// specialized configurations must implement their copy constructor.
+        /// Deserialization constructor.
+        /// In a specialized host, it must be implemented just like <see cref="DeviceConfiguration(ICKBinaryReader)"/>.
         /// </summary>
-        /// <param name="source">The source configuration to copy.</param>
-        public DeviceHostConfiguration( DeviceHostConfiguration<TConfiguration> source )
+        /// <param name="r">The reader.</param>
+        public DeviceHostConfiguration( ICKBinaryReader r )
         {
-            IsPartialConfiguration = source.IsPartialConfiguration;
-            Items = source.Items.Select( c => c.Clone() ).ToList();
+            r.ReadByte(); // version.
+            IsPartialConfiguration = r.ReadBoolean();
+            int c = r.ReadNonNegativeSmallInt32();
+            Items = new List<TConfiguration>( c );
+            var callParam = new object[] { r };
+            while( --c >= 0 )
+            {
+                Items.Add( (TConfiguration)Activator.CreateInstance( typeof( TConfiguration ), callParam ) );
+            }
+        }
+
+        /// <summary>
+        /// Writes this host configuration.
+        /// In a specialized host, it must be implemented just like <see cref="DeviceConfiguration.Write(ICKBinaryWriter)"/>.
+        /// </summary>
+        /// <param name="w"></param>
+        public virtual void Write( ICKBinaryWriter w )
+        {
+            w.Write( (byte)0 );
+            w.Write( IsPartialConfiguration );
+            w.WriteNonNegativeSmallInt32( Items.Count );
+            foreach( var c in Items ) c.Write( w );
         }
 
         /// <summary>
         /// Gets or sets whether this is a partial configuration: <see cref="Items"/> will be applied 
-        /// but existing devices without configurations are let as-is.
+        /// but existing devices without configurations are left as-is.
         /// Defaults to true.
         /// <para>
         /// When set to false, this configuration destroys all devices for which no configuration exists in the <see cref="Items"/>.
@@ -88,7 +112,7 @@ namespace CK.DeviceModel
                 monitor.Error( $"Empty configuration is not allowed." );
                 success = false;
             }
-            return success ? DoCheckValidity( monitor ) : false;
+            return success && DoCheckValidity( monitor );
         }
 
         /// <summary>

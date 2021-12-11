@@ -47,17 +47,42 @@ namespace CK.DeviceModel
         public DeviceStatus Status { get; }
 
         /// <summary>
-        /// Raised whenever a reconfiguration, a start or a stop happens: either the <see cref="IDevice.ConfigurationStatus"/>
-        /// or <see cref="IDevice.Status"/> has changed.
+        /// Raised whenever a change occurred:
+        /// <list type="table">
+        /// <item>
+        ///     <term>ControllerKey</term>
+        ///     <description>
+        ///     A <see cref="DeviceControllerKeyChangedEvent"/> is raised, either because of a reconfiguration or because of a call
+        ///     to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or a <see cref="SetControllerKeyDeviceCommand{THost}"/>
+        ///     command has been handled.
+        ///     </description>
+        /// </item>
+        /// <item>
+        ///     <term>Status</term>
+        ///     <description>
+        ///     A <see cref="DeviceStatusChangedEvent"/> is raised, whenever a reconfiguration, a start or a stop happens.
+        ///     </description>
+        /// </item>
+        /// <item>
+        ///     <term>Configuration</term>
+        ///     <description>
+        ///     A <see cref="DeviceConfigurationChangedEvent{TConfiguration}"/> is raised after a successful reconfiguration.
+        ///     </description>
+        /// </item>
+        /// </list>
         /// </summary>
-        PerfectEvent<IDevice> StatusChanged { get; }
+        PerfectEvent<DeviceLifetimeEvent> LifetimeEvent { get; }
 
         /// <summary>
-        /// Gets the current configuration status of this device.
-        /// Just like <see cref="IsRunning"/>, since a device lives in multi-threaded/concurrent contexts,
-        /// any sensible decision based on this "instant" status should be avoided.
+        /// Gets a clone of the actual current configuration.
+        /// This is NOT the actual configuration object reference that the device has received and
+        /// is using: configuration objects are cloned in order to isolate the running device of any change
+        /// in this publicly exposed configuration.
+        /// <para>
+        /// Even if changing this object is harmless, it should obviously not be changed.
+        /// </para>
         /// </summary>
-        DeviceConfigurationStatus ConfigurationStatus { get; }
+        DeviceConfiguration ExternalConfiguration { get; }
 
         /// <summary>
         /// Gets or sets an offset to the <see cref="DeviceConfiguration.BaseImmediateCommandLimit"/>.
@@ -75,26 +100,32 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Attempts to stop this device if it is running.
-        /// The only reason a device cannot be stopped (and this method to return false) is because <see cref="ConfigurationStatus"/>
+        /// The only reason a device cannot be stopped (and this method to return false) is because its <see cref="DeviceConfiguration.Status"/>
         /// is <see cref="DeviceConfigurationStatus.AlwaysRunning"/> and <paramref name="ignoreAlwaysRunning"/> is false.
         /// </summary>
-        /// <remarks>
-        /// When the device is forced to stop (<paramref name="ignoreAlwaysRunning"/> is true), note that the <see cref="ConfigurationStatus"/> is left
-        /// unchanged: the state of the system is what it should be: a device that has been configured to be always running is actually stopped.
-        /// It is up to the <see cref="DeviceHostDaemon"/> to apply the <see cref="IDeviceAlwaysRunningPolicy"/> so that the device can be
-        /// started again.
-        /// </remarks>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="ignoreAlwaysRunning">True to stop even if <see cref="ConfigurationStatus"/> states that this device must always run.</param>
+        /// <param name="ignoreAlwaysRunning">True to stop even if <see cref="DeviceConfiguration.Status"/> states that this device must always run.</param>
         /// <returns>Always true except if <paramref name="ignoreAlwaysRunning"/> is false and the configuration is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>.</returns>
         Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false );
 
         /// <summary>
-        /// Destroys this device.
+        /// Reconfigures the device.
+        /// Configuration's type must match the actual configuration type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
+        /// <param name="configuration">The configuration to apply.</param>
+        /// <param name="token">Optional cancellation token.</param>
+        /// <returns>the result of the device configuration.</returns>
+        Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, DeviceConfiguration configuration, CancellationToken token = default );
+
+        /// <summary>
+        /// Destroys this device by sending an immediate <see cref="BaseDestroyDeviceCommand"/> and either returns <see cref="Task.CompletedTask"/>
+        /// or the command completion's task depending on <paramref name="waitForDeviceDestroyed"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="waitForDeviceDestroyed">False to send the command and not wait for its completion.</param>
         /// <returns>The awaitable.</returns>
-        Task DestroyAsync( IActivityMonitor monitor );
+        Task DestroyAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed = true );
 
         /// <summary>
         /// Cancels all the commands that are waiting to be handled, either because they have been queued
@@ -137,13 +168,7 @@ namespace CK.DeviceModel
         Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key );
 
         /// <summary>
-        /// Raised whenever the <see cref="ControllerKey"/> changed, either because of a reconfiguration or
-        /// because of a call to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or <see cref="SetControllerKeyAsync(IActivityMonitor, string?, string?)"/>.
-        /// </summary>
-        PerfectEvent<IDevice, string?> ControllerKeyChanged { get; }
-
-        /// <summary>
-        /// Sends a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>.
+        /// Tries to send a command directly to this device instead of having it routed by <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>.
         /// By default, an <see cref="ArgumentException"/> is raised if:
         /// <list type="bullet">
         ///     <item><see cref="BaseDeviceCommand.HostType"/> is not compatible with this device's host type;</item>
@@ -151,6 +176,10 @@ namespace CK.DeviceModel
         ///     <item>or the <see cref="BaseDeviceCommand.DeviceName"/> doesn't match this device's name;</item>
         /// </list>
         /// The last check can be suppressed thanks to the <paramref name="checkDeviceName"/>.
+        /// <para>
+        /// Note that when this method returns false, the command completion has been called with an <see cref="UnavailableDeviceException"/> (and recall that
+        /// depending on the command that may be transformed into a canceled or successful command task's result).
+        /// </para>
         /// <para>
         /// The <see cref="ControllerKey"/> check is done at the time when the command is executed: if the check fails, an <see cref="InvalidControllerKeyException"/>
         /// will be set on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>. The <paramref name="checkControllerKey"/> parameter

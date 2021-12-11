@@ -2,6 +2,7 @@
   <SimpleGitVersion StartingVersion="2.0.0-alpha">
     <Branches>
       <Branch Name="develop" CIVersionMode="LastReleaseBased" VersionName="develop" />
+      <Branch Name="vNext" CIVersionMode="ZeroTimed" VersionName="vnext" />
     </Branches>
   </SimpleGitVersion>
 </RepositoryInfo>

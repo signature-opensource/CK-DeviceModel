@@ -28,8 +28,9 @@ namespace CK.DeviceModel
         /// <summary>
         /// This is the whole state of this Host. It is updated atomically (by setting a
         /// new dictionary instance). All Find methods (and RouteCommand) can use it lock-free.
+        /// It is exposed by GetDevices() methods.
         /// </summary>
-        Dictionary<string, ConfiguredDevice<T, TConfiguration>> _devices;
+        Dictionary<string, T> _devices;
 
         readonly PerfectEventSender<IDeviceHost> _devicesChanged;
 
@@ -55,17 +56,17 @@ namespace CK.DeviceModel
         /// lists) are called, just as if they were called from any other threads.
         /// </para>
         /// <para>
-        /// These device's methods call the synchronous OnDeviceReconfigured or OnDeviceDestroyed. They enter
-        /// the _reconfigureSyncLock and update the _reconfiguringDevices if it's not null or
-        /// create a new dictionary (copying the _devices), update it and set it as the new _devices.
+        /// The device's DestroyAsync method calls the synchronous OnDeviceDestroyed.
+        /// OnDeviceDestroyed enters the _reconfigureSyncLock and updates the _reconfiguringDevices
+        /// if it's not null or creates a new dictionary (copying the _devices), update it and set it as the new _devices.
         /// </para>
         /// <para>
-        /// Once ApplyConfigurationAsync is done calling its ReconfigureAsync or DestroyAsync methods,
-        /// it enters the _reconfigureSyncLock for the last time to set the _devices be the _reconfiguringDevices
+        /// Once ApplyConfigurationAsync is done calling its DestroyAsync methods,
+        /// it enters the _reconfigureSyncLock for the last time to set the _devices to the _reconfiguringDevices
         /// and to reset the _reconfiguringDevices to null. It finally returns the array of DeviceConfigurationResult.
         /// </para>
         /// </summary>
-        Dictionary<string, ConfiguredDevice<T, TConfiguration>>? _reconfiguringDevices;
+        Dictionary<string, T>? _reconfiguringDevices;
         bool _reconfiguringDevicesChanged;
         readonly object _reconfigureSyncLock;
 
@@ -90,10 +91,9 @@ namespace CK.DeviceModel
             _applyConfigAsynclock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
         }
 
-        // This is the only CS8618 warning that must be raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
         DeviceHost( bool privateCall )
         {
-            _devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>();
+            _devices = new Dictionary<string, T>();
             _devicesChanged = new PerfectEventSender<IDeviceHost>();
 
             var t = typeof( THostConfiguration );
@@ -105,8 +105,11 @@ namespace CK.DeviceModel
             ilGenerator.Emit( OpCodes.Ret );
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
             _reconfigureSyncLock = new object();
-            _alwayRunningStopped = new List<(IDevice Device, int Count, DateTime NextCall)>();
-            _alwayRunningStoppedSafe = Array.Empty<(IDevice, int, DateTime)>();
+            _alwayRunningStopped = new List<(IInternalDevice Device, int Count, DateTime NextCall)>();
+            _alwayRunningStoppedSafe = Array.Empty<(IInternalDevice, int, DateTime)>();
+            // Shut up the CS8618 warning is raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
+            // (But keep the warning for any other fields.)
+            _applyConfigAsynclock = null!;
         }
 
         /// <inheritdoc />
@@ -119,7 +122,7 @@ namespace CK.DeviceModel
 
         Type IDeviceHost.GetDeviceConfigurationType() => typeof( TConfiguration );
 
-        DeviceCommandWithResult<DeviceApplyConfigurationResult> IInternalDeviceHost.CreateReconfigureCommand( string name ) => new InternalReconfigureDeviceCommand<TConfiguration>( GetType(), name );
+        BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name, string? controllerKey, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration ) => new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, clonedConfiguration, ( name, controllerKey ) );
 
         BaseStartDeviceCommand IInternalDeviceHost.CreateStartCommand( string name ) => new InternalStartDeviceCommand( GetType(), name );
 
@@ -128,24 +131,6 @@ namespace CK.DeviceModel
         BaseDestroyDeviceCommand IInternalDeviceHost.CreateDestroyCommand( string name ) => new InternalDestroyDeviceCommand( GetType(), name );
 
         BaseSetControllerKeyDeviceCommand IInternalDeviceHost.CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey ) => new InternalSetControllerKeyDeviceCommand( GetType(), name, current, newControllerKey );
-
-        bool IInternalDeviceHost.OnDeviceConfigured( IActivityMonitor monitor, IDevice device, DeviceApplyConfigurationResult result, DeviceConfiguration externalConfig )
-        {
-            var configured = new ConfiguredDevice<T, TConfiguration>( (T)device, (TConfiguration)externalConfig, result );
-            lock( _reconfigureSyncLock )
-            {
-                if( _reconfiguringDevices != null )
-                {
-                    _reconfiguringDevices[device.Name] = configured;
-                    _reconfiguringDevicesChanged = true;
-                    return false;
-                }
-                var devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
-                devices[device.Name] = configured;
-                _devices = devices;
-                return true;
-            }
-        }
 
         bool IInternalDeviceHost.OnDeviceDestroyed( IActivityMonitor monitor, IDevice device )
         {
@@ -157,64 +142,52 @@ namespace CK.DeviceModel
                     _reconfiguringDevicesChanged = true;
                     return false;
                 }
-                var devices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
+                var devices = new Dictionary<string, T>( _devices );
                 devices.Remove( device.Name );
                 _devices = devices;
+                // Returning true will call RaiseDevicesChangedEventAsync.
                 return true;
             }
         }
+
+        Task IInternalDeviceHost.OnDeviceDestroyedAsync( IActivityMonitor monitor, IDevice device ) => OnDeviceDestroyedAsync( monitor, (T)device );
+
+        /// <summary>
+        /// Called when a device has been removed (its configuration disappeared or <see cref="IDevice.DestroyAsync(IActivityMonitor, bool)"/> has been called).
+        /// There is no way to prevent the device to be destroyed when its configuration disappeared and this is by design.
+        /// This method does nothing at this level.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="device">The device that has been removed.</param>
+        /// <returns>The awaitable.</returns>
+        protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device ) => Task.CompletedTask;
 
         /// <summary>
         /// Gets a device by its name.
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device or null if not found.</returns>
-        public T? this[string deviceName] => Find( deviceName );
+        public T? Find( string deviceName ) => _devices.GetValueOrDefault( deviceName );
 
         /// <summary>
-        /// Gets a device by its name (explicit the <see cref="this[string]"/> indexer).
+        /// Gets a device by its name.
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device or null if not found.</returns>
-        public T? Find( string deviceName ) => _devices.GetValueOrDefault( deviceName ).Device;
+        public T? this[ string deviceName ] => _devices.GetValueOrDefault( deviceName );
 
         IDevice? IDeviceHost.Find( string deviceName ) => Find( deviceName );
 
-        /// <summary>
-        /// Gets a device and its applied configuration by its name.
-        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
-        /// </summary>
-        /// <param name="deviceName">The device name to find.</param>
-        /// <returns>The device and its configuration or null if not found.</returns>
-        public ConfiguredDevice<T, TConfiguration>? GetConfiguredDevice( string deviceName )
-        {
-            return _devices.TryGetValue( deviceName, out var e ) ? e : null;
-        }
-
-        (IDevice?, DeviceConfiguration?) IDeviceHost.GetConfiguredDevice( string deviceName )
-        {
-            return _devices.TryGetValue( deviceName, out var e ) ? (e.Device, e.Configuration) : (null, null);
-        }
+        
+        IReadOnlyDictionary<string, IDevice> IDeviceHost.GetDevices() => _devices.AsIReadOnlyDictionary<string,T,IDevice>();
 
         /// <summary>
-        /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
-        /// Note that these objects are a copy of the ones that are used by the actual devices.
-        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
+        /// Gets a snapshot of the current devices indexed by name.
+        /// This read only dictionary can be freely used (there is no concurrency issues), <see cref="DevicesChanged"/>
+        /// event can be used to monitor changes.
         /// </summary>
-        /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
-        /// <returns>The snapshot of the configured devices.</returns>
-        public IReadOnlyList<ConfiguredDevice<T, TConfiguration>> GetConfiguredDevices( Func<T, TConfiguration, bool>? predicate = null )
-        {
-            return predicate != null
-                        ? _devices.Values.Where( e => predicate( e.Device, e.Configuration ) ).ToArray()
-                        : _devices.Values.ToArray();
-        }
-
-        IReadOnlyList<(IDevice, DeviceConfiguration)> IDeviceHost.GetConfiguredDevices( Func<IDevice, DeviceConfiguration, bool>? predicate )
-        {
-            var set = predicate != null ? _devices.Values.Where( e => predicate( e.Device, e.Configuration ) ) : _devices.Values;
-            return set.Select( e => ((IDevice)e.Device, (DeviceConfiguration)e.Configuration) ).ToArray();
-        }
+        /// <returns>A snapshot of the devices.</returns>
+        public IReadOnlyDictionary<string, T> GetDevices() => _devices;
 
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost> DevicesChanged => _devicesChanged.PerfectEvent;
@@ -305,6 +278,12 @@ namespace CK.DeviceModel
             return r.Success;
         }
 
+        BaseConfigureDeviceCommand IDeviceHost.CreateConfigureCommand( DeviceConfiguration? configuration )
+        {
+            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, null );
+        }
+
+
         /// <summary>
         /// Applies a host configuration: multiple devices can be configured at once and if <see cref="DeviceHostConfiguration{TConfiguration}.IsPartialConfiguration"/> is false,
         /// devices for which no configuration appear are stopped and destroyed.
@@ -313,12 +292,12 @@ namespace CK.DeviceModel
         /// <param name="configuration">The configuration to apply.</param>
         /// <param name="allowEmptyConfiguration">By default, an empty configuration is considered as an error.</param>
         /// <returns>The composite result of the potentially multiple configurations.</returns>
-        public async Task<ConfigurationResult> ApplyConfigurationAsync( IActivityMonitor monitor, THostConfiguration configuration, bool allowEmptyConfiguration = false )
+        public virtual async Task<ConfigurationResult> ApplyConfigurationAsync( IActivityMonitor monitor, THostConfiguration configuration, bool allowEmptyConfiguration = false )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
 
-            var safeConfig = configuration.Clone();
+            var safeConfig = configuration.DeepClone();
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );
 
             DeviceApplyConfigurationResult[] results = new DeviceApplyConfigurationResult[safeConfig.Items.Count];
@@ -330,23 +309,23 @@ namespace CK.DeviceModel
                 try
                 {
                     HashSet<string>? toDestroy = null;
-                    List<(int, IDevice)>? toStart = null;
+                    List<(int, T)>? toStart = null;
                     List<(int, T)>? toReconfigure = null;
 
                     // Capturing what we need to be able to work outside the sync lock.
                     lock( _reconfigureSyncLock )
                     {
-                        _reconfiguringDevices = new Dictionary<string, ConfiguredDevice<T, TConfiguration>>( _devices );
+                        _reconfiguringDevices = new Dictionary<string, T>( _devices );
                         _reconfiguringDevicesChanged = false;
                         if( !safeConfig.IsPartialConfiguration ) toDestroy = new HashSet<string>( _reconfiguringDevices.Keys );
                         int configIdx = 0;
                         foreach( var c in safeConfig.Items )
                         {
-                            if( !_reconfiguringDevices.TryGetValue( c.Name, out var configured ) )
+                            if( !_reconfiguringDevices.TryGetValue( c.Name, out var exists ) )
                             {
                                 using( monitor.OpenTrace( $"Creating new device '{c.Name}'." ) )
                                 {
-                                    var d = SafeCreateDevice( monitor, c );
+                                    var d = SafeCreateDevice( monitor, c, safeConfig.Items[configIdx] );
                                     Debug.Assert( d == null || d.Name == c.Name );
                                     if( d == null )
                                     {
@@ -357,12 +336,12 @@ namespace CK.DeviceModel
                                     {
                                         if( c.Status == DeviceConfigurationStatus.RunnableStarted || c.Status == DeviceConfigurationStatus.AlwaysRunning )
                                         {
-                                            if( toStart == null ) toStart = new List<(int, IDevice)>();
+                                            if( toStart == null ) toStart = new List<(int, T)>();
                                             toStart.Add( (configIdx, d) );
                                         }
                                         else
                                         {
-                                            _reconfiguringDevices.Add( c.Name, new ConfiguredDevice<T, TConfiguration>( d, c, DeviceApplyConfigurationResult.CreateSucceeded ) );
+                                            _reconfiguringDevices.Add( c.Name, d );
                                             results[configIdx] = DeviceApplyConfigurationResult.CreateSucceeded;
                                             _reconfiguringDevicesChanged = true;
                                         }
@@ -373,7 +352,7 @@ namespace CK.DeviceModel
                             {
                                 if( toDestroy != null ) toDestroy.Remove( c.Name );
                                 if( toReconfigure == null ) toReconfigure = new List<(int, T)>();
-                                toReconfigure.Add( (configIdx, configured.Device) );
+                                toReconfigure.Add( (configIdx, exists) );
                             }
                             ++configIdx;
                         }
@@ -388,6 +367,9 @@ namespace CK.DeviceModel
                                 var d = Find( n );
                                 if( d != null && !d.IsDestroyed )
                                 {
+                                    // We wait for the device to be destroyed here:
+                                    // resources from a destroyed devices may require an exclusive access
+                                    // that a reconfigured or started device (handled below) need.
                                     await d.DestroyAsync( monitor ).ConfigureAwait( false );
                                 }
                                 else
@@ -403,7 +385,7 @@ namespace CK.DeviceModel
                         {
                             foreach( var (idx,d) in toReconfigure )
                             {
-                                DeviceApplyConfigurationResult r = await d.InternalReconfigureAsync( monitor, configuration.Items[idx], safeConfig.Items[idx] ).ConfigureAwait( false );
+                                DeviceApplyConfigurationResult r = await d.InternalReconfigureAsync( monitor, configuration.Items[idx], safeConfig.Items[idx], default ).ConfigureAwait( false );
                                 results[idx] = r;
                                 success &= (r == DeviceApplyConfigurationResult.UpdateSucceeded || r == DeviceApplyConfigurationResult.None);
                             }
@@ -426,7 +408,7 @@ namespace CK.DeviceModel
                                     success = false;
                                 }
                                 results[idx] = r;
-                                _reconfiguringDevices.Add( d.Name, new ConfiguredDevice<T, TConfiguration>( (T)d, configuration.Items[idx], r ) );
+                                _reconfiguringDevices.Add( d.Name, d );
                                 _reconfiguringDevicesChanged = true;
                             }
                         }
@@ -444,28 +426,62 @@ namespace CK.DeviceModel
                     _applyConfigAsynclock.Leave( monitor );
                     if( _reconfiguringDevicesChanged )
                     {
-                        await RaiseDevicesChangedEvent( monitor ).ConfigureAwait( false );
+                        await RaiseDevicesChangedEventAsync( monitor ).ConfigureAwait( false );
                     }
                 }
             }
         }
 
-        Task RaiseDevicesChangedEvent( IActivityMonitor monitor ) => _devicesChanged.SafeRaiseAsync( monitor, this );
-        Task IInternalDeviceHost.RaiseDevicesChangedEvent( IActivityMonitor monitor ) => RaiseDevicesChangedEvent( monitor );
+        Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
+                                                                            ? Task.CompletedTask
+                                                                            : _devicesChanged.SafeRaiseAsync( monitor, this );
+
+        Task IInternalDeviceHost.RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => RaiseDevicesChangedEventAsync( monitor );
 
         /// <inheritdoc />
-        public Task ClearAsync( IActivityMonitor monitor )
+        public async Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed )
         {
-            THostConfiguration hostConfig = _hostConfigFactory();
-            hostConfig.IsPartialConfiguration = false;
-            return ApplyConfigurationAsync( monitor, hostConfig, true );
+            if( waitForDeviceDestroyed )
+            {
+                await Task.WhenAll( ParrallelStartDestroy( monitor ) ).ConfigureAwait( false );
+            }
+            else
+            {
+                var d = _devices;
+                monitor.Info( $"Clearing '{DeviceHostName}': {d.Count} devices will be eventually destroyed." );
+                foreach( var device in d.Values )
+                {
+                    await device.DestroyAsync( monitor, waitForDeviceDestroyed: false ).ConfigureAwait( false );
+                }
+            }
         }
 
-        T? SafeCreateDevice( IActivityMonitor monitor, TConfiguration config )
+        Task[] ParrallelStartDestroy( IActivityMonitor monitor )
         {
+            Type thisType = GetType();
+            var d = _devices;
+            monitor.Info( $"Clearing '{DeviceHostName}': destroying {d.Count} devices." );
+            int i = 0;
+            Task[] all = new Task[d.Count];
+            foreach( var device in d.Values )
+            {
+                var cmd = new InternalDestroyDeviceCommand( thisType, device.Name );
+                device.UnsafeSendCommand( monitor, cmd );
+                all[i++] = cmd.Completion.Task;
+            }
+            return all;
+        }
+
+        T? SafeCreateDevice( IActivityMonitor monitor, TConfiguration config, TConfiguration externalConfig )
+        {
+            if( DaemonStoppedToken.IsCancellationRequested )
+            {
+                monitor.Trace( "System is shutting down. Skipping new device creation." );
+                return null;
+            }
             try
             {
-                var device = CreateDevice( monitor, config );
+                var device = CreateDevice( monitor, config, externalConfig );
                 if( device != null && device.Name != config.Name )
                 {
                     monitor.Error( $"Created device name mismatch expected '{config.Name}' got '{device.Name}'." );
@@ -518,33 +534,36 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="tDevice">The device type to instantiate.</param>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="config">The device's configuration.</param>
+        /// <param name="config">The actual configuration (safe clone).</param>
+        /// <param name="externalConfig">The external configuration (original).</param>
         /// <returns>The new device instance.</returns>
-        protected virtual T InstantiateDevice( Type tDevice, IActivityMonitor monitor, TConfiguration config )
+        protected virtual T InstantiateDevice( Type tDevice, IActivityMonitor monitor, TConfiguration config, TConfiguration externalConfig )
         {
-            return (T)Activator.CreateInstance( tDevice, new object[] { monitor, CreateCreateInfo( config ) } );
+            return (T)Activator.CreateInstance( tDevice, new object[] { monitor, CreateCreateInfo( config, externalConfig ) } );
         }
 
         /// <summary>
         /// Helper that creates a <see cref="Device{TConfiguration}.CreateInfo"/> token.
         /// </summary>
-        /// <param name="config">The device's configuration.</param>
+        /// <param name="config">The actual configuration (safe clone).</param>
+        /// <param name="externalConfig">The external configuration (original).</param>
         /// <returns>The create information.</returns>
-        protected Device<TConfiguration>.CreateInfo CreateCreateInfo( TConfiguration config )
+        protected Device<TConfiguration>.CreateInfo CreateCreateInfo( TConfiguration config, TConfiguration externalConfig )
         {
-            return new Device<TConfiguration>.CreateInfo( config, this );
+            return new Device<TConfiguration>.CreateInfo( config, externalConfig, this );
         }
 
         /// <summary>
         /// Creates a <typeparamref name="T"/> device based on a <typeparamref name="TConfiguration"/> instance.
         /// This default implementation uses the protected virtual <see cref="FindDeviceTypeByConvention(IActivityMonitor, Type)"/> to
         /// locate the device type (based on <typeparamref name="TConfiguration"/> first and then the actual <paramref name="config"/>'s type)
-        /// and then (if found) instantiates it by calling the other helper <see cref="InstantiateDevice(Type, IActivityMonitor, TConfiguration)"/>.
+        /// and then (if found) instantiates it by calling the other helper <see cref="InstantiateDevice"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="config">The configuration.</param>
+        /// <param name="config">The actual configuration (safe clone).</param>
+        /// <param name="externalConfig">The external configuration (original).</param>
         /// <returns>A new device instance initialized with the <paramref name="config"/> or null on error.</returns>
-        protected virtual T? CreateDevice( IActivityMonitor monitor, TConfiguration config )
+        protected virtual T? CreateDevice( IActivityMonitor monitor, TConfiguration config, TConfiguration externalConfig )
         {
             Debug.Assert( !String.IsNullOrWhiteSpace( config.Name ), "Already tested by DeviceHostConfiguration<TConfiguration>.CheckValidity." );
             Debug.Assert( !_devices.ContainsKey( config.Name ), "Already tested by DeviceHostConfiguration<TConfiguration>.CheckValidity." );
@@ -561,18 +580,8 @@ namespace CK.DeviceModel
                     return null;
                 }
             }
-            return InstantiateDevice( tDevice, monitor, config );
+            return InstantiateDevice( tDevice, monitor, config, externalConfig );
         }
-
-        /// <summary>
-        /// Called when a device has been removed (its configuration disappeared or <see cref="IDevice.DestroyAsync(IActivityMonitor)"/> has been called).
-        /// There is no way to prevent the device to be destroyed when its configuration disappeared and this is by design.
-        /// This method does nothing at this level.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="device">The device that has been removed.</param>
-        /// <returns>The awaitable.</returns>
-        protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device ) => Task.CompletedTask;
 
         /// <inheritdoc />
         public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default )

@@ -6,9 +6,10 @@ namespace CK.DeviceModel
     /// Defines the action that must be taken for commands sent to be immediately handled when the device is stopped.
     /// The default behavior of a command is provided by the <see cref="BaseDeviceCommand.StoppedBehavior"/> protected property, 
     /// but this default behavior may be altered for any command by overriding the <see cref="Device{TConfiguration}.OnStoppedDeviceCommand(IActivityMonitor, BaseDeviceCommand)"/>
-    /// protected method if the command's behavior is not <see cref="RunAnyway"/>, <see cref="SilentAutoStartAndStop"/> or <see cref="AutoStartAndKeepRunning"/>.
+    /// protected method.
     /// <para>
-    /// The default <see cref="BaseDeviceCommand.StoppedBehavior"/> is <see cref="WaitForNextStartWhenAlwaysRunningOrCancel"/>.
+    /// The default <see cref="BaseDeviceCommand.StoppedBehavior"/> is <see cref="Cancel"/> since most of the commands
+    /// should not be executed while the device is stopped..
     /// </para>
     /// </summary>
     public enum DeviceImmediateCommandStoppedBehavior

@@ -43,7 +43,7 @@ namespace CK.DeviceModel.Tests
                 }
                 var match = Regex.Match( device.Name, ".*\\*(\\d+)" );
                 int mult = match.Success ? int.Parse( match.Groups[1].Value ) : 1;
-                int deltaMS = host switch { CameraHost c => CameraDuration * mult, MachineHost m => MachineDuration * mult, _ => OtherDuration * mult };
+                int deltaMS = host switch { FlashBulbHost _ => CameraDuration * mult, MachineHost _ => MachineDuration * mult, _ => OtherDuration * mult };
                 monitor.Trace( $"{device.FullName} -> {deltaMS} ms." );
                 return deltaMS;
             }
@@ -218,19 +218,21 @@ namespace CK.DeviceModel.Tests
 
 
             await ((IHostedService)daemon).StopAsync( default );
-            await host.ClearAsync( TestHelper.Monitor );
+            await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
         }
 
-        [Test]
-        public async Task multiple_hosts_handling()
+        [TestCase( OnStoppedDaemonBehavior.ClearAllHosts )]
+        [TestCase( OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed )]
+        public async Task multiple_hosts_handling_and_OnStoppedDaemonBehavior( OnStoppedDaemonBehavior behavior )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_hosts_handling) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_hosts_handling_and_OnStoppedDaemonBehavior )}-{behavior}" );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1 };
             var host1 = new MachineHost();
-            var host2 = new CameraHost();
+            var host2 = new FlashBulbHost();
             var host3 = new OtherMachineHost();
             var daemon = new DeviceHostDaemon( new IDeviceHost[] { host1, host2, host3 }, policy );
+            daemon.StoppedBehavior = behavior;
 
             await ((IHostedService)daemon).StartAsync( default );
 
@@ -239,7 +241,7 @@ namespace CK.DeviceModel.Tests
             c1.Name = "D*2";
             (await host1.EnsureDeviceAsync( TestHelper.Monitor, c1 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
 
-            var c2 = new CameraConfiguration() { Name = "D1", Status = DeviceConfigurationStatus.AlwaysRunning };
+            var c2 = new FlashBulbConfiguration() { Name = "D1", Status = DeviceConfigurationStatus.AlwaysRunning };
             (await host2.EnsureDeviceAsync( TestHelper.Monitor, c2 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
             c2.Name = "D*2";
             (await host2.EnsureDeviceAsync( TestHelper.Monitor, c2 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
@@ -249,10 +251,9 @@ namespace CK.DeviceModel.Tests
             c3.Name = "D*2";
             (await host3.EnsureDeviceAsync( TestHelper.Monitor, c3 )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
 
-            IDevice[] devices = ((IDeviceHost)host1).GetConfiguredDevices()
-                                    .Concat( ((IDeviceHost)host2).GetConfiguredDevices() )
-                                    .Concat( ((IDeviceHost)host3).GetConfiguredDevices() )
-                                    .Select( x => x.Item1 )
+            IDevice[] devices = ((IDeviceHost)host1).GetDevices().Values
+                                    .Concat( ((IDeviceHost)host2).GetDevices().Values )
+                                    .Concat( ((IDeviceHost)host3).GetDevices().Values )
                                     .ToArray();
 
             foreach( var d in devices )
@@ -269,15 +270,15 @@ namespace CK.DeviceModel.Tests
             await Task.Delay( 300 );
             devices.Count( d => d.IsRunning ).Should().Be( 6 );
 
-            // Must destroy the cameras because they are counted!
-            await host2.Find( "D1" )!.DestroyAsync( TestHelper.Monitor );
-            await host2.Find( "D*2" )!.DestroyAsync( TestHelper.Monitor );
-
             await ((IHostedService)daemon).StopAsync( default );
-
-            await host1.ClearAsync( TestHelper.Monitor );
-            await host2.ClearAsync( TestHelper.Monitor );
-            await host3.ClearAsync( TestHelper.Monitor );
+            if( behavior == OnStoppedDaemonBehavior.ClearAllHosts )
+            {
+                TestHelper.Monitor.Trace( "*** Wait ***" );
+                await Task.Delay( 300 );
+            }
+            host1.Count.Should().Be( 0 );
+            host2.Count.Should().Be( 0 );
+            host3.Count.Should().Be( 0 );
         }
 
         [Test]

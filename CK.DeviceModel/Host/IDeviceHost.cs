@@ -17,6 +17,9 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets the host name that SHOULD identify this host instance unambiguously in a running context.
         /// (this should be used as the configuration key name for instance).
+        /// <para>
+        /// This is by default the type name (without namespace) of this host's type.
+        /// </para>
         /// </summary>
         string DeviceHostName { get; }
 
@@ -26,23 +29,15 @@ namespace CK.DeviceModel
         int Count { get; }
 
         /// <summary>
-        /// Clears this host by stopping and destroying all existing devices.
+        /// Creates a <see cref="BaseConfigureDeviceCommand"/> with an existing or new empty Configuration
+        /// of the correct type and an empty <see cref="BaseDeviceCommand.DeviceName"/>.
+        /// <para>
+        /// If a configuration object is provided, its type must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
+        /// </para>
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The awaitable.</returns>
-        Task ClearAsync( IActivityMonitor monitor );
-
-        /// <summary>
-        /// Gets the type of the object that configures this host (the <see cref="DeviceHostConfiguration{TConfiguration}"/> that is used).
-        /// </summary>
-        /// <returns>The type of the host configurations.</returns>
-        Type GetDeviceHostConfigurationType();
-
-        /// <summary>
-        /// Gets the type of the object that configures the device.
-        /// </summary>
-        /// <returns>The type of the device configuration.</returns>
-        Type GetDeviceConfigurationType();
+        /// <param name="configuration">The existing configuration or null to initialize a new empty configuration object.</param>
+        /// <returns>The reconfigure command.</returns>
+        BaseConfigureDeviceCommand CreateConfigureCommand( DeviceConfiguration? configuration = null );
 
         /// <summary>
         /// Applies a configuration. Configuration's type must match the actual type otherwise an <see cref="InvalidCastException"/> is thrown.
@@ -55,6 +50,7 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Applies a device configuration: this ensures that the device exists (it is created if needed) and is configured by the provided <paramref name="configuration"/>.
+        /// Configuration's type must match the actual configuration type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="configuration">The configuration to apply.</param>
@@ -69,28 +65,17 @@ namespace CK.DeviceModel
         IDevice? Find( string deviceName );
 
         /// <summary>
-        /// Gets a device and its applied configuration by its name.
-        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
-        /// </summary>
-        /// <param name="deviceName">The device name to find.</param>
-        /// <returns>The device and its configuration (or null references if not found).</returns>
-        (IDevice?, DeviceConfiguration?) GetConfiguredDevice( string deviceName );
-
-        /// <summary>
-        /// Gets a snapshot of the current devices and their configurations that satisfy a predicate.
-        /// Note that the configuration objects are copies of the ones that are used by the actual devices.
-        /// See <see cref="ConfiguredDevice{T, TConfiguration}.Configuration"/>.
-        /// </summary>
-        /// <param name="predicate">Optional predicate to filter the snapshotted result.</param>
-        /// <returns>The snapshot of the configured devices.</returns>
-        IReadOnlyList<(IDevice, DeviceConfiguration)> GetConfiguredDevices( Func<IDevice, DeviceConfiguration, bool>? predicate = null );
-
-        /// <summary>
-        /// Gets a <see cref="PerfectEvent{IDeviceHost}"/> that is raised whenever the device list has changed
-        /// or any device's configuration has changed.
-        /// This event is not raised when devices are started or stopped or when their <see cref="IDevice.ControllerKey"/> changed.
+        /// Gets a <see cref="PerfectEvent{IDeviceHost}"/> that is raised whenever one or more devices appeared or disappeared.
         /// </summary>
         PerfectEvent<IDeviceHost> DevicesChanged { get; }
+
+        /// <summary>
+        /// Gets a snapshot of the current devices indexed by name.
+        /// This read only dictionary can be freely used (there is no concurrency issues), <see cref="DevicesChanged"/>
+        /// event can be used to monitor changes.
+        /// </summary>
+        /// <returns>A snapshot of the devices.</returns>
+        IReadOnlyDictionary<string,IDevice> GetDevices();
 
         /// <summary>
         /// Sends the provided command to the device it targets.
@@ -111,5 +96,28 @@ namespace CK.DeviceModel
         /// <param name="token">Optional cancellation token.</param>
         /// <returns>The <see cref="DeviceHostCommandResult"/>.</returns>
         public DeviceHostCommandResult SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkControllerKey = true, CancellationToken token = default );
+
+        /// <summary>
+        /// Clears this host by stopping and destroying all existing devices.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="waitForDeviceDestroyed">
+        /// True to wait for the device destruction, false to only
+        /// send the destroy command to each device, not waiting for their destruction.
+        /// </param>
+        /// <returns>The awaitable.</returns>
+        Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed );
+
+        /// <summary>
+        /// Gets the type of the object that configures this host (the <see cref="DeviceHostConfiguration{TConfiguration}"/> that is used).
+        /// </summary>
+        /// <returns>The type of the host configurations.</returns>
+        Type GetDeviceHostConfigurationType();
+
+        /// <summary>
+        /// Gets the type of the object that configures the device.
+        /// </summary>
+        /// <returns>The type of the device configuration.</returns>
+        Type GetDeviceConfigurationType();
     }
 }

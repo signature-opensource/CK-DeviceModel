@@ -41,6 +41,7 @@ namespace CK.DeviceModel
         /// </summary>
         class CommandAwaker : BaseDeviceCommand
         {
+            public CommandAwaker() : base( (string.Empty,null) ) { }
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
@@ -56,6 +57,7 @@ namespace CK.DeviceModel
             {
                 while( _commandQueue.Reader.TryRead( out var c ) )
                 {
+                    Debug.Assert( c.Command.IsLocked );
                     if( c.Command != _commandAwaker )
                     {
                         c.Command.InternalCompletion.SetCanceled();
@@ -86,9 +88,15 @@ namespace CK.DeviceModel
         {
             CheckDirectCommandParameter( monitor, command, checkDeviceName );
             monitor.Debug( $"Sending {(command.ImmediateSending ? "immediate" : "")} command '{command}'." );
-            return command.ImmediateSending
+            bool sent = command.ImmediateSending
                             ? SendRoutedCommandImmediate( command, token, checkControllerKey )
                             : SendRoutedCommand( command, token, checkControllerKey );
+            if( !sent )
+            {
+                monitor.Trace( $"Setting UnavailableDeviceException on {command} (while sending)." );
+                command.InternalCompletion.TrySetException( new UnavailableDeviceException( this, command ) );
+            }
+            return sent;
         }
 
         /// <inheritdoc />
@@ -111,6 +119,7 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         internal protected bool SendRoutedCommand( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
         {
+            command.Lock();
             return _commandQueue.Writer.TryWrite( (command, token, checkControllerKey ) );
         }
 
@@ -124,6 +133,7 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         internal protected bool SendRoutedCommandImmediate( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
         {
+            command.Lock();
             return _commandQueueImmediate.Writer.TryWrite( (command, token, checkControllerKey) )
                    && _commandQueue.Writer.TryWrite( (_commandAwaker, default, false) );
         }
@@ -141,10 +151,6 @@ namespace CK.DeviceModel
                     throw new ArgumentException( $"{command.GetType().Name}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it. (For direct execution, you can use checkDeviceName: false parameter to skip this check or use UnsafeSendCommand.)", nameof( command ) );
                 }
             }
-            else
-            {
-                command.DeviceName = Name;
-            }
         }
 
         async Task CommandRunLoop()
@@ -154,7 +160,9 @@ namespace CK.DeviceModel
             while( !IsDestroyed )
             {
                 BaseDeviceCommand? currentlyExecuting = null;
-                (BaseDeviceCommand cmd, CancellationToken token, bool checkKey) = (null!, default, false);
+                BaseDeviceCommand cmd;
+                CancellationToken token;
+                bool checkKey;
                 try
                 {
                     (cmd, token, checkKey) = await _commandQueue.Reader.ReadAsync().ConfigureAwait( false );
@@ -228,8 +236,8 @@ namespace CK.DeviceModel
                     }
                     if( cmd == _commandAwaker ) continue;
                     currentlyExecuting = cmd;
+                    Debug.Assert( cmd.IsLocked );
                     wasStop = !IsRunning;
-
                     await HandleCommandAsync( cmd, token, checkKey, allowDefer: true, isImmediate: false ).ConfigureAwait( false );
                 }
                 catch( Exception ex )
@@ -347,6 +355,7 @@ namespace CK.DeviceModel
                 _commandMonitor.Debug( "Failed to start. Canceling the AutoStarting command." );
             }
         }
+
         async Task HandleCommandAsync( BaseDeviceCommand command, CancellationToken token, bool checkKey, bool allowDefer, bool isImmediate )
         {
             if( token.IsCancellationRequested )
@@ -368,7 +377,7 @@ namespace CK.DeviceModel
                     if( checkKey && !CheckControllerKey( command ) ) return;
                     await HandleStartAsync( start, DeviceStartedReason.StartCall ).ConfigureAwait( false );
                     return;
-                case BaseReconfigureDeviceCommand<TConfiguration> config:
+                case BaseConfigureDeviceCommand<TConfiguration> config:
                     if( checkKey && !CheckControllerKey( command ) ) return;
                     await HandleReconfigureAsync( config, token ).ConfigureAwait( false );
                     return;
@@ -543,7 +552,7 @@ namespace CK.DeviceModel
         /// </para>
         /// <para>
         /// Specialized implementations can call <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> (or even
-        /// <see cref="IDevice.DestroyAsync(IActivityMonitor)"/>) directly if needed.
+        /// <see cref="IDevice.DestroyAsync(IActivityMonitor, bool)"/>) directly if needed.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>

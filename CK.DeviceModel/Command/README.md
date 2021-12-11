@@ -1,7 +1,8 @@
 # Commands
 
+All commands ultimately specialize [BaseDeviceCommand](BaseDeviceCommand.cs).
 All device commands must inherit from [DeviceCommand](DeviceCommand&lt;THost&gt;.cs) or [DeviceCommand&lt;THost,TResult&gt;](DeviceCommandT.cs)
-if the command generates a result. All commands ultimately specialize [BaseDeviceCommand](BaseDeviceCommand.cs).
+if the command generates a result. 
 
 ## Command sending
 
@@ -35,8 +36,13 @@ bool UnsafeSendCommand( IActivityMonitor monitor,
                         BaseDeviceCommand command,
                         CancellationToken token = default );
 ```
-These methods return `false` if the device is destroyed and cannot receive commands anymore. They throw an `ArgumentException`
-if the command is null or if its `CheckValidity` method returns `false`: command validity MUST be checked before sending it.
+These methods throw an `ArgumentException` if the command is null or if its `CheckValidity` method returns `false`:
+command validity MUST be checked before sending it.
+
+These methods return `false` if the device is destroyed and cannot receive commands anymore: the command completion has been
+called with an `UnavailableDeviceException` (that, depending on the command, may have been transformed into a canceled or successful
+command task's result - see below).
+
 
 #### Safe vs. Unsafe
 
@@ -48,12 +54,12 @@ The controller key is not checked when the command is sent but right before the 
 handled command can change the controller key). If the controller key doesn't match, an [InvalidControllerKeyException](../Device/InvalidControllerKeyException.cs)
 is set on the command completion.
 
-This (safe) behavior can be amended thanks to the SendCommand parameters or by calling the UnsafeSendCommand method.
+This (safe) behavior can be amended thanks to the `SendCommand` parameters or by calling the `UnsafeSendCommand` method.
 
 ### Through the DeviceHost
 
-By calling [`IDeviceHost`](../Host/IDeviceHost.cs) `SendCommand` method, relying on the `IDevice.DeviceName` to route the command to
-the target device:
+Commands can be sent by calling [`IDeviceHost`](../Host/IDeviceHost.cs) `SendCommand` method, relying on the `IDevice.DeviceName`
+to route the command to the target device:
 
 ```csharp
 DeviceHostCommandResult SendCommand( IActivityMonitor monitor,
@@ -90,10 +96,54 @@ or `DeviceCommandWithResult<TResult>.Completion` is eventually resolved
 by calling `SetResult`, `SetCanceled` or `SetException` on the Completion otherwise the caller 
 may indefinitely wait for the command completion.
 
+Error management is never simple. Consider the Destroy command for instance: can it fail? Actually not:
+- First, when destroying a device, any error that occurred must not prevent the device to be destroyed.
+- Second, this is an idempotent action: regardless of any race condition or concurrency issues, destroying an already destroyed
+device is fine.
+
+Of course, this doesn't prevent a buggy device to hang forever (there is currently no timeout on the destroy) or to leave opened
+resources (handles, pipes, etc.), but the developer that uses a device has almost none possibilities to handle these.
+
+Commands and their Completion offer a solid way to handle this scenario: Commands can hook the error and/or canceled case and
+transform their task's result according to their semantics. The destroy command for instance does just that
+(in [BaseDestroyDeviceCommand](Basic/BaseDestroyDeviceCommand.cs)):
+
+```csharp
+    void ICompletable.OnError( Exception ex, ref CompletionSource.OnError result) => result.SetResult();
+
+    void ICompletable.OnCanceled( ref CompletionSource.OnCanceled result ) => result.SetResult();
+```
+
+The configuration command is even more interesting since this command has a result that can express the error or canceled issues
+(in [BaseConfigureDeviceCommand](Basic/BaseConfigureDeviceCommand.cs)):
+
+```csharp
+    void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
+    {
+        if( ex is InvalidControllerKeyException ) result.SetResult( DeviceApplyConfigurationResult.InvalidControllerKey );
+        else result.SetResult( DeviceApplyConfigurationResult.UnexpectedError );
+    }
+
+    void ICompletable<DeviceApplyConfigurationResult>.OnCanceled( ref CompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
+    {
+        result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
+    }
+```
+
+If it is needed, the original exception or the fact that the command has actually been canceled is available on the `ICompletion` (that comes from
+CK.Core assembly).
+
 ## StoppedBehavior and ImmediateStoppedBehavior
 
 Each Command has an overridable `StoppedBehavior` and `ImmediateStoppedBehavior` that specify how it should be handled when the device is stopped.
 The [DeviceCommandStoppedBehavior](DeviceCommandStoppedBehavior.cs) enumeration describes the 8 available options.
-For "immediate" commands, [DeviceImmediateCommandStoppedBehavior](DeviceImmediateCommandStoppedBehavior.cs) there is only 3 options since
-immediate commands cannot be deferred.
 
+This "stopped behavior" is rather complete and should cover all needs. The default behavior is `WaitForNextStartWhenAlwaysRunningOrCancel`
+that cancels the command (calling `SetCanceled` on the command's completion) if the device is stopped, unless the DeviceConfigurationStatus is
+`AlwaysRunning`: in such case, the command is stored in an internal queue and executed as soon as the device restarts.
+
+Another useful behavior is `RunAnyway`: all the basic commands (Destroy, Reconfigure, SetControllerKey, Start and Stop) uses this
+behavior since they must obviously do their job even if the device is stopped (the Stop does nothing when the device is already stopped).
+
+For "immediate" commands, [DeviceImmediateCommandStoppedBehavior](DeviceImmediateCommandStoppedBehavior.cs) has only 3 options since
+immediate commands cannot be deferred.

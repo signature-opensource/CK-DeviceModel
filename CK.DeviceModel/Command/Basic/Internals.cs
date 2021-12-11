@@ -1,17 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace CK.DeviceModel
 {
-    internal class InternalReconfigureDeviceCommand<TConfiguration> : BaseReconfigureDeviceCommand<TConfiguration>
+    internal class InternalConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
         where TConfiguration : DeviceConfiguration
     {
-        public InternalReconfigureDeviceCommand( Type hostType, string name )
+        public InternalConfigureDeviceCommand( Type hostType, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration, (string lockedName, string? controllerKey)? locked = null )
+            : base( (TConfiguration?)configuration, (TConfiguration?)clonedConfiguration, locked )
         {
             HostType = hostType;
-            DeviceName = name;
         }
+
         public override Type HostType { get; }
     }
 

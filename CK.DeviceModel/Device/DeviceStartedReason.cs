@@ -6,7 +6,7 @@ namespace CK.DeviceModel
     public enum DeviceStartedReason
     {
         /// <summary>
-        /// Not applicable.
+        /// Not applicable (not started yet).
         /// </summary>
         None = 0,
 

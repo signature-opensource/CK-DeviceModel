@@ -12,14 +12,14 @@ namespace CK.DeviceModel
     /// The default <see cref="BaseDeviceCommand.StoppedBehavior"/> is <see cref="WaitForNextStartWhenAlwaysRunningOrCancel"/>.
     /// </para>
     /// <para>
-    /// For commands that are sent to be "immediately" handled (via <see cref="IDevice.SendCommandImmediate(IActivityMonitor, BaseDeviceCommand, bool, bool, CancellationToken)"/>
-    /// for instance), the possibilities are defined by <see cref="DeviceImmediateCommandStoppedBehavior"/>.
+    /// For commands that are sent and must be "immediately" handled (<see cref="BaseDeviceCommand.ImmediateSending"/>), the possibilities
+    /// are defined by <see cref="DeviceImmediateCommandStoppedBehavior"/>.
     /// </para>
     /// </summary>
     public enum DeviceCommandStoppedBehavior
     {
         /// <summary>
-        /// The command is stored in an internal queue if the <see cref="IDevice.ConfigurationStatus"/> is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>
+        /// The command is stored in an internal queue if the device's configuration status is <see cref="DeviceConfigurationStatus.AlwaysRunning"/>
         /// and as soon as the device is started, the command is executed, or the command is canceled.
         /// <para>
         /// This is the default.

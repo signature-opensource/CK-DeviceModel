@@ -15,9 +15,26 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class BaseDeviceCommand
     {
-        private protected BaseDeviceCommand()
+        private string _deviceName;
+        private string? _controllerKey;
+        bool _isLocked;
+
+        /// <summary>
+        /// Initialize a new locked command if <paramref name="locked"/> is provided.
+        /// Otherwise initializes a new unlocked command (DeviceName is empty, ControllerKey is null).
+        /// </summary>
+        /// <param name="locked">The device name and controller key or null.</param>
+        private protected BaseDeviceCommand( (string lockedName, string? lockedControllerKey)? locked = null )
         {
-            DeviceName = String.Empty;
+            if( locked.HasValue )
+            {
+                (_deviceName, _controllerKey) = locked.Value;
+                _isLocked = true;
+            }
+            else
+            {
+                _deviceName = String.Empty;
+            }
         }
 
         /// <summary>
@@ -67,7 +84,19 @@ namespace CK.DeviceModel
         /// <see cref="CheckValidity(IActivityMonitor)"/> must return true).
         /// </para>
         /// </summary>
-        public string DeviceName { get; set; }
+        public string DeviceName
+        {
+            get => _deviceName;
+            set
+            {
+                if( value == null ) throw new ArgumentNullException( nameof( DeviceName ) );
+                if( value != _deviceName )
+                {
+                    ThrowOnLocked();
+                    _deviceName = value;
+                }
+            }
+        }
 
         /// <summary>
         /// Gets or sets the required controller key. See <see cref="IDevice.ControllerKey"/>
@@ -76,12 +105,28 @@ namespace CK.DeviceModel
         /// Note that if the target <see cref="IDevice.ControllerKey"/> is null, all commands are accepted.
         /// </para>
         /// </summary>
-        public string? ControllerKey { get; set; }
+        public string? ControllerKey
+        {
+            get => _controllerKey;
+            set
+            {
+                ThrowOnLocked();
+                _controllerKey = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets whether this command has been submitted and should not be altered anymore.
+        /// </summary>
+        public bool IsLocked => _isLocked;
 
         /// <summary>
         /// Checks the validity of this command. <see cref="DeviceName"/> must not be null.
         /// This calls the protected <see cref="DoCheckValidity(IActivityMonitor)"/> that should be overridden to
         /// check specific command parameters constraints.
+        /// <para>
+        /// This can be called even if <see cref="IsLocked"/> is true.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor that will be used to emit warnings or errors.</param>
         /// <returns>Whether this configuration is valid.</returns>
@@ -99,6 +144,27 @@ namespace CK.DeviceModel
                 return false;
             }
             return DoCheckValidity( monitor );
+        }
+
+        /// <summary>
+        /// Sets <see cref="IsLocked"/> to true.
+        /// Called once the command is submitted (it has already been successfully validated).
+        /// This method can be overridden to prepare the command (like cloning internal data).
+        /// <para>
+        /// Override should ensure that this method can safely be called multiple times.
+        /// </para>
+        /// </summary>
+        public virtual void Lock()
+        {
+            _isLocked = true;
+        }
+
+        /// <summary>
+        /// Helper method that raises an <see cref="InvalidOperationException"/> if <see cref="IsLocked"/> is true.
+        /// </summary>
+        protected void ThrowOnLocked()
+        {
+            if( _isLocked ) throw new InvalidOperationException( nameof( IsLocked ) );
         }
 
         /// <summary>

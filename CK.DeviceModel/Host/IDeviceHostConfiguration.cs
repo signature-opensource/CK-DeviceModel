@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -8,7 +9,7 @@ namespace CK.DeviceModel
     /// <summary>
     /// Non generic abstraction of the host configuration.
     /// </summary>
-    public interface IDeviceHostConfiguration : ICloneableCopyCtor
+    public interface IDeviceHostConfiguration : ICKSimpleBinarySerializable
     {
         /// <summary>
         /// Gets whether this is a partial configuration.

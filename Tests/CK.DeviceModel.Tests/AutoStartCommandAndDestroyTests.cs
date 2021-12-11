@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -25,13 +26,22 @@ namespace CK.DeviceModel.Tests
             {
             }
 
-            public DConfiguration( DConfiguration other )
-                : base( other )
+            public string? Trace { get; set; }
+
+            public DConfiguration( ICKBinaryReader r )
+                : base( r )
             {
-                Trace = other.Trace;
+                r.ReadByte(); // version
+                Trace = r.ReadNullableString();
             }
 
-            public string? Trace { get; set; }
+            public override void Write( ICKBinaryWriter w )
+            {
+                base.Write( w );
+                w.Write( (byte)0 );
+                w.WriteNullableString( Trace );
+            }
+
         }
 
         public class D : Device<DConfiguration>
@@ -112,9 +122,9 @@ namespace CK.DeviceModel.Tests
             D? d = h["First"];
             Debug.Assert( d != null );
 
-            bool eventRaised = false;
-            void StatusChanged( IActivityMonitor monitor, IDevice e ) => eventRaised = true;
-            d.StatusChanged.Sync += StatusChanged;
+            bool statusChanged = false;
+            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e is DeviceStatusChangedEvent;
+            d.LifetimeEvent.Sync += OnLifetimeChange;
 
             var commands = Enumerable.Range( 0, 3 ).Select( i => new DCommand() { DeviceName = "First", Trace = $"n°{i}" } ).ToArray();
             var destroy = new DestroyDeviceCommand<DHost>() { DeviceName = "First", ImmediateSending = false };
@@ -129,7 +139,7 @@ namespace CK.DeviceModel.Tests
             h.SendCommand( TestHelper.Monitor, destroy );
 
             await commands[0].Completion.Task;
-            eventRaised.Should().BeTrue( "Since the first deferred command is executed, the device has started." );
+            statusChanged.Should().BeTrue( "Since the first deferred command is executed, the device has started." );
 
             await destroy.Completion;
 
@@ -160,9 +170,9 @@ namespace CK.DeviceModel.Tests
             var initialStatus = d.Status.ToString();
             initialStatus.Should().Be( "Stopped (None)" );
 
-            bool eventRaised = false;
-            void StatusChanged( IActivityMonitor monitor, IDevice e ) => eventRaised = true;
-            d.StatusChanged.Sync += StatusChanged;
+            bool statusChanged = false;
+            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e is DeviceStatusChangedEvent;
+            d.LifetimeEvent.Sync += OnLifetimeChange;
 
             var commands = Enumerable.Range( 0, 3 ).Select( i => new DCommand() { DeviceName = "First", Trace = $"n°{i}" } ).ToArray();
             var starter = new DCommandStarter( keepDeviceRunning: false ) { DeviceName = "First", Trace = "DO IT" };
@@ -178,7 +188,7 @@ namespace CK.DeviceModel.Tests
             // To let the implicit Stop command do its work.
             await Task.Delay( 50 );
 
-            eventRaised.Should().BeFalse();
+            statusChanged.Should().BeFalse();
             d.Status.ToString().Should().Be( initialStatus );
 
             h.SendCommand( TestHelper.Monitor, destroy );
@@ -228,7 +238,7 @@ namespace CK.DeviceModel.Tests
                     await c.Completion;
                     // This is expected.
                 }
-                catch( UnavailableDeviceException ex )
+                catch( UnavailableDeviceException  )
                 {
                     // This is expected.
                 }
