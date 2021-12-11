@@ -92,24 +92,24 @@ namespace CK.DeviceModel.Tests
             if( mode == "StoppedReset" )
             {
                 events.Events.Select( e => e.ToString() )
-                             .Should().BeEquivalentTo( "Device 'SimpleScaleHost/M' status changed: Running (StartCall).",
-                                                       "Measure!",
-                                                       "Measure!",
-                                                       "Device 'SimpleScaleHost/M' status changed: Stopped (StoppedCall).",
-                                                       "Reset",
-                                                       "Device 'SimpleScaleHost/M' status changed: Running (StartCall).",
-                                                       "Measure!",
-                                                       "Device 'SimpleScaleHost/M' status changed: Stopped (StoppedCall)." );
+                             .Should().BeEquivalentTo( new[] { "Device 'SimpleScaleHost/M' status changed: Running (StartCall).",
+                                                               "Measure!",
+                                                               "Measure!",
+                                                               "Device 'SimpleScaleHost/M' status changed: Stopped (StoppedCall).",
+                                                               "Reset",
+                                                               "Device 'SimpleScaleHost/M' status changed: Running (StartCall).",
+                                                               "Measure!",
+                                                               "Device 'SimpleScaleHost/M' status changed: Stopped (StoppedCall)." } );
             }
             else
             {
                 events.Events.Select( e => e.ToString() )
-                             .Should().BeEquivalentTo( "Device 'SimpleScaleHost/M' status changed: Running (StartCall).",
-                                                       "Measure!",
-                                                       "Measure!",
-                                                       "Reset",
-                                                       "Measure!",
-                                                       "Device 'SimpleScaleHost/M' status changed: Stopped (StoppedCall)." );
+                             .Should().BeEquivalentTo( new[] { "Device 'SimpleScaleHost/M' status changed: Running (StartCall).",
+                                                               "Measure!",
+                                                               "Measure!",
+                                                               "Reset",
+                                                               "Measure!",
+                                                               "Device 'SimpleScaleHost/M' status changed: Stopped (StoppedCall)." } );
             }
 
             var measures = events.Events.OfType<SimpleScaleMeasureEvent>().Select( e => e.Measure ).ToArray();
