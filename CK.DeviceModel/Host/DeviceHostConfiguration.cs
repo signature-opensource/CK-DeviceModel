@@ -42,7 +42,7 @@ namespace CK.DeviceModel
             var callParam = new object[] { r };
             while( --c >= 0 )
             {
-                Items.Add( (TConfiguration)Activator.CreateInstance( typeof( TConfiguration ), callParam ) );
+                Items.Add( (TConfiguration)Activator.CreateInstance( typeof( TConfiguration ), callParam )! );
             }
         }
 

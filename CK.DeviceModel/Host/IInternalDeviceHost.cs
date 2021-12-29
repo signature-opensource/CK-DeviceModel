@@ -26,7 +26,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Called synchronously (interact with the reconfiguring sync lock).
         /// </summary>
-        bool OnDeviceDestroyed( IActivityMonitor monitor, IDevice device );
+        bool OnDeviceDoDestroy( IActivityMonitor monitor, IDevice device );
 
         /// <summary>
         /// Called asynchronously after OnDeviceDestroyed and once

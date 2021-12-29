@@ -34,7 +34,7 @@ namespace CK.DeviceModel
             _eventMonitor = new ActivityMonitor( $"Event loop for device {FullName}." );
             _deviceEvent = new PerfectEventSender<TEvent>();
             _allEvent = new PerfectEventSender<BaseDeviceEvent>();
-            _ = Task.Run( RunEventLoop );
+            _ = Task.Run( RunEventLoopAsync );
         }
 
         /// <summary>
@@ -92,7 +92,7 @@ namespace CK.DeviceModel
         void IMonitoredWorker.LogTrace( string msg ) => DoPost( m => m.Trace( msg ) );
         void IMonitoredWorker.LogDebug( string msg ) => DoPost( m => m.Debug( msg ) );
 
-        async Task RunEventLoop()
+        async Task RunEventLoopAsync()
         {
             var r = _events.Reader;
             object? ev = null;

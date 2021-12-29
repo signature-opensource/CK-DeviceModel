@@ -52,11 +52,11 @@ namespace CK.DeviceModel
             OnConfigurationChanged();
             if( _applyChannel.Reader.TryRead( out var toApply ))
             {
-                await ApplyOnceAsync( _changeMonitor, toApply, cancellationToken );
+                await ApplyOnceAsync( _changeMonitor, toApply );
             }
             _changeMonitor.SetTopic( "CK-DeviceModel Configurator (Configuration change detection)" );
             _changeSubscription = ChangeToken.OnChange( _configuration.GetReloadToken, OnConfigurationChanged );
-            _ = Task.Run( TheLoopAsync );
+            _ = Task.Run( TheLoopAsync, cancellationToken: default );
         }
 
         async Task TheLoopAsync()
@@ -65,12 +65,12 @@ namespace CK.DeviceModel
             while( !_run.IsCancellationRequested )
             {
                 var toApply = await _applyChannel.Reader.ReadAsync( tRun );
-                await ApplyOnceAsync( _changeMonitor, toApply, tRun );
+                await ApplyOnceAsync( _changeMonitor, toApply );
             }
             _changeMonitor.MonitorEnd();
         }
 
-        async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply, CancellationToken cancellationToken )
+        static async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply )
         {
             foreach( var (host, config) in toApply )
             {

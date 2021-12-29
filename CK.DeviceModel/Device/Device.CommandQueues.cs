@@ -89,8 +89,8 @@ namespace CK.DeviceModel
             CheckDirectCommandParameter( monitor, command, checkDeviceName );
             monitor.Debug( $"Sending {(command.ImmediateSending ? "immediate" : "")} command '{command}'." );
             bool sent = command.ImmediateSending
-                            ? SendRoutedCommandImmediate( command, token, checkControllerKey )
-                            : SendRoutedCommand( command, token, checkControllerKey );
+                            ? SendRoutedCommandImmediate( command, checkControllerKey, token )
+                            : SendRoutedCommand( command, checkControllerKey, token );
             if( !sent )
             {
                 monitor.Trace( $"Setting UnavailableDeviceException on {command} (while sending)." );
@@ -105,8 +105,8 @@ namespace CK.DeviceModel
             CheckDirectCommandParameter( monitor, command, false );
             monitor.Debug( $"Unsafe sending {(command.ImmediateSending ? "immediate" : "")} command '{command}'." );
             return command.ImmediateSending
-                            ? SendRoutedCommandImmediate( command, token, false )
-                            : SendRoutedCommand( command, token, false );
+                            ? SendRoutedCommandImmediate( command, false, token )
+                            : SendRoutedCommand( command, false, token );
         }
 
         /// <summary>
@@ -114,10 +114,10 @@ namespace CK.DeviceModel
         /// This is to be used for low level internal commands, typically initiated by timers.
         /// </summary>
         /// <param name="command">The command to send without any checks.</param>
-        /// <param name="token">Optional cancellation token.</param>
         /// <param name="checkControllerKey">Optionally checks the ControllerKey.</param>
+        /// <param name="token">Optional cancellation token.</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
-        internal protected bool SendRoutedCommand( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
+        internal protected bool SendRoutedCommand( BaseDeviceCommand command, bool checkControllerKey = false, CancellationToken token = default )
         {
             command.Lock();
             return _commandQueue.Writer.TryWrite( (command, token, checkControllerKey ) );
@@ -128,10 +128,10 @@ namespace CK.DeviceModel
         /// This is to be used for low level internal commands, typically initiated by timers.
         /// </summary>
         /// <param name="command">The command to send without any checks.</param>
-        /// <param name="token">Optional cancellation token.</param>
         /// <param name="checkControllerKey">Optionally checks the ControllerKey.</param>
+        /// <param name="token">Optional cancellation token.</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
-        internal protected bool SendRoutedCommandImmediate( BaseDeviceCommand command, CancellationToken token = default, bool checkControllerKey = false )
+        internal protected bool SendRoutedCommandImmediate( BaseDeviceCommand command, bool checkControllerKey = false, CancellationToken token = default )
         {
             command.Lock();
             return _commandQueueImmediate.Writer.TryWrite( (command, token, checkControllerKey) )
@@ -153,7 +153,7 @@ namespace CK.DeviceModel
             }
         }
 
-        async Task CommandRunLoop()
+        async Task CommandRunLoopAsync()
         {
             bool wasStop = true;
             UpdateImmediateCommandLimit();
@@ -179,7 +179,7 @@ namespace CK.DeviceModel
                         {
                             currentlyExecuting = immediate.Command;
                             _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been sent as Immediate. Handling it now." );
-                            await HandleCommandAsync( currentlyExecuting, immediate.Token, immediate.CheckKey, allowDefer: false, isImmediate: true ).ConfigureAwait( false );
+                            await HandleCommandAsync( currentlyExecuting, immediate.CheckKey, allowDefer: false, isImmediate: true, token: immediate.Token ).ConfigureAwait( false );
                         }
                         while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate ) );
                         // It would not be a good idea to log here that maxCount reached 0 since it could be a false positive and that
@@ -202,7 +202,7 @@ namespace CK.DeviceModel
                             {
                                 currentlyExecuting = ct.Command;
                                 _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been deferred. Handling it now." );
-                                await HandleCommandAsync( currentlyExecuting, ct.Token, ct.CheckKey, allowDefer: false, isImmediate: false ).ConfigureAwait( false );
+                                await HandleCommandAsync( currentlyExecuting, ct.CheckKey, allowDefer: false, isImmediate: false, token: ct.Token ).ConfigureAwait( false );
                                 if( !IsDestroyed && _commandQueueImmediate.Reader.TryRead( out immediate ) )
                                 {
                                     if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
@@ -211,7 +211,7 @@ namespace CK.DeviceModel
                                     {
                                         currentlyExecuting = immediate.Command;
                                         _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been sent as Immediate. Handling it now." );
-                                        await HandleCommandAsync( currentlyExecuting, immediate.Token, immediate.CheckKey, allowDefer: false, isImmediate: true ).ConfigureAwait( false );
+                                        await HandleCommandAsync( currentlyExecuting, immediate.CheckKey, allowDefer: false, isImmediate: true, token: immediate.Token ).ConfigureAwait( false );
                                     }
                                     while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate ) );
                                 }
@@ -238,7 +238,7 @@ namespace CK.DeviceModel
                     currentlyExecuting = cmd;
                     Debug.Assert( cmd.IsLocked );
                     wasStop = !IsRunning;
-                    await HandleCommandAsync( cmd, token, checkKey, allowDefer: true, isImmediate: false ).ConfigureAwait( false );
+                    await HandleCommandAsync( cmd, checkKey, allowDefer: true, isImmediate: false, token: token ).ConfigureAwait( false );
                 }
                 catch( Exception ex )
                 {
@@ -356,7 +356,7 @@ namespace CK.DeviceModel
             }
         }
 
-        async Task HandleCommandAsync( BaseDeviceCommand command, CancellationToken token, bool checkKey, bool allowDefer, bool isImmediate )
+        async Task HandleCommandAsync( BaseDeviceCommand command, bool checkKey, bool allowDefer, bool isImmediate, CancellationToken token )
         {
             if( token.IsCancellationRequested )
             {

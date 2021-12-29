@@ -49,7 +49,7 @@ namespace CK.DeviceModel
         private protected override Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
         {
             return base.SafeRaiseLifetimeEventAsync( monitor, e )
-                       .ContinueWith( _ => _allEvent.SafeRaiseAsync( monitor, e ) );
+                       .ContinueWith( _ => _allEvent.SafeRaiseAsync( monitor, e ), TaskScheduler.Default );
         }
 
         class AutoSendEvent : DeviceCommandNoResult

@@ -14,6 +14,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
+#pragma warning disable CA2211 // Non-constant fields should not be visible
+
 namespace CK.DeviceModel.Configuration.Tests
 {
     [TestFixture]
@@ -179,12 +181,12 @@ namespace CK.DeviceModel.Configuration.Tests
         }
 
         [Test]
-        public async Task empty_configuration_does_not_create_any_device()
+        public async Task empty_configuration_does_not_create_any_device_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( empty_configuration_does_not_create_any_device ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( empty_configuration_does_not_create_any_device_Async ) );
 
             var config = DynamicConfiguration.Create();
-            await RunHost( config, services =>
+            await RunHostAsync( config, services =>
             {
                 Camera.TotalCount.Should().Be( 0 );
                 Camera.TotalRunning.Should().Be( 0 );
@@ -195,15 +197,15 @@ namespace CK.DeviceModel.Configuration.Tests
         }
 
         [Test]
-        public async Task initial_configuration_create_devices()
+        public async Task initial_configuration_create_devices_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( initial_configuration_create_devices ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( initial_configuration_create_devices_Async ) );
 
             var config = DynamicConfiguration.Create();
             config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "Runnable" );
             config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "Runnable" );
             config.Provider.Set( "CK-DeviceModel:LightControllerHost:Items:L1:Status", "Disabled" );
-            await RunHost( config, services =>
+            await RunHostAsync( config, services =>
             {
                 Debug.Assert( CameraHost.TestInstance != null );
                 Debug.Assert( LightControllerHost.Instance != null );
@@ -224,16 +226,16 @@ namespace CK.DeviceModel.Configuration.Tests
         }
 
         [Test]
-        public async Task initial_configuration_can_start_devices_and_then_they_live_their_lifes()
+        public async Task initial_configuration_can_start_devices_and_then_they_live_their_lifes_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( initial_configuration_can_start_devices_and_then_they_live_their_lifes ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( initial_configuration_can_start_devices_and_then_they_live_their_lifes_Async ) );
 
             var config = DynamicConfiguration.Create();
             config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "RunnableStarted" );
             config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "AlwaysRunning" );
             config.Provider.Set( "CK-DeviceModel:LightControllerHost:Items:L1:Status", "Runnable" );
             config.Provider.Set( "CK-DeviceModel:LightControllerHost:Items:L2:Status", "Disabled" );
-            await RunHost( config, async services =>
+            await RunHostAsync( config, async services =>
             {
                 Debug.Assert( CameraHost.TestInstance != null );
                 Debug.Assert( LightControllerHost.Instance != null );
@@ -304,7 +306,7 @@ namespace CK.DeviceModel.Configuration.Tests
             public int DevicesChangedCount { get; private set; }
             public int DeviceConfigurationChangedCount => _devices.Values.Sum();
 
-            Dictionary<IDevice, int> _devices;
+            readonly Dictionary<IDevice, int> _devices;
 
             public ChangeCounter( IDeviceHost host )
             {
@@ -344,14 +346,14 @@ namespace CK.DeviceModel.Configuration.Tests
         }
 
         [Test]
-        public async Task configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service()
+        public async Task configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( configuration_changes_are_detected_and_applied_by_the_DeviceConfigurator_hosted_service_Async ) );
 
             var config = DynamicConfiguration.Create();
             config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "RunnableStarted" );
 
-            await RunHost( config, async services =>
+            await RunHostAsync( config, async services =>
             {
                 Debug.Assert( CameraHost.TestInstance != null );
                 Debug.Assert( LightControllerHost.Instance != null );
@@ -412,14 +414,14 @@ namespace CK.DeviceModel.Configuration.Tests
         }
 
         [Test]
-        public async Task DeviceHostDaemon_is_configured_by_optional_Daemon_section()
+        public async Task DeviceHostDaemon_is_configured_by_optional_Daemon_section_Async()
         {
-            using var _ = TestHelper.Monitor.OpenInfo( nameof( DeviceHostDaemon_is_configured_by_optional_Daemon_section ) );
+            using var _ = TestHelper.Monitor.OpenInfo( nameof( DeviceHostDaemon_is_configured_by_optional_Daemon_section_Async ) );
 
             var config = DynamicConfiguration.Create();
             config.Provider.Set( "CK-DeviceModel:Daemon:StoppedBehavior", "not a valid name." );
 
-            await RunHost( config, async services =>
+            await RunHostAsync( config, async services =>
             {
                 var daemon = services.GetRequiredService<DeviceHostDaemon>();
 
@@ -447,7 +449,7 @@ namespace CK.DeviceModel.Configuration.Tests
         }
 
 
-        async Task RunHost( DynamicConfiguration config, Func<IServiceProvider,Task> running, [CallerMemberName] string? caller = null )
+        async Task RunHostAsync( DynamicConfiguration config, Func<IServiceProvider,Task> running, [CallerMemberName] string? caller = null )
         {
             using( TestHelper.Monitor.OpenInfo( $"Running host from '{caller}'." ) )
             {

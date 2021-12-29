@@ -77,7 +77,7 @@ namespace CK.DeviceModel
         protected DeviceHost( string deviceHostName )
             : this( true )
         {
-            if( String.IsNullOrWhiteSpace( deviceHostName ) ) throw new ArgumentException( nameof( deviceHostName ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( deviceHostName );
             // The name of the lock is the DeviceHostName.
             _applyConfigAsynclock = new AsyncLock( LockRecursionPolicy.NoRecursion, deviceHostName );
         }
@@ -132,7 +132,7 @@ namespace CK.DeviceModel
 
         BaseSetControllerKeyDeviceCommand IInternalDeviceHost.CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey ) => new InternalSetControllerKeyDeviceCommand( GetType(), name, current, newControllerKey );
 
-        bool IInternalDeviceHost.OnDeviceDestroyed( IActivityMonitor monitor, IDevice device )
+        bool IInternalDeviceHost.OnDeviceDoDestroy( IActivityMonitor monitor, IDevice device )
         {
             lock( _reconfigureSyncLock )
             {
@@ -358,6 +358,7 @@ namespace CK.DeviceModel
                         }
                     }
 
+                    // No more in the lock: applies the toDestroy, toReconfigure and eventually toStart lists.
                     if( toDestroy != null && toDestroy.Count > 0 )
                     {
                         using( monitor.OpenInfo( $"Destroying {toDestroy.Count} devices." ) )
@@ -514,6 +515,7 @@ namespace CK.DeviceModel
             }
             Debug.Assert( "Configuration".Length == 13 );
             var fullName = typeConfiguration.FullName;
+            Debug.Assert( fullName != null );
             var deviceFullName = fullName.Substring( 0, fullName.Length - 13 );
             try
             {
@@ -529,8 +531,9 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Helper that uses <see cref="Activator.CreateInstance(Type, object[])"/> with the <paramref name="monitor"/> and the <paramref name="config"/>
-        /// as the constructor parameters.
+        /// Helper that uses <see cref="Activator.CreateInstance(Type, object[])"/> with the <paramref name="monitor"/> and the
+        /// result of the call to <see cref="CreateCreateInfo(TConfiguration, TConfiguration)"/> with <paramref name="config"/>
+        /// and <paramref name="externalConfig"/> as the constructor parameters.
         /// </summary>
         /// <param name="tDevice">The device type to instantiate.</param>
         /// <param name="monitor">The monitor to use.</param>
@@ -539,11 +542,11 @@ namespace CK.DeviceModel
         /// <returns>The new device instance.</returns>
         protected virtual T InstantiateDevice( Type tDevice, IActivityMonitor monitor, TConfiguration config, TConfiguration externalConfig )
         {
-            return (T)Activator.CreateInstance( tDevice, new object[] { monitor, CreateCreateInfo( config, externalConfig ) } );
+            return (T)Activator.CreateInstance( tDevice, new object[] { monitor, CreateCreateInfo( config, externalConfig ) } )!;
         }
 
         /// <summary>
-        /// Helper that creates a <see cref="Device{TConfiguration}.CreateInfo"/> token.
+        /// Helper that creates a <see cref="Device{TConfiguration}.CreateInfo"/> opaque object.
         /// </summary>
         /// <param name="config">The actual configuration (safe clone).</param>
         /// <param name="externalConfig">The external configuration (original).</param>
@@ -591,8 +594,8 @@ namespace CK.DeviceModel
             Debug.Assert( device != null );
             monitor.Debug( $"{DeviceHostName}: sending {(command.ImmediateSending ? "immediate" : "")} '{command}' to '{device.Name}'." );
             if( !(command.ImmediateSending
-                    ? device.SendRoutedCommandImmediate( command, token, checkControllerKey )
-                    : device.SendRoutedCommand( command, token, checkControllerKey )) )
+                    ? device.SendRoutedCommandImmediate( command, checkControllerKey, token )
+                    : device.SendRoutedCommand( command, checkControllerKey, token )) )
             {
                 return DeviceHostCommandResult.DeviceDestroyed;
             }

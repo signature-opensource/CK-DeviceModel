@@ -82,7 +82,7 @@ namespace CK.DeviceModel.Tests
             {
                 if( command is DCommand cmd )
                 {
-                    await Task.Delay( 10 );
+                    await Task.Delay( 10, token ).ConfigureAwait( false );
                     Traces.Add( $"Command {cmd.Trace}" );
                     monitor.Info( $"Handling {cmd.Trace}" );
                     cmd.Completion.SetResult();

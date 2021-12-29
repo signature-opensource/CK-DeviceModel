@@ -99,7 +99,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="obj">The other object.</param>
         /// <returns>True if they are equal, false otherwise.</returns>
-        public override bool Equals( object obj ) => obj is DeviceStatus s ? Equals( s ) : false;
+        public override bool Equals( object? obj ) => obj is DeviceStatus s && Equals( s );
 
         /// <summary>
         /// Computes hash based on value equality. 

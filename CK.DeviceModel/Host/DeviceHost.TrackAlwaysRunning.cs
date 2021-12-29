@@ -46,7 +46,7 @@ namespace CK.DeviceModel
         /// For the very first attempt, this is 0. 
         /// </param>
         /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
-        protected virtual Task<int> TryAlwaysRunningRestart( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, IDevice device, int retryCount )
+        protected virtual Task<int> TryAlwaysRunningRestartAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, IDevice device, int retryCount )
         {
             return global.RetryStartAsync( monitor, this, device, retryCount );
         }
@@ -120,7 +120,7 @@ namespace CK.DeviceModel
                         delta = (e.NextCall - now).Ticks;
                         if( delta <= 0 )
                         {
-                            delta = await TryAlwaysRunningRestart( monitor, global, d, e.Count ).ConfigureAwait( false );
+                            delta = await TryAlwaysRunningRestartAsync( monitor, global, d, e.Count ).ConfigureAwait( false );
                             if( d.IsRunning || delta < 0 ) delta = 0;
                             else
                             {
@@ -187,7 +187,7 @@ namespace CK.DeviceModel
         {
             Debug.Assert( System.Threading.Monitor.IsEntered( _alwayRunningStopped ) );
             _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
-            monitor.Debug( $"{(signalHost ? "Host signaled!" : "(no signal.)")}. Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall.ToString( "HH:mm.ss.ff" )})" ).Concatenate( ", (" )})." );
+            monitor.Debug( $"{(signalHost ? "Host signaled!" : "(no signal.)")}. Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall:HH:mm.ss.ff})" ).Concatenate( ", (" )})." );
             if( signalHost ) _daemon?.Signal();
         }
     }

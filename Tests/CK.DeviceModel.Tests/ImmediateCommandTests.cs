@@ -81,7 +81,7 @@ namespace CK.DeviceModel.Tests
                 if( command is DCommand cmd )
                 {
                     Traces.Add( $"Command {cmd.Trace}" );
-                    await Task.Delay( cmd.ExecutionTime );
+                    await Task.Delay( cmd.ExecutionTime, token ).ConfigureAwait( false );
                     cmd.Completion.SetResult();
                     return;
                 }
@@ -214,7 +214,7 @@ namespace CK.DeviceModel.Tests
                     inspector = inspector.Slice( blockLen );
                 }
                 while( inspector[0] == 'I' );
-                inspector.ToArray().All( c => c == 'N' );
+                inspector.ToArray().All( c => c == 'N' ).Should().BeTrue();
             }
 
             var h = new DHost();

@@ -111,7 +111,7 @@ namespace CK.DeviceModel
             _destroyed = new CancellationTokenSource();
             _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
             _immediateCommandLimitDirty = true;
-            _ = Task.Run( CommandRunLoop );
+            _ = Task.Run( CommandRunLoopAsync );
         }
 
         /// <summary>
@@ -690,7 +690,7 @@ namespace CK.DeviceModel
             var h = _host;
             _host = null;
             _destroyed.Cancel();
-            if( h.OnDeviceDestroyed( _commandMonitor, this ) )
+            if( h.OnDeviceDoDestroy( _commandMonitor, this ) )
             {
                 await h.RaiseDevicesChangedEventAsync( _commandMonitor ).ConfigureAwait( false );
             }

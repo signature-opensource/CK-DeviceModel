@@ -65,7 +65,7 @@ namespace CK.DeviceModel
             if( _deviceHosts.Length > 0 )
             {
                 _daemonMonitor = new ActivityMonitor( nameof( DeviceHostDaemon ) );
-                _runLoop = TheLoop();
+                _runLoop = TheLoopAsync();
             }
             return Task.CompletedTask;
         }
@@ -80,7 +80,7 @@ namespace CK.DeviceModel
             s.TrySetResult( true );
         }
 
-        async Task TheLoop()
+        async Task TheLoopAsync()
         {
             Debug.Assert( _daemonMonitor != null );
             _daemonMonitor.Debug( "Daemon loop started." );
