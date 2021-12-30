@@ -15,8 +15,8 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class BaseDeviceCommand
     {
-        private string _deviceName;
-        private string? _controllerKey;
+        string _deviceName;
+        string? _controllerKey;
         bool _isLocked;
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace CK.DeviceModel
             get => _deviceName;
             set
             {
-                if( value == null ) throw new ArgumentNullException( nameof( DeviceName ) );
+                Throw.CheckNotNullArgument( value );
                 if( value != _deviceName )
                 {
                     ThrowOnLocked();
@@ -164,7 +164,7 @@ namespace CK.DeviceModel
         /// </summary>
         protected void ThrowOnLocked()
         {
-            if( _isLocked ) throw new InvalidOperationException( nameof( IsLocked ) );
+            if( _isLocked ) Throw.InvalidOperationException( nameof( IsLocked ) );
         }
 
         /// <summary>
