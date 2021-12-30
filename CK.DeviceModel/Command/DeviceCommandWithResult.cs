@@ -18,7 +18,7 @@ namespace CK.DeviceModel
             : base( locked )
         {
             Completion = new CompletionSource<TResult>( this );
-            _commandToString = GetType().Name + '<' + typeof( TResult ).Name + '>';
+            _commandToString = GetType().ToCSharpName( withNamespace: false );
         }
 
         /// <summary>

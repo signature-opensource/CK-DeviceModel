@@ -17,6 +17,7 @@ namespace CK.DeviceModel
     {
         string _deviceName;
         string? _controllerKey;
+        DateTime _sendTime;
         bool _isLocked;
 
         /// <summary>
@@ -35,6 +36,7 @@ namespace CK.DeviceModel
             {
                 _deviceName = String.Empty;
             }
+            _sendTime = Util.UtcMinValue;
         }
 
         /// <summary>
@@ -73,7 +75,33 @@ namespace CK.DeviceModel
         /// Gets or sets whether this command must be sent and handled immediately.
         /// Defaults to false, except for the 5 basic commands (Start, Stop, Configure, SetControllerKey and Destroy).
         /// </summary>
-        public bool ImmediateSending { get; set; }
+        public bool ImmediateSending
+        {
+            get => _sendTime.Kind == DateTimeKind.Unspecified;
+            set
+            {
+                ThrowOnLocked();
+                _sendTime = DateTime.MinValue;
+            }
+        }
+
+        public DateTime? SendingTimeUtc
+        {
+            get => _sendTime.Ticks == 0 ? null : _sendTime;
+            set
+            {
+                ThrowOnLocked();
+                if( !value.HasValue )
+                {
+                    _sendTime = Util.UtcMinValue;
+                }
+                else
+                {
+                    Throw.CheckArgument( value.Value.Kind == DateTimeKind.Utc );
+                    _sendTime = value.Value;
+                }
+            }
+        }
 
         /// <summary>
         /// Gets or sets the target device name.
@@ -168,7 +196,8 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Waiting for covariant return type in .Net 5: this could be public virtual.
+        /// Because of covariant return type limitation, this property unifies the <see cref="DeviceCommandNoResult.Completion"/>
+        /// and <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
         /// </summary>
         internal abstract ICompletionSource InternalCompletion { get; }
 

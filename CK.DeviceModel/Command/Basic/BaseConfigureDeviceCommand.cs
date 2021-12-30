@@ -15,7 +15,8 @@ namespace CK.DeviceModel
         private protected BaseConfigureDeviceCommand( DeviceConfiguration configuration, (string lockedName, string? lockedControllerKey)? locked = null )
             : base( locked )
         {
-            Configuration = configuration ?? throw new ArgumentNullException( nameof( configuration ) );
+            Throw.CheckNotNullArgument( configuration );
+            Configuration = configuration;
             ImmediateSending = true;
         }
 
