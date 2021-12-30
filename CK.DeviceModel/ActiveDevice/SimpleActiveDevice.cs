@@ -52,6 +52,9 @@ namespace CK.DeviceModel
                        .ContinueWith( _ => _allEvent.SafeRaiseAsync( monitor, e ), TaskScheduler.Default );
         }
 
+        /// <summary>
+        /// Dummy command that carries the event to send to the event loop.
+        /// </summary>
         class AutoSendEvent : DeviceCommandNoResult
         {
             public readonly TEvent Event;
@@ -73,7 +76,7 @@ namespace CK.DeviceModel
         /// <para>
         /// To raise events while handling a command, the protected <see cref="RaiseEventAsync(IActivityMonitor, TEvent)"/> should
         /// be used. However, even if this implements the <see cref="IActiveDevice.DebugPostEvent(BaseActiveDeviceEvent)"/> contract for
-        /// the external world, this can also be used this to defer the event raising. 
+        /// the external world, this can also be used internally to defer the event raising. 
         /// </para>
         /// </summary>
         /// <param name="e">
@@ -87,7 +90,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="e">The device event to raise.</param>
-        /// <returns></returns>
+        /// <returns>The awaitable.</returns>
         protected Task RaiseEventAsync( IActivityMonitor monitor, TEvent e ) => _allEvent.SafeRaiseAsync( monitor, e );
 
         /// <summary>
@@ -98,7 +101,7 @@ namespace CK.DeviceModel
         /// <param name="monitor">The command monitor.</param>
         /// <param name="command">The command to handle.</param>
         /// <param name="token">Cancellation token.</param>
-        /// <returns></returns>
+        /// <returns>The awaitable.</returns>
         protected override Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
         {
             return command is AutoSendEvent s

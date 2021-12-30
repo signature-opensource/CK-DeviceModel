@@ -80,8 +80,13 @@ namespace CK.DeviceModel
             get => _sendTime.Kind == DateTimeKind.Unspecified;
             set
             {
-                ThrowOnLocked();
-                _sendTime = DateTime.MinValue;
+                // We don't check _isLocked here for 2 reasons:
+                // 1 - This is called to configure the already locked basic command default configuration.
+                // 2 - this is pointless since Lock() is called after the routing between Immediate and regular
+                //     command queues has been made.
+                // The side effect is that if Lock() is called by user code before sending the command, this can
+                // still be changed. But we don't care :).
+                _sendTime = value ? DateTime.MinValue : Util.UtcMinValue;
             }
         }
 
