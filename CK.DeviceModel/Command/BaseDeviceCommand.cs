@@ -90,6 +90,20 @@ namespace CK.DeviceModel
             }
         }
 
+        /// <summary>
+        /// Gets or sets the sending time of this command.
+        /// When null (the default) or set to <see cref="Util.UtcMinValue"/> the command is executed
+        /// (as usual) when it is dequeued.
+        /// <para>
+        /// When <see cref="ImmediateSending"/> is set to true, this automatically sets this to null.
+        /// And when this is set to a non null UTC time, the ImmediateSending is automatically set to false.
+        /// </para>
+        /// <para>
+        /// The value should be in the future but no check is done against <see cref="DateTime.UtcNow"/>
+        /// in order to safely handle any clock drift: if the time is in the past when the command is dequeued,
+        /// it will be executed like any regular (non immediate) command.
+        /// </para>
+        /// </summary>
         public DateTime? SendingTimeUtc
         {
             get => _sendTime.Ticks == 0 ? null : _sendTime;
@@ -197,7 +211,7 @@ namespace CK.DeviceModel
         /// </summary>
         protected void ThrowOnLocked()
         {
-            if( _isLocked ) Throw.InvalidOperationException( nameof( IsLocked ) );
+            if( _isLocked ) Throw.InvalidOperationException( $"Command '{this}' is locked." );
         }
 
         /// <summary>
