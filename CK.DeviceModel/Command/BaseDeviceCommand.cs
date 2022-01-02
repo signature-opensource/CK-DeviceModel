@@ -17,7 +17,8 @@ namespace CK.DeviceModel
     {
         string _deviceName;
         string? _controllerKey;
-        DateTime _sendTime;
+        // Internal for the command queue.
+        internal DateTime SendTime;
         bool _isLocked;
 
         /// <summary>
@@ -36,7 +37,7 @@ namespace CK.DeviceModel
             {
                 _deviceName = String.Empty;
             }
-            _sendTime = Util.UtcMinValue;
+            SendTime = Util.UtcMinValue;
         }
 
         /// <summary>
@@ -77,16 +78,17 @@ namespace CK.DeviceModel
         /// </summary>
         public bool ImmediateSending
         {
-            get => _sendTime.Kind == DateTimeKind.Unspecified;
+            get => SendTime.Kind == DateTimeKind.Unspecified;
             set
             {
-                // We don't check _isLocked here for 2 reasons:
+                // We don't check _isLocked here for 3 reasons:
                 // 1 - This is called to configure the already locked basic command default configuration.
-                // 2 - this is pointless since Lock() is called after the routing between Immediate and regular
+                // 2 - Delayed commands (with a SendingTimeUtc) are sent as immediate ones.
+                // 3 - this is pointless since Lock() is called after the routing between Immediate and regular
                 //     command queues has been made.
                 // The side effect is that if Lock() is called by user code before sending the command, this can
                 // still be changed. But we don't care :).
-                _sendTime = value ? DateTime.MinValue : Util.UtcMinValue;
+                SendTime = value ? DateTime.MinValue : Util.UtcMinValue;
             }
         }
 
@@ -106,18 +108,18 @@ namespace CK.DeviceModel
         /// </summary>
         public DateTime? SendingTimeUtc
         {
-            get => _sendTime.Ticks == 0 ? null : _sendTime;
+            get => SendTime.Ticks == 0 ? null : SendTime;
             set
             {
                 ThrowOnLocked();
                 if( !value.HasValue )
                 {
-                    _sendTime = Util.UtcMinValue;
+                    SendTime = Util.UtcMinValue;
                 }
                 else
                 {
                     Throw.CheckArgument( value.Value.Kind == DateTimeKind.Utc );
-                    _sendTime = value.Value;
+                    SendTime = value.Value;
                 }
             }
         }
@@ -226,5 +228,6 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True for a valid configuration, false otherwise.</returns>
         protected virtual bool DoCheckValidity( IActivityMonitor monitor ) => true;
+
     }
 }

@@ -153,20 +153,55 @@ namespace CK.DeviceModel
             }
         }
 
+        PriorityQueue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey), DateTime>? _delayedQueue;
+
         async Task CommandRunLoopAsync()
         {
             bool wasStop = true;
             UpdateImmediateCommandLimit();
+
+            // Mutable current command: the catch clause is common to all execution.
+            BaseDeviceCommand? currentlyExecuting;
+            // De-structured regular command.
+            BaseDeviceCommand cmd;
+            CancellationToken token;
+            bool checkKey;
+            // Current immediate command.
+            (BaseDeviceCommand Command, CancellationToken Token, bool CheckKey) immediate = (null!, default, false);
+            // Next delayed command sending time.
+            DateTime nextDelayedTime = default;
             while( !IsDestroyed )
             {
-                BaseDeviceCommand? currentlyExecuting = null;
-                BaseDeviceCommand cmd;
-                CancellationToken token;
-                bool checkKey;
+                currentlyExecuting = null;
                 try
                 {
+                    if( _delayedQueue != null )
+                    {
+                        var now = DateTime.UtcNow;
+                        while( _delayedQueue.TryPeek( out var delayed, out nextDelayedTime ) && nextDelayedTime < now )
+                        {
+                            _delayedQueue.Dequeue();
+                            if( delayed.Token.IsCancellationRequested )
+                            {
+                                TODO: BaseDeviceCommand should hold the SendingToken and register
+                                      a callback to its SetCanceled: cancelation will not have to wait for the command handling!
+                                continue;
+                            }
+                            delayed.Command.ImmediateSending = true;
+                            _commandQueue.Writer.TryWrite( delayed );
+                        }
+                    }
                     (cmd, token, checkKey) = await _commandQueue.Reader.ReadAsync().ConfigureAwait( false );
-                    if( _commandQueueImmediate.Reader.TryRead( out var immediate ) )
+                    #region Immediate commands
+                    // Commands in the regular _commandQueue can be ImmediateSending if they are from the _delayedQueue.
+                    // We handle these as if they are from the immediate queue.
+                    bool isDelayedCommand = cmd.ImmediateSending;
+                    if( isDelayedCommand )
+                    {
+                        immediate = (cmd, token, checkKey);
+                    }
+                    // Handle all available immediate at once (but no more than ImmediateCommandLimit to avoid regular commands starvation).
+                    if( isDelayedCommand || _commandQueueImmediate.Reader.TryRead( out immediate ) )
                     {
                         // Because of the currentlyExecuting that captures the command so that the
                         // single factorized try/catch clause can do its job, this loop cannot be
@@ -178,7 +213,7 @@ namespace CK.DeviceModel
                         do
                         {
                             currentlyExecuting = immediate.Command;
-                            _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been sent as Immediate. Handling it now." );
+                            _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been {(currentlyExecuting == cmd ? "delayed" : "sent as Immediate")}. Handling it now." );
                             await HandleCommandAsync( currentlyExecuting, immediate.CheckKey, allowDefer: false, isImmediate: true, token: immediate.Token ).ConfigureAwait( false );
                         }
                         while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate ) );
@@ -188,36 +223,45 @@ namespace CK.DeviceModel
                         // they have), logging here would not be really interesting. It's better to find a way to collect and represents the metrics and let
                         // the limit here do its job silently: the metrics itself must show the status' of the queues.
                     }
+                    // If the regular dequeued command was a delayed one, it has been handled.
+                    if( isDelayedCommand ) continue;
+                    #endregion
 
-                    // Captures the reference (since it can be replaced by CancelAllPendingCommands).
-                    // Executing deferred commands is a subordinated loop that alternates deferred and immediate commands: both loops are
-                    // constrained by their respective limits.
-                    var deferred = _deferredCommands;
-                    if( wasStop && IsRunning && deferred.Count > 0 )
+                    #region Deferred commands
+                    if( wasStop && IsRunning )
                     {
-                        Debug.Assert( !IsDestroyed );
-                        using( _commandMonitor.OpenInfo( $"Device started: executing {deferred.Count} deferred commands." ) )
+                        // Captures the reference (since it can be replaced by CancelAllPendingCommands).
+                        // Executing deferred commands is a subordinated loop that alternates deferred and immediate commands: both loops are
+                        // constrained by their respective limits.
+                        var deferred = _deferredCommands;
+                        if( deferred.Count > 0 )
                         {
-                            while( IsRunning && deferred.TryDequeue( out var ct ) )
+                            Debug.Assert( !IsDestroyed );
+                            using( _commandMonitor.OpenInfo( $"Device started: executing {deferred.Count} deferred commands." ) )
                             {
-                                currentlyExecuting = ct.Command;
-                                _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been deferred. Handling it now." );
-                                await HandleCommandAsync( currentlyExecuting, ct.CheckKey, allowDefer: false, isImmediate: false, token: ct.Token ).ConfigureAwait( false );
-                                if( !IsDestroyed && _commandQueueImmediate.Reader.TryRead( out immediate ) )
+                                while( IsRunning && deferred.TryDequeue( out var ct ) )
                                 {
-                                    if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
-                                    int maxCount = _currentImmediateCommandLimit;
-                                    do
+                                    currentlyExecuting = ct.Command;
+                                    _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been deferred. Handling it now." );
+                                    await HandleCommandAsync( currentlyExecuting, ct.CheckKey, allowDefer: false, isImmediate: false, token: ct.Token ).ConfigureAwait( false );
+                                    if( !IsDestroyed && _commandQueueImmediate.Reader.TryRead( out immediate ) )
                                     {
-                                        currentlyExecuting = immediate.Command;
-                                        _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been sent as Immediate. Handling it now." );
-                                        await HandleCommandAsync( currentlyExecuting, immediate.CheckKey, allowDefer: false, isImmediate: true, token: immediate.Token ).ConfigureAwait( false );
+                                        if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
+                                        int maxCount = _currentImmediateCommandLimit;
+                                        do
+                                        {
+                                            currentlyExecuting = immediate.Command;
+                                            _commandMonitor.Debug( $"Command '{currentlyExecuting}' has been sent as Immediate. Handling it now." );
+                                            await HandleCommandAsync( currentlyExecuting, immediate.CheckKey, allowDefer: false, isImmediate: true, token: immediate.Token ).ConfigureAwait( false );
+                                        }
+                                        while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate ) );
                                     }
-                                    while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate ) );
                                 }
                             }
                         }
                     }
+                    #endregion
+
                     if( IsDestroyed )
                     {
                         if( cmd != _commandAwaker )
@@ -235,6 +279,16 @@ namespace CK.DeviceModel
                         (cmd, token, checkKey) = oneRegular;
                     }
                     if( cmd == _commandAwaker ) continue;
+                    // Now that immediate and potential deferred have been handled, consider the SendingTimeUtc.
+                    var t = cmd.SendTime;
+                    Debug.Assert( t.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
+                    if( t > DateTime.UtcNow )
+                    {
+                        if( _delayedQueue == null ) _delayedQueue = new PriorityQueue<BaseDeviceCommand, DateTime>();
+                        _delayedQueue.Enqueue( cmd, t );
+                        ActivateTimer();
+                        continue;
+                    }
                     currentlyExecuting = cmd;
                     Debug.Assert( cmd.IsLocked );
                     wasStop = !IsRunning;
@@ -295,6 +349,11 @@ namespace CK.DeviceModel
                 }
             }
             _commandMonitor.MonitorEnd();
+        }
+
+        void ActivateTimer()
+        {
+            PeriodicTimer timer = new PeriodicTimer();
         }
 
         void UpdateImmediateCommandLimit()
