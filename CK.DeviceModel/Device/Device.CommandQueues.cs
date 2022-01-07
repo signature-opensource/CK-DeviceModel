@@ -44,12 +44,13 @@ namespace CK.DeviceModel
         /// This does nothing and is ignored except that, just like any other commands that are
         /// dequeued, this handles the _commandQueueImmediate execution.
         /// </summary>
-        class CommandAwaker : BaseDeviceCommand
+        sealed class CommandAwaker : BaseDeviceCommand
         {
             public CommandAwaker() : base( (string.Empty,null) ) { }
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+            public override string ToString() => nameof(CommandAwaker);
         }
         static readonly CommandAwaker _commandAwaker = new();
 
@@ -59,7 +60,7 @@ namespace CK.DeviceModel
         /// Special low level immediate command that can cancel pending commands.
         /// This is an immediate command that doesn't call OnCommandCompleted.
         /// </summary>
-        class CommandCanceler : DeviceCommandWithResult<(int, int, int)>
+        sealed class CommandCanceler : DeviceCommandWithResult<(int, int, int)>
         {
             public readonly bool QueuedCommands;
             public readonly bool DelayedCommands;
@@ -140,6 +141,7 @@ namespace CK.DeviceModel
 
         #endregion        /// <inheritdoc />
 
+        #region SendCommand methods
         /// <inheritdoc />
         public bool SendCommand( IActivityMonitor monitor,
                                  BaseDeviceCommand command,
@@ -205,7 +207,8 @@ namespace CK.DeviceModel
                 }
             }
             command.OnCommandEnter( monitor.DependentActivity().CreateToken() );
-        }
+        } 
+        #endregion
 
         async Task CommandRunLoopAsync()
         {
@@ -247,7 +250,7 @@ namespace CK.DeviceModel
                     }
                     #endregion
 
-                    #region Handles low-level ReminderCommand.
+                    #region Handles low-level ReminderCommand (from the _delayedQueue).
                     if( cmd is ReminderCommand reminder )
                     {
                         try
@@ -299,16 +302,27 @@ namespace CK.DeviceModel
                         // Breaks the loop: let the queues be flushed below.
                         break;
                     }
+
+                    // Updates the wasStop flag.
+                    wasStop = !IsRunning;
+
                     // Flushes any command awaker before an actual command.
                     while( cmd == _commandAwaker )
                     {
                         if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) break;
                         cmd = oneRegular;
                     }
-                    if( cmd == _commandAwaker ) continue;
-                    // Updates the wasStop flag.
-                    wasStop = !IsRunning;
-
+                    if( cmd == _commandAwaker )
+                    {
+                        // No regular command found. Before awaiting the next command,
+                        // handle any potential immediate ones since we may have dequeued the last
+                        // awaker.
+                        if( _commandQueueImmediate.Reader.TryRead( out immediate ) )
+                        {
+                            await HandleImmediateCommandsAsync( immediate ).ConfigureAwait( false );
+                        }
+                        continue;
+                    }
                     Debug.Assert( cmd.IsLocked );
                     // Now that immediate and potential deferred have been handled, consider the SendingTimeUtc.
                     if( EnqueueDelayed( cmd ) )
@@ -404,7 +418,8 @@ namespace CK.DeviceModel
                 if( _delayedQueue.Peek() == cmd )
                 {
                     Debug.Assert( _timer != null );
-                    _timer.Change( delta, Timeout.InfiniteTimeSpan );
+                    _commandMonitor.Debug( $"Timer set to {delta.TotalMilliseconds} ms." );
+                    _timer.Change( delta, Timeout.InfiniteTimeSpan /*TimeSpan.FromMilliseconds( 100 )*/ );
                 }
                 return true;
             }
@@ -427,14 +442,17 @@ namespace CK.DeviceModel
                     {
                         continue;
                     }
+                    _commandMonitor.Debug( $"Delayed Command dequeued: {delayed} {delayed.SendTime}." );
                     // The command is no more delayed.
                     delayed.SendTime = Util.UtcMinValue;
                     cmd = delayed;
+                    break;
                 }
                 // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
                 if( deltaMS > 0 )
                 {
                     Debug.Assert( _delayedQueue.Count > 0 );
+                    _commandMonitor.Debug( $"Timer set to {deltaMS} ms." );
                     _timer.Change( deltaMS, Timeout.Infinite );
                 }
             }
@@ -444,11 +462,20 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Handles immediate commands:
-        /// - CommandCanceler calls HandleCancelAllPendingCommands.
-        /// - If the command is completed (it has been added to the immediate queue by IInternalDeviceHost.OnCommandCompleted),
-        /// virtual OnCommandCompletedAsync() is called and if an unhandled exception occurs, the device is force stopped.
-        /// - Any other immediate commands are handled by HandleCommandAsync (with no possible defer).
+        /// Handles ImmediateCommandLimit immediate commands:
+        /// <list type="bullet">
+        ///  <item>
+        ///         CommandCanceler calls HandleCancelAllPendingCommands.
+        ///  </item>
+        ///  <item>
+        ///     If the command is completed (it has been added to the immediate queue by IInternalDeviceHost.OnCommandCompleted),
+        ///     virtual OnCommandCompletedAsync() is called and if an unhandled exception occurs, the device is force stopped.
+        ///     These completions don't count for ImmediateCommandLimit.
+        ///  </item>
+        ///  <item>
+        ///     Any other immediate commands are handled by HandleCommandAsync (with no possible defer).
+        ///  </item>
+        /// </list>
         /// </summary>
         /// <param name="immediate">The first immediate command.</param>
         /// <returns>The awaitable.</returns>
@@ -464,6 +491,8 @@ namespace CK.DeviceModel
                 }
                 else if( immediate.InternalCompletion.IsCompleted )
                 {
+                    // Command completion don't count as immediate commands.
+                    ++maxCount;
                     try
                     {
                         await OnCommandCompletedAsync( _commandMonitor, immediate );
@@ -738,7 +767,7 @@ namespace CK.DeviceModel
             if( _commandQueueImmediate.Writer.TryWrite( cmd ) ) _commandQueue.Writer.TryWrite( _commandAwaker );
         }
 
-        class ReminderCommand : BaseDeviceCommand
+        sealed class ReminderCommand : BaseDeviceCommand
         {
             public readonly DateTime Time;
             public readonly object? State;
@@ -753,6 +782,7 @@ namespace CK.DeviceModel
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+            public override string ToString() => nameof( ReminderCommand );
         }
 
         /// <summary>
