@@ -13,7 +13,10 @@ namespace CK.DeviceModel
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        BaseConfigureDeviceCommand CreateLockedConfigureCommand( string name, string? controllerKey, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration );
+        BaseConfigureDeviceCommand CreateLockedConfigureCommand( string name,
+                                                                 string? controllerKey,
+                                                                 DeviceConfiguration? configuration,
+                                                                 DeviceConfiguration? clonedConfiguration );
 
         BaseStartDeviceCommand CreateStartCommand( string name );
 

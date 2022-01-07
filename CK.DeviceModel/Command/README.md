@@ -18,8 +18,10 @@ This shortcuts the "regular" queue and there is still NO concurrency to handle, 
 immediately or right after the end of the currently executing command (if any).
 *Immediate* commands are simply enqueued in a high priority queue.
 
-Another internal queue exists: the queue of the deferred commands that contains the commands that cannot be handled
+Two other internal queues exist:
+- the queue of the deferred commands that contains the commands that cannot be handled
 by a stopped device. These deferred commands are automatically executed as soon as a device restarts.
+- a PriorityQueue where commands that have a `SendingTimeUtc` in the future are stored.
 
 ### On the Device
 
@@ -37,7 +39,7 @@ bool UnsafeSendCommand( IActivityMonitor monitor,
                         CancellationToken token = default );
 ```
 These methods throw an `ArgumentException` if the command is null or if its `CheckValidity` method returns `false`:
-command validity MUST be checked before sending it.
+command MUST be valid when they are sent.
 
 These methods return `false` if the device is destroyed and cannot receive commands anymore: the command completion has been
 called with an `UnavailableDeviceException` (that, depending on the command, may have been transformed into a canceled or successful
@@ -70,6 +72,30 @@ DeviceHostCommandResult SendCommand( IActivityMonitor monitor,
 
 The [DeviceHostCommandResult](../Host/DeviceHostCommandResult.cs) captures the result of the command sending operation.
 
+## Delayed commands
+
+Actual command sending can be delayed thanks to:
+
+```csharp
+/// <summary>
+/// Gets or sets the sending time of this command.
+/// When null (the default) or set to <see cref="Util.UtcMinValue"/> the command is executed
+/// (as usual) when it is dequeued.
+/// <para>
+/// When <see cref="ImmediateSending"/> is set to true, this SendingTimeUtc is automatically set to null.
+/// And when this is set to a non null UTC time, the ImmediateSending is automatically set to false.
+/// </para>
+/// <para>
+/// The value should be in the future but no check is done against <see cref="DateTime.UtcNow"/>
+/// in order to safely handle any clock drift: if the time is in the past when the command is dequeued,
+/// it will be executed like any regular (non immediate) command.
+/// </para>
+/// </summary>
+public DateTime? SendingTimeUtc { get; set; }
+```
+
+As the comment states, `SendingTimeUtc` and `ImmediateSending` are exclusive.
+
 ## Command handling: Its all about command Completion!
 
 The `Device.DoHandleCommandAsync` SHOULD be overridden otherwise, since all commands should be handled, the default implementation
@@ -87,6 +113,7 @@ When `DoHandleCommandAsync` is called, the command has been validated:
 - The `BaseDeviceCommand.DeviceName` matches this `IDevice.Name" (or Device.UnsafeSendCommand has been used). 
 - The `BaseDeviceCommand.ControllerKey` is either null or match the current `IDevice.ControllerKey` (or an Unsafe send has been used).
 - `BaseDeviceCommand.StoppedBehavior` is coherent with this current `IsRunning` state.
+- The `BaseDeviceCommand.SendingTimeUtc` is in the past.
 
 Typical `DoHandleCommandAsync` implementation applies pattern matching on the command type and handles
 it the way its wants, either directly or through a totally desynchronized process:
@@ -109,25 +136,25 @@ transform their task's result according to their semantics. The destroy command 
 (in [BaseDestroyDeviceCommand](Basic/BaseDestroyDeviceCommand.cs)):
 
 ```csharp
-    void ICompletable.OnError( Exception ex, ref CompletionSource.OnError result) => result.SetResult();
+protected override void OnError( Exception ex, ref CompletionSource.OnError result ) => result.SetResult();
 
-    void ICompletable.OnCanceled( ref CompletionSource.OnCanceled result ) => result.SetResult();
+protected override void OnCanceled( ref CompletionSource.OnCanceled result ) => result.SetResult();
 ```
 
 The configuration command is even more interesting since this command has a result that can express the error or canceled issues
 (in [BaseConfigureDeviceCommand](Basic/BaseConfigureDeviceCommand.cs)):
 
 ```csharp
-    void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
-    {
-        if( ex is InvalidControllerKeyException ) result.SetResult( DeviceApplyConfigurationResult.InvalidControllerKey );
-        else result.SetResult( DeviceApplyConfigurationResult.UnexpectedError );
-    }
+protected override void OnCanceled( ref CompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
+{
+    result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
+}
 
-    void ICompletable<DeviceApplyConfigurationResult>.OnCanceled( ref CompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
-    {
-        result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
-    }
+protected override void OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
+{
+    if( ex is InvalidControllerKeyException ) result.SetResult( DeviceApplyConfigurationResult.InvalidControllerKey );
+    else result.SetResult( DeviceApplyConfigurationResult.UnexpectedError );
+}
 ```
 
 If it is needed, the original exception or the fact that the command has actually been canceled is available on the `ICompletion` (that comes from
@@ -147,3 +174,23 @@ behavior since they must obviously do their job even if the device is stopped (t
 
 For "immediate" commands, [DeviceImmediateCommandStoppedBehavior](DeviceImmediateCommandStoppedBehavior.cs) has only 3 options since
 immediate commands cannot be deferred.
+
+## OnCommandCompletedAsync: command continuations
+
+When a command has completed (whatever its final state is), continuations can easily occur thanks to the Device's virtual method:
+```csharp
+/// <summary>
+/// Called when a command completes and its <see cref="BaseDeviceCommand.ShouldCallDeviceOnCommandCompleted"/> is true.
+/// </summary>
+/// <param name="monitor">The monitor to use.</param>
+/// <param name="command">The completed command.</param>
+/// <returns>The awaitable.</returns>
+protected virtual Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command ) => Task.CompletedTask;
+```
+
+Whether this method is called or not depends on the public `BaseDeviceCommand.ShouldCallDeviceOnCommandCompleted` boolean
+command's property that is:
+- False for the 5 standard commands.
+- True by default for any other commands. It can be changed at any time (before the completion occurs of course).
+
+

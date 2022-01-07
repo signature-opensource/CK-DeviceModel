@@ -76,16 +76,16 @@ namespace CK.DeviceModel.Tests
                 return Task.CompletedTask;
             }
 
-            protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
+            protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
             {
                 if( command is DCommand cmd )
                 {
                     Traces.Add( $"Command {cmd.Trace}" );
-                    await Task.Delay( cmd.ExecutionTime, token ).ConfigureAwait( false );
+                    await Task.Delay( cmd.ExecutionTime, cmd.CancellationToken ).ConfigureAwait( false );
                     cmd.Completion.SetResult();
                     return;
                 }
-                await base.DoHandleCommandAsync( monitor, command, token );
+                await base.DoHandleCommandAsync( monitor, command );
             }
         }
 
@@ -228,7 +228,10 @@ namespace CK.DeviceModel.Tests
             D? d = h["D"];
             Debug.Assert( d != null && d.IsRunning );
 
-            foreach( var c in SendCommands( d, nb ) ) await c.Completion;
+            foreach( var c in SendCommands( d, nb ) )
+            {
+                await c.Completion;
+            }
 
             CheckCommandTraces( d.Traces, 5, nb );
 

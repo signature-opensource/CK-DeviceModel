@@ -14,7 +14,7 @@ namespace CK.DeviceModel
     /// and supports <see cref="IActiveDevice{TEvent}"/>.
     /// <para>
     /// This SimpleActiveDevice raises its <see cref="AllEvent"/> from the command loop instead of running
-    /// a dedicated event loop like the <see cref="ActiveDevice{TConfiguration, TEvent}"/>.
+    /// a dedicated event loop like the "real" <see cref="ActiveDevice{TConfiguration, TEvent}"/>.
     /// </para>
     /// </summary>
     /// <typeparam name="TConfiguration">The device's configuration type.</typeparam>
@@ -62,6 +62,7 @@ namespace CK.DeviceModel
             public AutoSendEvent( TEvent e )
             {
                 ImmediateSending = true;
+                ShouldCallDeviceOnCommandCompleted = false;
                 Event = e;
             }
 
@@ -95,18 +96,17 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Overridden to handle the internal command that raises events from <see cref="IActiveDevice.DebugPostEvent(BaseActiveDeviceEvent)"/> or
-        /// calls the base <see cref="Device{TConfiguration}.DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand, CancellationToken)"/> (that
+        /// calls the base <see cref="Device{TConfiguration}.DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/> (that
         /// throws an <see cref="NotSupportedException"/>).
         /// </summary>
         /// <param name="monitor">The command monitor.</param>
         /// <param name="command">The command to handle.</param>
-        /// <param name="token">Cancellation token.</param>
         /// <returns>The awaitable.</returns>
-        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
+        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
         {
             return command is AutoSendEvent s
                     ? _allEvent.SafeRaiseAsync( monitor, s.Event )
-                    : base.DoHandleCommandAsync( monitor, command, token );
+                    : base.DoHandleCommandAsync( monitor, command );
         }
 
     }

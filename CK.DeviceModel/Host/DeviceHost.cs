@@ -122,7 +122,13 @@ namespace CK.DeviceModel
 
         Type IDeviceHost.GetDeviceConfigurationType() => typeof( TConfiguration );
 
-        BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name, string? controllerKey, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration ) => new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, clonedConfiguration, ( name, controllerKey ) );
+        BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name,
+                                                                                     string? controllerKey,
+                                                                                     DeviceConfiguration? configuration,
+                                                                                     DeviceConfiguration? clonedConfiguration )
+        {
+            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, clonedConfiguration, (name, controllerKey) );
+        }
 
         BaseStartDeviceCommand IInternalDeviceHost.CreateStartCommand( string name ) => new InternalStartDeviceCommand( GetType(), name );
 

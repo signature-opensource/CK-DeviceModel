@@ -19,7 +19,17 @@ namespace CK.DeviceModel
         string? _controllerKey;
         // Internal for the command queue.
         internal DateTime SendTime;
+        CancellationTokenRegistration[] _cancels;
+        static readonly Action<object?> _cancelFromTokenHandle = o => ((BaseDeviceCommand)o!).CancelFromCancellationTokens();
+        readonly CancellationTokenSource _cancelsResult;
         bool _isLocked;
+
+        // Running data...
+        // ...initialized by OnCommandEnter.
+        internal ActivityMonitor.DependentToken? _dependentToken;
+        // ...initialized by OnCommandSend.
+        internal bool _mustCheckControllerKey;
+        IInternalDevice? _device;
 
         /// <summary>
         /// Initialize a new locked command if <paramref name="locked"/> is provided.
@@ -37,7 +47,10 @@ namespace CK.DeviceModel
             {
                 _deviceName = String.Empty;
             }
+            ShouldCallDeviceOnCommandCompleted = true;
             SendTime = Util.UtcMinValue;
+            _cancels = Array.Empty<CancellationTokenRegistration>();
+            _cancelsResult = new CancellationTokenSource();
         }
 
         /// <summary>
@@ -81,10 +94,9 @@ namespace CK.DeviceModel
             get => SendTime.Kind == DateTimeKind.Unspecified;
             set
             {
-                // We don't check _isLocked here for 3 reasons:
+                // We don't check _isLocked here for 2 reasons:
                 // 1 - This is called to configure the already locked basic command default configuration.
-                // 2 - Delayed commands (with a SendingTimeUtc) are sent as immediate ones.
-                // 3 - this is pointless since Lock() is called after the routing between Immediate and regular
+                // 2 - this is pointless since Lock() is called after the routing between Immediate and regular
                 //     command queues has been made.
                 // The side effect is that if Lock() is called by user code before sending the command, this can
                 // still be changed. But we don't care :).
@@ -97,7 +109,7 @@ namespace CK.DeviceModel
         /// When null (the default) or set to <see cref="Util.UtcMinValue"/> the command is executed
         /// (as usual) when it is dequeued.
         /// <para>
-        /// When <see cref="ImmediateSending"/> is set to true, this automatically sets this to null.
+        /// When <see cref="ImmediateSending"/> is set to true, this SendingTimeUtc is automatically set to null.
         /// And when this is set to a non null UTC time, the ImmediateSending is automatically set to false.
         /// </para>
         /// <para>
@@ -123,6 +135,13 @@ namespace CK.DeviceModel
                 }
             }
         }
+
+        /// <summary>
+        /// Gets or sets whether <see cref="Device{TConfiguration}.OnCommandCompletedAsync(IActivityMonitor, BaseDeviceCommand)"/>
+        /// should be called once the command completed.
+        /// Defaults to true, except for the 5 basic commands (Start, Stop, Configure, SetControllerKey and Destroy).
+        /// </summary>
+        public bool ShouldCallDeviceOnCommandCompleted { get; set; }
 
         /// <summary>
         /// Gets or sets the target device name.
@@ -184,12 +203,17 @@ namespace CK.DeviceModel
             Debug.Assert( HostType != null, "Thanks to the private protected constructor and the generic of <THost>, a command instance has a host type." );
             if( DeviceName == null )
             {
-                monitor.Error( $"Command '{GetType().Name}': DeviceName must not be null." );
+                monitor.Error( $"Command '{ToString()}': DeviceName must not be null." );
                 return false;
             }
             if( InternalCompletion.IsCompleted )
             {
-                monitor.Error( $"{GetType().Name} has already a Result. Command cannot be reused." );
+                monitor.Error( $"{ToString()} has already a Result. Command cannot be reused." );
+                return false;
+            }
+            if( _device != null )
+            {
+                monitor.Error( $"{ToString()} has already been sent to device '{_device.FullName}'. A command can only be sent once." );
                 return false;
             }
             return DoCheckValidity( monitor );
@@ -213,7 +237,55 @@ namespace CK.DeviceModel
         /// </summary>
         protected void ThrowOnLocked()
         {
-            if( _isLocked ) Throw.InvalidOperationException( $"Command '{this}' is locked." );
+            if( _isLocked ) Throw.InvalidOperationException( $"Command '{ToString()}' is locked." );
+        }
+
+        /// <summary>
+        /// Registers a source for this <see cref="CancellationToken"/>.
+        /// Nothing is done if <see cref="CancellationToken.CanBeCanceled"/> is false
+        /// or this command has already been completed (see <see cref="ICompletion.IsCompleted"/>).
+        /// <para>
+        /// Whenever one of the added token is canceled, <see cref="ICompletionSource.TrySetCanceled()"/> is called.
+        /// If the token is already canceled, the call to try to cancel the completion is made immediately.
+        /// </para>
+        /// </summary>
+        /// <param name="t">The token.</param>
+        /// <returns>True if the token has been registered or triggered the cancellation, false otherwise.</returns>
+        public bool AddCancellationSource( CancellationToken t )
+        {
+            if( t.CanBeCanceled && !InternalCompletion.IsCompleted )
+            {
+                if( t.IsCancellationRequested )
+                {
+                    CancelFromCancellationTokens();
+                }
+                else
+                {
+                    // Register returns a dummy registration if the token has been signaled.
+                    var c = t.UnsafeRegister( _cancelFromTokenHandle, this );
+                    // Instead of using CreateLinkedTokenSource and its linked list
+                    // for which we'll have to handle the head with an interlocked setter anyway,
+                    // we use a reallocated array of registrations because:
+                    //  - it results in much less allocations (one array of value type instead of the linked nodes).
+                    //  - concurrency should be exceptional (interlocked operations will almost always occur once).
+                    Util.InterlockedAdd( ref _cancels, c );
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Gets a cancellation token that combines all tokens added by <see cref="AddCancellationSource(CancellationToken)"/>.
+        /// It is signaled as soon as one of the source token is signaled but not when the Completion is canceled: it
+        /// must be used to cancel any operation related to the command execution. 
+        /// </summary>
+        public CancellationToken CancellationToken => _cancelsResult.Token;
+
+        void CancelFromCancellationTokens()
+        {
+            _cancelsResult.Cancel();
+            InternalCompletion.TrySetCanceled();
         }
 
         /// <summary>
@@ -221,6 +293,37 @@ namespace CK.DeviceModel
         /// and <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
         /// </summary>
         internal abstract ICompletionSource InternalCompletion { get; }
+
+        internal void OnCommandEnter( ActivityMonitor.DependentToken d )
+        {
+            _dependentToken = d;
+        }
+
+        internal void OnCommandSend( IInternalDevice device, bool checkControllerKey, CancellationToken token )
+        {
+            if( _device != null ) Throw.InvalidOperationException( $"Command '{ToString()}' has already been sent." );
+            Lock();
+            _device = device;
+            _mustCheckControllerKey = checkControllerKey;
+            if( token.CanBeCanceled ) AddCancellationSource( token );
+        }
+
+        // This is called by the ICompletable.OnCompleted implementations of DeviceCommandNoResult
+        // and DeviceCommandWithResult.
+        private protected void OnInternalCommandCompleted()
+        {
+            Debug.Assert( InternalCompletion.IsCompleted );
+            Debug.Assert( _device != null );
+            Util.InterlockedSet( ref _cancels, cancels =>
+            {
+                foreach( var c in cancels ) c.Dispose();
+                return Array.Empty<CancellationTokenRegistration>();
+            } );
+            if( ShouldCallDeviceOnCommandCompleted )
+            {
+                _device.OnCommandCompleted( this );
+            }
+        }
 
         /// <summary>
         /// Extension point to <see cref="CheckValidity(IActivityMonitor)"/>. Called only after basic checks successfully passed.

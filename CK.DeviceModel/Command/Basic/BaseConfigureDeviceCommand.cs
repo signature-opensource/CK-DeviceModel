@@ -10,7 +10,7 @@ namespace CK.DeviceModel
     /// It exposes a base <see cref="DeviceConfiguration"/> and is useful when configuration type
     /// is not statically available.
     /// </summary>
-    public abstract class BaseConfigureDeviceCommand : DeviceCommandWithResult<DeviceApplyConfigurationResult>, ICompletable<DeviceApplyConfigurationResult>
+    public abstract class BaseConfigureDeviceCommand : DeviceCommandWithResult<DeviceApplyConfigurationResult>
     {
         private protected BaseConfigureDeviceCommand( DeviceConfiguration configuration, (string lockedName, string? lockedControllerKey)? locked = null )
             : base( locked )
@@ -18,30 +18,41 @@ namespace CK.DeviceModel
             Throw.CheckNotNullArgument( configuration );
             Configuration = configuration;
             ImmediateSending = true;
+            ShouldCallDeviceOnCommandCompleted = false;
         }
 
-        void ICompletable<DeviceApplyConfigurationResult>.OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
+        /// <summary>
+        /// Transforms cancellation into <see cref="DeviceApplyConfigurationResult.ConfigurationCanceled"/> result.
+        /// </summary>
+        /// <param name="result">The result setter.</param>
+        protected override sealed void OnCanceled( ref CompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
+        {
+            result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
+        }
+
+        /// <summary>
+        /// Transforms InvalidControllerKeyException into <see cref="DeviceApplyConfigurationResult.InvalidControllerKey"/>
+        /// and any other error into <see cref="DeviceApplyConfigurationResult.UnexpectedError"/> result.
+        /// </summary>
+        /// <param name="ex">The exception.</param>
+        /// <param name="result">The result setter.</param>
+        protected override sealed void OnError( Exception ex, ref CompletionSource<DeviceApplyConfigurationResult>.OnError result )
         {
             if( ex is InvalidControllerKeyException ) result.SetResult( DeviceApplyConfigurationResult.InvalidControllerKey );
             else result.SetResult( DeviceApplyConfigurationResult.UnexpectedError );
-        }
-
-        void ICompletable<DeviceApplyConfigurationResult>.OnCanceled( ref CompletionSource<DeviceApplyConfigurationResult>.OnCanceled result )
-        {
-            result.SetResult( DeviceApplyConfigurationResult.ConfigurationCanceled );
         }
 
         /// <summary>
         /// Returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>: the configuration can obviously be applied while the device is stopped.
         /// Note that this is not used: basic commands are always run by design.
         /// </summary>
-        protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+        protected internal override sealed DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
 
         /// <summary>
         /// Returns <see cref="DeviceImmediateCommandStoppedBehavior.RunAnyway"/>: the configuration can obviously be applied while the device is stopped.
         /// Note that this is not used: basic commands are always run by design.
         /// </summary>
-        protected internal override DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
+        protected internal override sealed DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
 
         /// <summary>
         /// Gets the configuration to apply.
@@ -53,7 +64,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
-        protected override bool DoCheckValidity( IActivityMonitor monitor )
+        protected override sealed bool DoCheckValidity( IActivityMonitor monitor )
         {
             return Configuration.CheckValid( monitor );
         }

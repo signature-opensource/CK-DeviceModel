@@ -16,6 +16,7 @@ namespace CK.DeviceModel
         private protected BaseSetControllerKeyDeviceCommand()
         {
             ImmediateSending = true;
+            ShouldCallDeviceOnCommandCompleted = false;
         }
 
         /// <summary>

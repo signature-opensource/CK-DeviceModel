@@ -129,13 +129,21 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Cancels all the commands that are waiting to be handled, either because they have been queued
-        /// and not handled yet or because they are waiting for the device to be running.
+        /// and not handled yet or because they are waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/>
+        /// or the device to be running.
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
         /// <param name="cancelQueuedCommands">Cancels the current command queue.</param>
-        /// <param name="cancelDeferredCommands">Cancels deferred commands waiting for the device to be running.</param>
-        /// <returns>The number of waiting commands and deferred commands that have been canceled.</returns>
-        (int,int) CancelAllPendingCommands( IActivityMonitor monitor, bool cancelQueuedCommands, bool cancelDeferredCommands );
+        /// <param name="cancelDelayedCommands">
+        /// Cancels delayed commands waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/> and any
+        /// registered <see cref="Device{TConfiguration}.AddReminder(DateTime, object?, bool)"/>.
+        /// </param>
+        /// <param name="cancelDeferredCommands">
+        /// Cancels deferred commands waiting for the device to be running.
+        /// </param>
+        /// <returns>The number of queued, delayed and deferred commands that have been canceled.</returns>
+        Task<(int,int,int)> CancelAllPendingCommandsAsync( bool cancelQueuedCommands,
+                                                           bool cancelDelayedCommands,
+                                                           bool cancelDeferredCommands );
 
         /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.
@@ -196,9 +204,13 @@ namespace CK.DeviceModel
         /// By default, the <see cref="BaseDeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
         /// Using false here skips this check.
         /// </param>
-        /// <param name="token">Optional cancellation token.</param>
+        /// <param name="token">Optional cancellation token (added to <see cref="BaseDeviceCommand.AddCancellationSource(CancellationToken)"/>).</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
-        bool SendCommand( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName = true, bool checkControllerKey = true, CancellationToken token = default );
+        bool SendCommand( IActivityMonitor monitor,
+                          BaseDeviceCommand command,
+                          bool checkDeviceName = true,
+                          bool checkControllerKey = true,
+                          CancellationToken token = default );
 
         /// <summary>
         /// Same as <see cref="SendCommand"/> except that only the host type
@@ -207,7 +219,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
-        /// <param name="token">Optional cancellation token.</param>
+        /// <param name="token">Optional cancellation token (added to <see cref="BaseDeviceCommand.AddCancellationSource(CancellationToken)"/>).</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         bool UnsafeSendCommand( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default );
     }

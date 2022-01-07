@@ -31,7 +31,10 @@ namespace CK.DeviceModel
         internal override ICompletionSource InternalCompletion => Completion;
 
         void ICompletable.OnError( Exception ex, ref CompletionSource.OnError result ) => OnError( ex, ref result );
+
         void ICompletable.OnCanceled( ref CompletionSource.OnCanceled result ) => OnCanceled( ref result );
+
+        void ICompletable.OnCompleted() => OnInternalCommandCompleted();
 
         /// <summary>
         /// Called by the CompletionSource when a error is set.

@@ -78,17 +78,17 @@ namespace CK.DeviceModel.Tests
                 return Task.CompletedTask;
             }
 
-            protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
+            protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
             {
                 if( command is DCommand cmd )
                 {
-                    await Task.Delay( 10, token ).ConfigureAwait( false );
+                    await Task.Delay( 10, cmd.CancellationToken ).ConfigureAwait( false );
                     Traces.Add( $"Command {cmd.Trace}" );
                     monitor.Info( $"Handling {cmd.Trace}" );
                     cmd.Completion.SetResult();
                     return;
                 }
-                await base.DoHandleCommandAsync( monitor, command, token );
+                await base.DoHandleCommandAsync( monitor, command );
             }
         }
 
