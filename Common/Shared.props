@@ -30,7 +30,7 @@
   <!--<StandardProperties>-->
   <PropertyGroup>
     <RepositoryUrl>https://gitlab.com/signature-code/CK-DeviceModel</RepositoryUrl>
-    <ProductName>SC</ProductName>
+    <ProductName>SC[NetCore3]</ProductName>
     <Company>Signature Code</Company>
     <Authors>Signature Code</Authors>
     <Copyright>Copyright Signature-Code 2007-$([System.DateTime]::UtcNow.ToString("yyyy"))</Copyright>
@@ -73,7 +73,7 @@
   </Target>
   <!--</SourceLinkDebuggingWorkaround>-->
 
-  <!--<Analyzers>-->
+  <!--<Analyzers>: This analyzer provides very welcome guidelines about async and threading issues.-->
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.0.64" PrivateAssets="All" IncludeAssets="runtime;build;native;contentfiles;analyzers" />
   </ItemGroup>
