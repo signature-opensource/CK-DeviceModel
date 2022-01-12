@@ -47,7 +47,7 @@ namespace CK.DeviceModel
             {
                 _daemonMonitor = new ActivityMonitor( nameof( DeviceHostDaemon ) );
                 // We don't wait for the actual termination of the loop: we don't need to capture the loop task.
-                _ = Task.Run( TheLoop );
+                _ = Task.Run( TheLoopAsync );
             }
             return Task.CompletedTask;
         }
@@ -60,7 +60,7 @@ namespace CK.DeviceModel
             s.TrySetResult( true );
         }
 
-        async Task TheLoop()
+        async Task TheLoopAsync()
         {
             Debug.Assert( _daemonMonitor != null );
             foreach( var h in _deviceHosts )
@@ -83,17 +83,17 @@ namespace CK.DeviceModel
                     }
                     if( signalTask.IsCompleted )
                     {
-                        _daemonMonitor.CloseGroup( $"Host has been signaled. Repeat." );
+                        _daemonMonitor.CloseGroup( $"Daemon has been signaled. Repeat." );
                     }
                     else if( wait != Int64.MaxValue )
                     {
                         int w = (int)(wait / TimeSpan.TicksPerMillisecond);
-                        _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a host's signal." );
+                        _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a signal." );
                         await Task.WhenAny( Task.Delay( w ), signalTask );
                     }
                     else
                     {
-                        _daemonMonitor.CloseGroup( $"Waiting for a host's signal." );
+                        _daemonMonitor.CloseGroup( $"Waiting for a signal." );
                         await signalTask;
                     }
                 }

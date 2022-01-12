@@ -80,16 +80,13 @@ namespace CK.DeviceModel
         /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
         public virtual async Task<int> RetryStartAsync( IActivityMonitor monitor, IDeviceHost host, IDevice device, int retryCount )
         {
-            using( monitor.OpenInfo( $"DeviceAlwaysRunningPolicy '{GetType().Name}': attempt n°{retryCount} to restart the device '{device.FullName}'." ) )
+            if( await device.StartAsync( monitor ).ConfigureAwait( false ) )
             {
-                if( await device.StartAsync( monitor ).ConfigureAwait( false ) )
-                {
-                    return 0;
-                }
-                return retryCount < _retryTimeouts.Length
-                            ? _retryTimeouts[retryCount]
-                            : (AlwaysRetry ? _retryTimeouts[^1] : 0);
+                return 0;
             }
+            return retryCount < _retryTimeouts.Length
+                        ? _retryTimeouts[retryCount]
+                        : (AlwaysRetry ? _retryTimeouts[^1] : 0);
         }
     }
 }

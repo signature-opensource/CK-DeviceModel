@@ -109,7 +109,6 @@ namespace CK.DeviceModel
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
             _reconfigureSyncLock = new object();
             _alwayRunningStopped = new List<(IDevice Device, int Count, DateTime NextCall)>();
-            _alwayRunningStoppedSafe = Array.Empty<(IDevice, int, DateTime)>();
         }
 
         /// <inheritdoc />

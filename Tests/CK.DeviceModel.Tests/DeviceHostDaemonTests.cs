@@ -53,9 +53,9 @@ namespace CK.DeviceModel.Tests
         [TestCase( "UseDestroyCommandImmediate" )]
         [TestCase( "UseDestroyCommand" )]
         [TestCase( "UseDestroyMethod" )]
-        public async Task simple_auto_restart( string mode )
+        public async Task simple_auto_restart_Async( string mode )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(simple_auto_restart) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(simple_auto_restart_Async) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1, MachineDuration = 200 };
             var host = new MachineHost();
@@ -106,9 +106,9 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
-        public async Task restart_can_be_fast()
+        public async Task restart_can_be_fast_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(restart_can_be_fast) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(restart_can_be_fast_Async) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 0, MachineDuration = 200 };
             var host = new MachineHost();
@@ -134,9 +134,9 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
-        public async Task multiple_devices_handling()
+        public async Task multiple_devices_handling_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_devices_handling) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_devices_handling_Async) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1, MachineDuration = 1000 };
             var host = new MachineHost();
@@ -223,9 +223,9 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
-        public async Task multiple_hosts_handling()
+        public async Task multiple_hosts_handling_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_hosts_handling) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_hosts_handling_Async) );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1 };
             var host1 = new MachineHost();
@@ -282,9 +282,9 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
-        public async Task DefaultDeviceAlwaysRunningPolicy_always_retry_by_default()
+        public async Task DefaultDeviceAlwaysRunningPolicy_always_retry_by_default_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( DefaultDeviceAlwaysRunningPolicy_always_retry_by_default ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( DefaultDeviceAlwaysRunningPolicy_always_retry_by_default_Async ) );
 
             var policy = new DefaultDeviceAlwaysRunningPolicy();
             var host = new MachineHost();
@@ -330,7 +330,6 @@ namespace CK.DeviceModel.Tests
             d.IsDestroyed.Should().BeTrue();
             await ((IHostedService)daemon).StopAsync( default );
         }
-
 
     }
 }
