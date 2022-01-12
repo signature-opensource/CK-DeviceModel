@@ -106,7 +106,6 @@ namespace CK.DeviceModel
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
             _reconfigureSyncLock = new object();
             _alwayRunningStopped = new List<(IInternalDevice Device, int Count, DateTime NextCall)>();
-            _alwayRunningStoppedSafe = Array.Empty<(IInternalDevice, int, DateTime)>();
             // Shut up the CS8618 warning is raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
             // (But keep the warning for any other fields.)
             _applyConfigAsynclock = null!;

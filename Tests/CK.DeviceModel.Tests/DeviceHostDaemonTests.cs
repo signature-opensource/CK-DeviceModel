@@ -331,6 +331,5 @@ namespace CK.DeviceModel.Tests
             await ((IHostedService)daemon).StopAsync( default );
         }
 
-
     }
 }
