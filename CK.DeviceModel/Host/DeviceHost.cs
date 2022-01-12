@@ -248,7 +248,7 @@ namespace CK.DeviceModel
                 Success = success;
                 HostConfiguration = initialConfiguration;
                 Results = r;
-                _destroyedNames = destroyedNames;
+                _destroyedNames = (IReadOnlyCollection<string>?)destroyedNames ?? Array.Empty<string>();
             }
 
             /// <summary>
