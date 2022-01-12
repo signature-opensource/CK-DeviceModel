@@ -19,8 +19,8 @@ And some methods:
 that send their respective [5 basic commands](../Command/Basic)).
 
 The Device implementation handles the nitty-gritty details of device life cycle and provide
-any implementation for really safe asynchronous command handling and independent monitoring thanks to an
-internal asynchronous loop.
+any implementation for really safe asynchronous command handling (including delayed executions, cancellations) and
+independent monitoring thanks to an internal asynchronous loop.
 
 Specialized devices must provide implementations for:
 
@@ -30,6 +30,15 @@ protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityM
 protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
 protected abstract Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason );
 protected abstract Task DoDestroyAsync( IActivityMonitor monitor );
+```
+Optional extension points of a Device are:
+```csharp
+protected virtual DeviceCommandStoppedBehavior OnStoppedDeviceCommand( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual DeviceImmediateCommandStoppedBehavior OnStoppedDeviceImmediateCommand( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state );
+protected virtual ValueTask<bool> OnUnhandledExceptionAsync( IActivityMonitor monitor, BaseDeviceCommand command, Exception ex );
+protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 ```
 
 ## Commands
@@ -47,8 +56,9 @@ and an internally managed asynchronous command loop with its own ActivityMonitor
 - Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
  starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs).
 - Commands can be sent immediately (highest priority) or delayed, waiting for their `SendingTimeUtc`.
+- Commands can have one timeout (in milliseconds) and any number of associated CancellationTokens.
 - Commands completion MUST be signaled explicitly.
-- Commands may transform errors or cancellation into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
+- Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
 is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
 - Completed commands (even the ones that are completed outside of the command loop and regardless of their state - error, canceled or success) 
 can be safely "continued" thanks to the Device's `OnCommandCompletedAsync` method.
@@ -87,7 +97,7 @@ Reminders can be added and are triggered regardless of the Device status (stoppe
 
 ## Configuration
 
-Device are instantiated with an initial configuration and can be reconfigured at any time. [DeviceConfiguration](../DeviceConfiguration.cs)
+Devices are instantiated with an initial configuration and can be reconfigured at any time. [DeviceConfiguration](../DeviceConfiguration.cs)
 are basic, Poco-like, mutable objects that must be binary serializable. Thanks to the binary serialization, Configuration can be
 deep cloned: we use this to isolate the actual running configuration (that can be accessed through the protected `CurrentConfiguration`
 property from device's code) and the device's publicly exposed `ExternalConfiguration` that is an independent clone.

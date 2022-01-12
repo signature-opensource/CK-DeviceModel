@@ -180,7 +180,7 @@ namespace CK.DeviceModel.Tests
                 }
                 else if( !inc.Value )
                 {
-                    commands.Reverse();
+                    Array.Reverse( commands );
                 }
                 c.AddRangeArray( commands );
                 foreach( var cmd in commands ) device.UnsafeSendCommand( TestHelper.Monitor, cmd );
@@ -199,8 +199,8 @@ namespace CK.DeviceModel.Tests
             Debug.Assert( d != null );
 
             var all = new List<DCommand>();
-            SendCommands( d, true, all );
             SendCommands( d, false, all );
+            SendCommands( d, true, all );
             SendCommands( d, null, all );
 
             // We have 2 execTimeMS per command: one for the delay in DoHandleCommandAsync and one for the reminder.

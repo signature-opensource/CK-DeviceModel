@@ -12,9 +12,11 @@ namespace CK.DeviceModel.Tests
     {
         public static int TotalCount;
         public static int TotalRunning;
+        public static int OnCommandComplededCount;
 
         int _color;
         bool _colorFromConfig;
+
 
         // For test, not for doc.
         readonly PerfectEventSender<IDevice, int> _testFlash;
@@ -99,6 +101,12 @@ namespace CK.DeviceModel.Tests
             }
             // The base.DoHandleCommandAsync throws a NotSupportedException: all defined commands MUST be handled above.
             await base.DoHandleCommandAsync( monitor, command );
+        }
+
+        protected override Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command )
+        {
+            Interlocked.Increment( ref OnCommandComplededCount );
+            return base.OnCommandCompletedAsync( monitor, command );
         }
 
         protected override Task DoDestroyAsync( IActivityMonitor monitor )

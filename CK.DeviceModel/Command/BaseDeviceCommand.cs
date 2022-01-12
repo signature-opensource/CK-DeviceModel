@@ -15,18 +15,49 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class BaseDeviceCommand
     {
+        /// <summary>
+        /// Cancellation reason used when <see cref="ICompletionSource.SetCanceled()"/> or <see cref="ICompletionSource.TrySetCanceled()"/>
+        /// have been used.
+        /// </summary>
+        public const string CommandCompletionCanceledReason = "CommandCompletionCanceled";
+
+        /// <summary>
+        /// Cancellation reason used when the timeout computed by <see cref="Device.GetCommandTimeoutAsync(IActivityMonitor, BaseDeviceCommand)"/>
+        /// elapsed.
+        /// </summary>
+        public const string CommandTimeoutReason = "CommandTimeout";
+
+        /// <summary>
+        /// Cancellation reason used when the token provided to <see cref="Device{TConfiguration}.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, bool, CancellationToken)"/>
+        /// has been signaled.
+        /// </summary>
+        public const string SendCommandTokenReason = "SendCommandToken";
+
         string _deviceName;
         string? _controllerKey;
         // Internal for the command queue.
-        internal DateTime SendTime;
+        internal DateTime _sendTime;
         CancellationTokenRegistration[] _cancels;
-        static readonly Action<object?> _cancelFromTokenHandle = o => ((BaseDeviceCommand)o!).CancelFromCancellationTokens();
+        static readonly Action<object?> _cancelFromTokenHandle = o => CancelFromTokenRelay( o! );
+        static readonly Action<object?> _cancelFromTimeoutHandle = o => CancelFromTimeoutRelay( o! );
+
+        static void CancelFromTokenRelay( object o )
+        {
+            var (c,n) = (Tuple<BaseDeviceCommand,string>)o;
+            c.CancelFromCancellationTokens( n );
+        }
+
+        static void CancelFromTimeoutRelay( object o )
+        {
+            ((BaseDeviceCommand)o).CancelFromTimeout();
+        }
+
         readonly CancellationTokenSource _cancelsResult;
+        string? _firstCancellationReason;
+        int _shouldCallCommandComplete;
         bool _isLocked;
 
         // Running data...
-        // ...initialized by OnCommandEnter.
-        internal ActivityMonitor.DependentToken? _dependentToken;
         // ...initialized by OnCommandSend.
         internal bool _mustCheckControllerKey;
         IInternalDevice? _device;
@@ -48,9 +79,10 @@ namespace CK.DeviceModel
                 _deviceName = String.Empty;
             }
             ShouldCallDeviceOnCommandCompleted = true;
-            SendTime = Util.UtcMinValue;
+            _sendTime = Util.UtcMinValue;
             _cancels = Array.Empty<CancellationTokenRegistration>();
             _cancelsResult = new CancellationTokenSource();
+            _cancelsResult.Token.UnsafeRegister( _cancelFromTimeoutHandle, this );
         }
 
         /// <summary>
@@ -91,7 +123,7 @@ namespace CK.DeviceModel
         /// </summary>
         public bool ImmediateSending
         {
-            get => SendTime.Kind == DateTimeKind.Unspecified;
+            get => _sendTime.Kind == DateTimeKind.Unspecified;
             set
             {
                 // We don't check _isLocked here for 2 reasons:
@@ -100,7 +132,7 @@ namespace CK.DeviceModel
                 //     command queues has been made.
                 // The side effect is that if Lock() is called by user code before sending the command, this can
                 // still be changed. But we don't care :).
-                SendTime = value ? DateTime.MinValue : Util.UtcMinValue;
+                _sendTime = value ? DateTime.MinValue : Util.UtcMinValue;
             }
         }
 
@@ -120,18 +152,18 @@ namespace CK.DeviceModel
         /// </summary>
         public DateTime? SendingTimeUtc
         {
-            get => SendTime.Ticks == 0 ? null : SendTime;
+            get => _sendTime.Ticks == 0 ? null : _sendTime;
             set
             {
                 ThrowOnLocked();
                 if( !value.HasValue )
                 {
-                    SendTime = Util.UtcMinValue;
+                    _sendTime = Util.UtcMinValue;
                 }
                 else
                 {
                     Throw.CheckArgument( value.Value.Kind == DateTimeKind.Utc );
-                    SendTime = value.Value;
+                    _sendTime = value.Value;
                 }
             }
         }
@@ -140,8 +172,19 @@ namespace CK.DeviceModel
         /// Gets or sets whether <see cref="Device{TConfiguration}.OnCommandCompletedAsync(IActivityMonitor, BaseDeviceCommand)"/>
         /// should be called once the command completed.
         /// Defaults to true, except for the 5 basic commands (Start, Stop, Configure, SetControllerKey and Destroy).
+        /// <para>
+        /// It is always false once OnCommandCompletedAsync has been called.
+        /// </para>
         /// </summary>
-        public bool ShouldCallDeviceOnCommandCompleted { get; set; }
+        public bool ShouldCallDeviceOnCommandCompleted
+        {
+            get => _shouldCallCommandComplete == 1;
+            set
+            {
+                if( value ) Interlocked.CompareExchange( ref _shouldCallCommandComplete, 1, 0 );
+                else Interlocked.CompareExchange( ref _shouldCallCommandComplete, 0, 1 );
+            }
+        }
 
         /// <summary>
         /// Gets or sets the target device name.
@@ -206,11 +249,6 @@ namespace CK.DeviceModel
                 monitor.Error( $"Command '{ToString()}': DeviceName must not be null." );
                 return false;
             }
-            if( InternalCompletion.IsCompleted )
-            {
-                monitor.Error( $"{ToString()} has already a Result. Command cannot be reused." );
-                return false;
-            }
             if( _device != null )
             {
                 monitor.Error( $"{ToString()} has already been sent to device '{_device.FullName}'. A command can only be sent once." );
@@ -241,7 +279,31 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Registers a source for this <see cref="CancellationToken"/>.
+        /// Gets the cancellation reason if a cancellation occurred.
+        /// </summary>
+        public string? CancellationReason => InternalCompletion.HasBeenCanceled ? _firstCancellationReason : null;
+
+        /// <summary>
+        /// Cancels this command with an explicit reason.
+        /// </summary>
+        /// <param name="reason">
+        /// The reason to cancel the command. Must not be empty or whitespace.
+        /// This must not be empty or whitespace nor <see cref="CommandCompletionCanceledReason"/>, <see cref="CommandTimeoutReason"/> or <see cref="SendCommandTokenReason"/>.
+        /// </param>
+        public void Cancel( string reason )
+        {
+            Throw.CheckNotNullOrWhiteSpaceArgument( reason );
+            Throw.CheckArgument( reason != CommandTimeoutReason && reason != CommandCompletionCanceledReason && reason != SendCommandTokenReason );
+            if( !InternalCompletion.IsCompleted )
+            {
+                Interlocked.CompareExchange( ref _firstCancellationReason, reason, null );
+                _cancelsResult.Cancel();
+            }
+        }
+
+#pragma warning disable CA1068 // CancellationToken parameters must come last
+        /// <summary>
+        /// Registers a source for this <see cref="CancellationToken"/> along with a reason.
         /// Nothing is done if <see cref="CancellationToken.CanBeCanceled"/> is false
         /// or this command has already been completed (see <see cref="ICompletion.IsCompleted"/>).
         /// <para>
@@ -250,19 +312,30 @@ namespace CK.DeviceModel
         /// </para>
         /// </summary>
         /// <param name="t">The token.</param>
+        /// <param name="reason">
+        /// Reason that will be <see cref="CancellationReason"/> if this token is the first to cancel the command.
+        /// This must not be empty or whitespace nor <see cref="CommandCompletionCanceledReason"/>, <see cref="CommandTimeoutReason"/> or <see cref="SendCommandTokenReason"/>.
+        /// </param>
         /// <returns>True if the token has been registered or triggered the cancellation, false otherwise.</returns>
-        public bool AddCancellationSource( CancellationToken t )
+        public bool AddCancellationSource( CancellationToken t, string reason )
+        {
+            Throw.CheckNotNullOrEmptyArgument( reason );
+            Throw.CheckArgument( reason != CommandTimeoutReason && reason != CommandCompletionCanceledReason && reason != SendCommandTokenReason );
+            return DoAddCancellationSource( t, reason );
+        }
+
+        bool DoAddCancellationSource( CancellationToken t, string reason )
         {
             if( t.CanBeCanceled && !InternalCompletion.IsCompleted )
             {
                 if( t.IsCancellationRequested )
                 {
-                    CancelFromCancellationTokens();
+                    CancelFromCancellationTokens( reason );
                 }
                 else
                 {
                     // Register returns a dummy registration if the token has been signaled.
-                    var c = t.UnsafeRegister( _cancelFromTokenHandle, this );
+                    var c = t.UnsafeRegister( _cancelFromTokenHandle, Tuple.Create( this, reason ) );
                     // Instead of using CreateLinkedTokenSource and its linked list
                     // for which we'll have to handle the head with an interlocked setter anyway,
                     // we use a reallocated array of registrations because:
@@ -274,18 +347,30 @@ namespace CK.DeviceModel
             }
             return false;
         }
+#pragma warning restore CA1068 // CancellationToken parameters must come last
 
         /// <summary>
-        /// Gets a cancellation token that combines all tokens added by <see cref="AddCancellationSource(CancellationToken)"/>.
-        /// It is signaled as soon as one of the source token is signaled but not when the Completion is canceled: it
-        /// must be used to cancel any operation related to the command execution. 
+        /// Gets a cancellation token that combines all tokens added by <see cref="AddCancellationSource(CancellationToken, string)"/>,
+        /// command timeout, and cancellations on the Completion or via <see cref="Cancel(string)"/>.
+        /// It must be used to cancel any operation related to the command execution. 
         /// </summary>
         public CancellationToken CancellationToken => _cancelsResult.Token;
 
-        void CancelFromCancellationTokens()
+        void CancelFromCancellationTokens( string reason )
         {
+            Interlocked.CompareExchange( ref _firstCancellationReason, reason, null );
             _cancelsResult.Cancel();
+        }
+
+        void CancelFromTimeout()
+        {
+            Interlocked.CompareExchange( ref _firstCancellationReason, CommandTimeoutReason, null );
             InternalCompletion.TrySetCanceled();
+        }
+
+        internal void SetCommandTimeout( int ms )
+        {
+            _cancelsResult.CancelAfter( ms );
         }
 
         /// <summary>
@@ -294,18 +379,32 @@ namespace CK.DeviceModel
         /// </summary>
         internal abstract ICompletionSource InternalCompletion { get; }
 
-        internal void OnCommandEnter( ActivityMonitor.DependentToken d )
-        {
-            _dependentToken = d;
-        }
-
         internal void OnCommandSend( IInternalDevice device, bool checkControllerKey, CancellationToken token )
         {
-            if( _device != null ) Throw.InvalidOperationException( $"Command '{ToString()}' has already been sent." );
+            Debug.Assert( _device == null );
             Lock();
             _device = device;
-            _mustCheckControllerKey = checkControllerKey;
-            if( token.CanBeCanceled ) AddCancellationSource( token );
+            if( InternalCompletion.IsCompleted )
+            {
+                // This is already completed but we are accepting the command here...
+                // We must be sure that OnCommandCompled is called ONCE (if ShouldCallDeviceOnCommandCompleted is true).
+                // To prevent a race condition, the trick here (and in OnInternalCommandCompleted) is to use -1
+                // as an atomic marker that OnCommandCompleted has already been called.
+                // Thanks to this, we don't need to secure the _device assignation: we are sure to see it here
+                // so we can safely miss it in OnInternalCommandCompleted.
+                //
+                // Note that an already completed command doesn't check the controller key.
+                //
+                if( Interlocked.CompareExchange( ref _shouldCallCommandComplete, -1, 1 ) == 1 ) 
+                {
+                    _device.OnCommandCompleted( this );
+                }
+            }
+            else
+            {
+                _mustCheckControllerKey = checkControllerKey;
+                if( token.CanBeCanceled ) DoAddCancellationSource( token, SendCommandTokenReason );
+            }
         }
 
         // This is called by the ICompletable.OnCompleted implementations of DeviceCommandNoResult
@@ -313,13 +412,18 @@ namespace CK.DeviceModel
         private protected void OnInternalCommandCompleted()
         {
             Debug.Assert( InternalCompletion.IsCompleted );
-            Debug.Assert( _device != null );
             Util.InterlockedSet( ref _cancels, cancels =>
             {
                 foreach( var c in cancels ) c.Dispose();
                 return Array.Empty<CancellationTokenRegistration>();
             } );
-            if( ShouldCallDeviceOnCommandCompleted )
+            if( InternalCompletion.HasBeenCanceled )
+            {
+                Interlocked.CompareExchange( ref _firstCancellationReason, CommandCompletionCanceledReason, null );
+            }
+            // A command can be completed before being sent:
+            // we don't call OnCommandCompleted is such case.
+            if( _device != null && Interlocked.CompareExchange( ref _shouldCallCommandComplete, -1, 1 ) == 1 )
             {
                 _device.OnCommandCompleted( this );
             }

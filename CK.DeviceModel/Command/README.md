@@ -70,7 +70,8 @@ DeviceHostCommandResult SendCommand( IActivityMonitor monitor,
                                      CancellationToken token = default );
 ```
 
-The [DeviceHostCommandResult](../Host/DeviceHostCommandResult.cs) captures the result of the command sending operation.
+The [DeviceHostCommandResult](../Host/DeviceHostCommandResult.cs) captures the result of the command sending operation
+through a host.
 
 ## Delayed commands
 
@@ -114,6 +115,7 @@ When `DoHandleCommandAsync` is called, the command has been validated:
 - The `BaseDeviceCommand.ControllerKey` is either null or match the current `IDevice.ControllerKey` (or an Unsafe send has been used).
 - `BaseDeviceCommand.StoppedBehavior` is coherent with this current `IsRunning` state.
 - The `BaseDeviceCommand.SendingTimeUtc` is in the past.
+- `GetCommandTimeoutAsync` has been called and the command's timeout is configured.
 
 Typical `DoHandleCommandAsync` implementation applies pattern matching on the command type and handles
 it the way its wants, either directly or through a totally desynchronized process:
@@ -174,6 +176,75 @@ behavior since they must obviously do their job even if the device is stopped (t
 
 For "immediate" commands, [DeviceImmediateCommandStoppedBehavior](DeviceImmediateCommandStoppedBehavior.cs) has only 3 options since
 immediate commands cannot be deferred.
+
+## Cancellations & timeout
+
+Many reasons can lead to the cancellation of a command. A "reason" string is exposed on the Command that describes
+why the command has been canceled:
+
+```csharp
+/// <summary>
+/// Gets the cancellation reason if a cancellation occurred.
+/// </summary>
+public string? CancellationReason { get; }
+```
+
+### Multiple cancellation sources
+
+First, any number of CancellationToken can be enlisted at any time on a Command thanks to:
+```csharp
+/// <summary>
+/// Registers a source for this <see cref="CancellationToken"/> along with a reason.
+/// Nothing is done if <see cref="CancellationToken.CanBeCanceled"/> is false
+/// or this command has already been completed (see <see cref="ICompletion.IsCompleted"/>).
+/// <para>
+/// Whenever one of the added token is canceled, <see cref="ICompletionSource.TrySetCanceled()"/> is called.
+/// If the token is already canceled, the call to try to cancel the completion is made immediately.
+/// </para>
+/// </summary>
+/// <param name="t">The token.</param>
+/// <param name="reason">
+/// Reason that will be <see cref="CancellationReason"/> if this token is the first to cancel the command.
+/// This must not be empty or whitespace nor <see cref="CommandCompletionCanceledReason"/>, <see cref="CommandTimeoutReason"/> or <see cref="SendCommandTokenReason"/>.
+/// </param>
+/// <returns>True if the token has been registered or triggered the cancellation, false otherwise.</returns>
+public bool AddCancellationSource( CancellationToken t, string reason )
+```
+Host's and Device's `SendCommand` methods enlist their optional `CancellationToken` parameter with
+the `SendCommandToken` reason string.
+
+Second, a Command can be explicitly canceled in two ways:
+- By calling its `Completion.TrySetCancel()` (or `Completion.SetCancel()`) method. In this
+case the reason is the constant string `CommandCompletionCanceled`.
+- By calling the Command's `void Cancel( string reason )` method that enables to set an explicit reason.
+
+Last but not least, a Command can have an associated timeout in milliseconds. This timeout can be estimated/computed
+by the `Device.GetCommandTimeoutAsync` method:
+```csharp
+/// <summary>
+/// Called right before <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/> to compute a
+/// timeout in milliseconds for the command that is about to be executed.
+/// By default this returns 0: negative or 0 means that no timeout will be set on the command.
+/// </summary>
+/// <param name="monitor">The monitor to use.</param>
+/// <param name="command">The command about to be handled by <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/>.</param>
+/// <returns>A timeout in milliseconds. 0 or negative if timeout cannot or shouldn't be set.</returns>
+protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monitor, BaseDeviceCommand command ) => new ValueTask<int>( 0 ); 
+```
+When positive, this timeout may cancel the command with the `CommandTimout` reason string.
+
+### The command's CancellationToken
+
+When handling a command, a unique token is exposed by the Command that summarizes all cancellations:
+```csharp
+/// <summary>
+/// Gets a cancellation token that combines all tokens added by <see cref="AddCancellationSource(CancellationToken, string)"/>,
+/// command timeout, and cancellations on the Completion or via <see cref="Cancel(string)"/>.
+/// It must be used to cancel any operation related to the command execution. 
+/// </summary>
+public CancellationToken CancellationToken { get; }
+```
+
 
 ## OnCommandCompletedAsync: command continuations
 

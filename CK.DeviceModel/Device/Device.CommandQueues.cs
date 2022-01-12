@@ -16,7 +16,7 @@ namespace CK.DeviceModel
         readonly Channel<BaseDeviceCommand> _commandQueue;
         readonly Channel<BaseDeviceCommand> _commandQueueImmediate;
         readonly Queue<BaseDeviceCommand> _deferredCommands;
-        PriorityQueue<BaseDeviceCommand, DateTime>? _delayedQueue;
+        PriorityQueue<BaseDeviceCommand, long>? _delayedQueue;
         Timer? _timer;
         // Current command being handled.
         BaseDeviceCommand? _currentlyExecuting;
@@ -27,6 +27,8 @@ namespace CK.DeviceModel
         volatile bool _immediateCommandLimitDirty;
         // Read & Updated only by the Command loop.
         int _currentImmediateCommandLimit;
+
+        const long TicksPerMillisecond = 10000;
 
         /// <inheritdoc />
         public int ImmediateCommandLimitOffset
@@ -119,7 +121,7 @@ namespace CK.DeviceModel
                     tRemoved = _delayedQueue.Count;
                     foreach( var (t, _) in _delayedQueue.UnorderedItems )
                     {
-                        if( t is not ReminderCommand )
+                        if( t is not Reminder )
                         {
                             t.InternalCompletion.SetCanceled();
                         }
@@ -206,7 +208,6 @@ namespace CK.DeviceModel
                     Throw.ArgumentException( nameof( command ), $"{command}: Command DeviceName is '{command.DeviceName}', device '{Name}' cannot execute it. (For direct execution, you can use checkDeviceName: false parameter to skip this check or use UnsafeSendCommand.)" );
                 }
             }
-            command.OnCommandEnter( monitor.DependentActivity().CreateToken() );
         } 
         #endregion
 
@@ -239,8 +240,12 @@ namespace CK.DeviceModel
                     // any regular ones).
                     // This de facto enables ready-to-run delayed commands to be handled at a higher priority than regular ones.
                     cmd = await WaitForNextCommandAsync( expectDelayed: false ).ConfigureAwait( false );
-                    if( cmd == _commandAwaker ) cmd = await WaitForNextCommandAsync( expectDelayed: true ).ConfigureAwait( false );
-
+                    _commandMonitor.Debug( $"Obtained {cmd}." );
+                    if( cmd == _commandAwaker )
+                    {
+                        cmd = await WaitForNextCommandAsync( expectDelayed: true ).ConfigureAwait( false );
+                        _commandMonitor.Debug( $"Obtained {cmd}." );
+                    }
                     #region Immediate commands
                     // Handle all available immediate at once (but no more than ImmediateCommandLimit to avoid regular commands starvation).
                     if( _commandQueueImmediate.Reader.TryRead( out immediate ) )
@@ -251,7 +256,7 @@ namespace CK.DeviceModel
                     #endregion
 
                     #region Handles low-level ReminderCommand (from the _delayedQueue).
-                    if( cmd is ReminderCommand reminder )
+                    if( cmd is Reminder reminder )
                     {
                         try
                         {
@@ -311,6 +316,7 @@ namespace CK.DeviceModel
                     {
                         if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) break;
                         cmd = oneRegular;
+                        if( cmd == _commandAwaker ) _commandMonitor.Warn( "_commandAwaker flushed!" );
                     }
                     if( cmd == _commandAwaker )
                     {
@@ -401,25 +407,36 @@ namespace CK.DeviceModel
             _commandMonitor.MonitorEnd();
         }
 
+
         bool EnqueueDelayed( BaseDeviceCommand cmd )
         {
-            var t = cmd.SendTime;
-            Debug.Assert( t.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
-            var delta = t - DateTime.UtcNow;
-            if( delta > TimeSpan.Zero )
+            Debug.Assert( cmd._sendTime.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
+            var ticks = cmd._sendTime.Ticks;
+            var deltaTicks = ticks - DateTime.UtcNow.Ticks;
+            if( deltaTicks > 0 )
             {
                 if( _delayedQueue == null )
                 {
-                    _delayedQueue = new PriorityQueue<BaseDeviceCommand, DateTime>();
-                    _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
+                    _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
+                    _timer = new Timer( _ =>
+                    {
+                        CK.Monitoring.GrandOutput.Default!.ExternalLog( LogLevel.Debug, "Timer fired!" );
+                        _commandQueue.Writer.TryWrite( _commandAwaker );
+                    } );
                     _commandMonitor.Info( "Created DelayedQueue and Timer." );
                 }
-                _delayedQueue.Enqueue( cmd, t );
+                _delayedQueue.Enqueue( cmd, ticks );
                 if( _delayedQueue.Peek() == cmd )
                 {
                     Debug.Assert( _timer != null );
-                    _commandMonitor.Debug( $"Timer set to {delta.TotalMilliseconds} ms." );
-                    _timer.Change( delta, Timeout.InfiniteTimeSpan /*TimeSpan.FromMilliseconds( 100 )*/ );
+                    uint delta = (uint)(deltaTicks / TicksPerMillisecond);
+                    _commandMonitor.Debug( $"First delayed command in {delta} ms." );
+                    if( !_timer.Change( delta, 0 ) )
+                    {
+                        _commandMonitor.Debug( $"Failed to Change timer." );
+                        _failedChangeTimerNextTick = ticks;
+                        _commandQueue.Writer.TryWrite( _commandAwaker );
+                    }
                 }
                 return true;
             }
@@ -432,33 +449,73 @@ namespace CK.DeviceModel
             if( _delayedQueue != null )
             {
                 Debug.Assert( _timer != null );
-                var now = DateTime.UtcNow;
-                long deltaMS = 0;
-                while( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTime )
-                       && (deltaMS = (nextDelayedTime.Ticks - now.Ticks) / 10000 /*TicksPerMillisecond*/) <= 2 )
+                var nowTicks = DateTime.UtcNow.Ticks;
+                // First tries to Change the timer if a previous attempt failed.
+                if( _failedChangeTimerNextTick != 0 )
                 {
+                    _commandMonitor.Debug( $"Retrying to Change timer." );
+                    var deltaTicks = _failedChangeTimerNextTick - nowTicks;
+                    if( deltaTicks > TicksPerMillisecond )
+                    {
+                        uint delta = (uint)(_failedChangeTimerNextTick / TicksPerMillisecond);
+                        if( !_timer.Change( delta, 0 ) )
+                        {
+                            _commandMonitor.Debug( $"Failed to Change timer (again)." );
+                            _commandQueue.Writer.TryWrite( _commandAwaker );
+                        }
+                        else _failedChangeTimerNextTick = 0;
+                    }
+                    else _failedChangeTimerNextTick = 0;
+                }
+                // Next, dequeue the next ready-to-run delayed commands, skipping the canceled ones,
+                // with a 1 ms margin: we consider that a 1 ms delay is negligible.
+                bool hasDequeued = false;
+                while( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTicks )
+                       && nextDelayedTicks <= nowTicks + TicksPerMillisecond )
+                {
+                    hasDequeued = true;
                     _delayedQueue.Dequeue();
                     if( delayed.CancellationToken.IsCancellationRequested )
                     {
+                        _commandMonitor.Debug( $"Skipped canceled Delayed Command {delayed}." );
                         continue;
                     }
-                    _commandMonitor.Debug( $"Delayed Command dequeued: {delayed} {delayed.SendTime}." );
+                    _commandMonitor.Debug( $"Delayed Command dequeued: {delayed} {delayed._sendTime:O}." );
                     // The command is no more delayed.
-                    delayed.SendTime = Util.UtcMinValue;
+                    delayed._sendTime = Util.UtcMinValue;
                     cmd = delayed;
                     break;
                 }
-                // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
-                if( deltaMS > 0 )
+                if( hasDequeued )
                 {
-                    Debug.Assert( _delayedQueue.Count > 0 );
-                    _commandMonitor.Debug( $"Timer set to {deltaMS} ms." );
-                    _timer.Change( deltaMS, Timeout.Infinite );
+                    if( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTicks ) )
+                    {
+                        var deltaTicks = nextDelayedTicks - nowTicks;
+                        // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
+                        // We use the same 1 ms margin as above.
+                        if( deltaTicks > TicksPerMillisecond )
+                        {
+                            Debug.Assert( _delayedQueue.Count > 0 );
+                            uint d = (uint)(deltaTicks / TicksPerMillisecond);
+                            _commandMonitor.Debug( $"Next delayed command is {delayed} in {d} ms." );
+                            _failedChangeTimerNextTick = 0;
+                            if( !_timer.Change( d, 0 ) )
+                            {
+                                _commandMonitor.Debug( $"Failed to Change timer." );
+                                _failedChangeTimerNextTick = nextDelayedTicks;
+                                _commandQueue.Writer.TryWrite( _commandAwaker );
+                            }
+                        }
+                        else _commandMonitor.Debug( "Next delayed command is ready to be dequeued." );
+                    }
+                    else _commandMonitor.Debug( "No more delayed command." );
                 }
+                else _commandMonitor.Debug( "No ready-to-run delayed command." );
             }
-            return cmd != null || expectDelayed
-                    ? new ValueTask<BaseDeviceCommand>( cmd ?? _commandAwaker )
-                    : _commandQueue.Reader.ReadAsync();
+            if( cmd != null || expectDelayed ) return new ValueTask<BaseDeviceCommand>( cmd ?? _commandAwaker );
+
+            _commandMonitor.Debug( "Waiting for command..." );
+            return _commandQueue.Reader.ReadAsync();
         }
 
         /// <summary>
@@ -552,11 +609,11 @@ namespace CK.DeviceModel
             {
                 try
                 {
-                    await DoHandleCommandAsync( _commandMonitor, command ).ConfigureAwait( false );
-                    if( IsRunning )
+                    int t = await GetCommandTimeoutAsync( _commandMonitor, command ).ConfigureAwait( false );
+                    if( t > 0 ) command.SetCommandTimeout( t );
+                    if( !command.CancellationToken.IsCancellationRequested )
                     {
-                        // Awake the queue for deferred commands.
-                        _commandQueue.Writer.TryWrite( _commandAwaker );
+                        await DoHandleCommandAsync( _commandMonitor, command ).ConfigureAwait( false );
                     }
                 }
                 finally
@@ -572,12 +629,20 @@ namespace CK.DeviceModel
                             _commandMonitor.Debug( "Device has already been stopped." );
                         }
                     }
+                    else
+                    {
+                        if( IsRunning )
+                        {
+                            // Awake the queue for deferred commands.
+                            _commandQueue.Writer.TryWrite( _commandAwaker );
+                        }
+                    }
                 }
             }
             else
             {
                 _commandMonitor.Warn( $"Failed to start the device. Canceling the AutoStarting command '{command}'." );
-                command.InternalCompletion.TrySetCanceled();
+                command.Cancel( "DeviceAutoStartFailed" );
             }
         }
 
@@ -631,7 +696,7 @@ namespace CK.DeviceModel
                                             return;
                                         case DeviceImmediateCommandStoppedBehavior.Cancel:
                                             _commandMonitor.CloseGroup( $"Canceling command." );
-                                            command.InternalCompletion.TrySetCanceled();
+                                            command.Cancel( nameof( DeviceImmediateCommandStoppedBehavior) );
                                             return;
                                         case DeviceImmediateCommandStoppedBehavior.RunAnyway:
                                             _commandMonitor.CloseGroup( $"Let the command be handled anyway." );
@@ -665,7 +730,7 @@ namespace CK.DeviceModel
                                             else
                                             {
                                                 _commandMonitor.CloseGroup( "Canceling command." );
-                                                command.InternalCompletion.TrySetCanceled();
+                                                command.Cancel( "DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel" );
                                             }
                                             return;
                                         case DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetUnavailableDeviceException:
@@ -686,7 +751,7 @@ namespace CK.DeviceModel
                                             return;
                                         case DeviceCommandStoppedBehavior.Cancel:
                                             _commandMonitor.CloseGroup( "Canceling command." );
-                                            command.InternalCompletion.TrySetCanceled();
+                                            command.Cancel( "DeviceCommandStoppedBehavior.Cancel" );
                                             return;
                                         case DeviceCommandStoppedBehavior.AlwaysWaitForNextStart:
                                             if( allowDefer )
@@ -711,7 +776,12 @@ namespace CK.DeviceModel
                         using( _commandMonitor.OpenDebug( $"Handling command '{command}'." ) )
                         {
                             if( command._mustCheckControllerKey && !CheckControllerKey( command ) ) return;
-                            await DoHandleCommandAsync( _commandMonitor, command ).ConfigureAwait( false );
+                            int t = await GetCommandTimeoutAsync( _commandMonitor, command ).ConfigureAwait( false );
+                            if( t > 0 ) command.SetCommandTimeout( t );
+                            if( !command.CancellationToken.IsCancellationRequested )
+                            {
+                                await DoHandleCommandAsync( _commandMonitor, command ).ConfigureAwait( false );
+                            }
                         }
                         break;
                     }
@@ -767,22 +837,22 @@ namespace CK.DeviceModel
             if( _commandQueueImmediate.Writer.TryWrite( cmd ) ) _commandQueue.Writer.TryWrite( _commandAwaker );
         }
 
-        sealed class ReminderCommand : BaseDeviceCommand
+        sealed class Reminder : BaseDeviceCommand
         {
             public readonly DateTime Time;
             public readonly object? State;
-            public ReminderCommand( DateTime time, object? state )
+            public Reminder( DateTime time, object? state )
                 : base( (string.Empty, null) )
             {
                 // SendTime is reset when the command is extracted from the _delayedQueue.
                 // Time field preserves it.
-                SendTime = Time = time;
+                _sendTime = Time = time;
                 State = state;
             }
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            public override string ToString() => nameof( ReminderCommand );
+            public override string ToString() => nameof( Reminder );
         }
 
         /// <summary>
@@ -797,7 +867,7 @@ namespace CK.DeviceModel
         protected bool AddReminder( DateTime timeUtc, object? state, bool throwIfPast = true )
         {
             Throw.CheckArgument( timeUtc.Kind == DateTimeKind.Utc );
-            var c = new ReminderCommand( timeUtc, state );
+            var c = new Reminder( timeUtc, state );
             if( !EnqueueDelayed( c ) )
             {
                 if( throwIfPast ) Throw.ArgumentException( nameof( timeUtc ), $"Must be in the future: value '{timeUtc:O}' is before now '{DateTime.UtcNow:O}'." );
@@ -828,7 +898,8 @@ namespace CK.DeviceModel
         protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state ) => Task.CompletedTask;
 
         /// <summary>
-        /// Extension point that can be overridden to avoid calling <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> (that ignores
+        /// Extension point that is called when <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/> raises an exception.
+        /// It can be overridden to avoid calling <see cref="IDevice.StopAsync(IActivityMonitor, bool)"/> (that ignores
         /// the <see cref="DeviceConfigurationStatus.AlwaysRunning"/> configuration), when the handling of a command raised an exception,
         /// and/or to emit an event (typically an UnexpectedErrorEvent).
         /// <para>
@@ -846,7 +917,17 @@ namespace CK.DeviceModel
         /// <param name="command">The culprit command.</param>
         /// <param name="ex">The exception raised.</param>
         /// <returns>True to stop this device, false to let this device run.</returns>
-        protected virtual Task<bool> OnUnhandledExceptionAsync( IActivityMonitor monitor, BaseDeviceCommand command, Exception ex ) => Task.FromResult( true );
+        protected virtual ValueTask<bool> OnUnhandledExceptionAsync( IActivityMonitor monitor, BaseDeviceCommand command, Exception ex ) => new ValueTask<bool>( true );
+
+        /// <summary>
+        /// Called right before <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/> to compute a
+        /// timeout in milliseconds for the command that is about to be executed.
+        /// By default this returns 0: negative or 0 means that no timeout will be set on the command.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The command about to be handled by <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/>.</param>
+        /// <returns>A timeout in milliseconds. 0 or negative if timeout cannot or shouldn't be set.</returns>
+        protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monitor, BaseDeviceCommand command ) => new ValueTask<int>( 0 ); 
 
         /// <summary>
         /// Since all commands should be handled, this default implementation systematically throws a <see cref="NotSupportedException"/>.
@@ -880,6 +961,13 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Called when a command completes and its <see cref="BaseDeviceCommand.ShouldCallDeviceOnCommandCompleted"/> is true.
+        /// <para>
+        /// This default implementation does nothing (returns <see cref="Task.CompletedTask"/>.
+        /// </para>
+        /// <para>
+        /// If an exception is thrown by this method, it is logged and the device is stopped: there is no callback like for
+        /// <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/>/<see cref="OnUnhandledExceptionAsync(IActivityMonitor, BaseDeviceCommand, Exception)"/>.
+        /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The completed command.</param>
