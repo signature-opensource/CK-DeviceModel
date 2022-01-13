@@ -418,11 +418,7 @@ namespace CK.DeviceModel
                 if( _delayedQueue == null )
                 {
                     _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
-                    _timer = new Timer( _ =>
-                    {
-                        CK.Monitoring.GrandOutput.Default!.ExternalLog( LogLevel.Debug, "Timer fired!" );
-                        _commandQueue.Writer.TryWrite( _commandAwaker );
-                    } );
+                    _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
                     _commandMonitor.Info( "Created DelayedQueue and Timer." );
                 }
                 _delayedQueue.Enqueue( cmd, ticks );

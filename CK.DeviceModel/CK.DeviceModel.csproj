@@ -12,13 +12,6 @@
     <PackageReference Include="CK.PerfectEvent" Version="15.0.0-r03" />
     <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
-
-
-
-    
-    <PackageReference Include="CK.Monitoring" Version="15.0.0-r03" />
-
-
   </ItemGroup>
   <ItemGroup>
     <PackageReference Update="Microsoft.VisualStudio.Threading.Analyzers" Version="17.0.64">

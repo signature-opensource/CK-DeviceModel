@@ -79,8 +79,8 @@ namespace CK.DeviceModel.Tests
                 {
                     if( cmd.ExpectedCancellationReason == BaseDeviceCommand.CommandTimeoutReason )
                     {
-                        monitor.Trace( $"GetCommandTimeoutAsync set to 50 ms for {command}" );
-                        return ValueTask.FromResult( 50 );
+                        monitor.Trace( $"GetCommandTimeoutAsync set to 40 ms for {command}" );
+                        return ValueTask.FromResult( 40 );
                     }
                 }
                 return ValueTask.FromResult( 0 );
@@ -93,16 +93,17 @@ namespace CK.DeviceModel.Tests
                     if( _rnd.Next( 2 ) == 0 )
                     {
                         var t = DateTime.UtcNow.Add( cmd.WaitToComplete );
-                        monitor.Trace( $"AddReminder for {command} at {t:O}." );
+                        monitor.Trace( $"AddReminder to complete {command} in {(long)cmd.WaitToComplete.TotalMilliseconds} ms." );
                         AddReminder( t, cmd );
                     }
                     else
                     {
-                        monitor.Trace( $"Using delayed Task.Run for {command}." );
+                        monitor.Trace( $"Using delayed Task.Run() to complete {command} in {(long)cmd.WaitToComplete.TotalMilliseconds}." );
                         _ = Task.Run( async () =>
                         {
                             await Task.Delay( cmd.WaitToComplete );
                             DoComplete( cmd );
+                            Monitoring.GrandOutput.Default!.ExternalLog( LogLevel.Trace, $"Task.Run() completed {command}." );
                         } );
                     }
                     return;
@@ -150,6 +151,8 @@ namespace CK.DeviceModel.Tests
         [TestCase( 200, 42 )]
         public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed )
         {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_cancellation_reasons_Async )}({nb},{randomSeed})" );
+
             var rnd = new Random( randomSeed );
             var h = new DHost();
             var config = new DConfiguration() { Name = "Single", Status = DeviceConfigurationStatus.RunnableStarted, RandomSeed = rnd.Next() };

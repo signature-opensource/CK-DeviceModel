@@ -167,7 +167,7 @@ namespace CK.DeviceModel.Tests
         [TestCase( 60, 0, true )]
         public async Task stress_test_Async( int nbDevice, int randomSeed, bool useDirectReconfiguration )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( stress_test_Async )}-{nbDevice}-{randomSeed}-useDirectReconfiguration:{useDirectReconfiguration}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( stress_test_Async )}({nbDevice},{randomSeed},{useDirectReconfiguration})" );
 
             var rnd = randomSeed != 0 ? new Random( randomSeed ) : new Random();
             var policy = new AlwaysRetryPolicy( rnd.Next( 5 ) + 1 );
@@ -209,7 +209,7 @@ namespace CK.DeviceModel.Tests
                 devices[i].UnsafeSendCommand( TestHelper.Monitor, commands[i] );
             }
             var deferred = new List<DCommand>();
-            using( TestHelper.Monitor.OpenInfo( "Waiting for command completion." ) )
+            using( TestHelper.Monitor.OpenInfo( "Waiting for commands completion." ) )
             {
                 for( int i = 0; i < nbDevice; i++ )
                 {
@@ -217,16 +217,16 @@ namespace CK.DeviceModel.Tests
                     var c = commands[i];
                     if( d.Fail == FailureType.None )
                     {
-                        (await c.Completion).Should().Be( CommandResult.Success );
+                        (await c.Completion).Should().Be( CommandResult.Success, $"{c.Trace} should have succeeded." );
                     }
                     else if( d.Fail == FailureType.CommandSync || d.Fail == FailureType.CommandSync )
                     {
-                        (await c.Completion).Should().Be( CommandResult.Failure );
+                        (await c.Completion).Should().Be( CommandResult.Failure, $"{c.Trace} should have failed." );
                     }
                     else
                     {
                         // The command is in the deferred queue.
-                        c.Completion.IsCompleted.Should().BeFalse();
+                        c.Completion.IsCompleted.Should().BeFalse( $"{c.Trace} should be in the deferred queue." );
                         deferred.Add( c );
                     }
                 }
