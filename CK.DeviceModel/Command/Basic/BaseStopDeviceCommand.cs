@@ -12,15 +12,32 @@ namespace CK.DeviceModel
     /// <remarks>
     /// This class cannot be specialized. The only concrete type of this command is <see cref="StopDeviceCommand{THost}"/>.
     /// </remarks>
-    public abstract class BaseStopDeviceCommand : DeviceCommandWithResult<bool>, ICompletable<bool>
+    public abstract class BaseStopDeviceCommand : DeviceCommandWithResult<bool>
     {
         private protected BaseStopDeviceCommand()
         {
             ImmediateSending = true;
+            ShouldCallDeviceOnCommandCompleted = false;
         }
 
-        void ICompletable<bool>.OnError( Exception ex, ref CompletionSource<bool>.OnError result ) => result.SetResult( false );
-        void ICompletable<bool>.OnCanceled( ref CompletionSource<bool>.OnCanceled result ) => result.SetResult( false );
+        /// <summary>
+        /// Transforms any error into false result.
+        /// </summary>
+        /// <param name="ex">The exception.</param>
+        /// <param name="result">The result setter.</param>
+        protected override sealed void OnError( Exception ex, ref CompletionSource<bool>.OnError result )
+        {
+            result.SetResult( false );
+        }
+
+        /// <summary>
+        /// Transforms cancellation into false result.
+        /// </summary>
+        /// <param name="result">The result setter.</param>
+        protected override sealed void OnCanceled( ref CompletionSource<bool>.OnCanceled result )
+        {
+            result.SetResult( false );
+        }
 
         /// <summary>
         /// Gets or sets whether the <see cref="DeviceConfigurationStatus.AlwaysRunning"/> should be ignored.
@@ -31,13 +48,13 @@ namespace CK.DeviceModel
         /// Returns <see cref="DeviceCommandStoppedBehavior.RunAnyway"/> (will be a no-op) since it must obviously not be deferred until the next start.
         /// Note that this is not used: basic commands are always run by design.
         /// </summary>
-        protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+        protected internal override sealed DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
 
         /// <summary>
         /// Returns <see cref="DeviceImmediateCommandStoppedBehavior.RunAnyway"/> (will be a no-op).
         /// Note that this is not used: basic commands are always run by design.
         /// </summary>
-        protected internal override DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
+        protected internal override sealed DeviceImmediateCommandStoppedBehavior ImmediateStoppedBehavior => DeviceImmediateCommandStoppedBehavior.RunAnyway;
 
     }
 

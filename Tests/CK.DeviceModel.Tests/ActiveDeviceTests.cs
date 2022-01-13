@@ -49,9 +49,9 @@ namespace CK.DeviceModel.Tests
         [TestCase( "RunningReset", "UseLifetimeAndDeviceEvent" )]
         [TestCase( "StoppedReset", "UseAllEvent" )]
         [TestCase( "StoppedReset", "UseLifetimeAndDeviceEvent" )]
-        public async Task collecting_lifetime_reset_and_measure_events_shows_that_Reset_command_has_a_RunAnyway_stopped_behavior( string mode, string useAllEvent )
+        public async Task collecting_lifetime_reset_and_measure_events_shows_that_Reset_command_has_a_RunAnyway_stopped_behavior_Async( string mode, string useAllEvent )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( collecting_lifetime_reset_and_measure_events_shows_that_Reset_command_has_a_RunAnyway_stopped_behavior )}-{mode}-{useAllEvent}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( collecting_lifetime_reset_and_measure_events_shows_that_Reset_command_has_a_RunAnyway_stopped_behavior_Async )}-{mode}-{useAllEvent}" );
             var host = new SimpleScaleHost();
 
             var config = new SimpleScaleConfiguration()
@@ -120,9 +120,9 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
-        public async Task event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself()
+        public async Task event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself_Async ) );
             var host = new SimpleScaleHost();
             var config = new SimpleScaleConfiguration()
             {

@@ -4,7 +4,7 @@ Devices are configurable objects identified by a unique name inside a [device ho
 device's running code and prevent concurrency issues.
 
 ## Device
-A device basically exposes its [IDevice](IDevice.cs) interface that exposes:
+A device basically exposes its [IDevice](IDevice.cs) interface:
 - its stable unique device's Name inside its host and FullName (that is "DeviceHostName/Name"). 
 - its changing lifetime status as a ([DeviceStatus](DeviceStatus.cs) as well as `IsRunning` and `IsDestroyed` easy to use booleans.
 - its current `ControllerKey`.
@@ -19,17 +19,26 @@ And some methods:
 that send their respective [5 basic commands](../Command/Basic)).
 
 The Device implementation handles the nitty-gritty details of device life cycle and provide
-any implementation for really safe asynchronous command handling and independent monitoring thanks to an
-internal asynchronous loop.
+any implementation for really safe asynchronous command handling (including delayed executions, cancellations) and
+independent monitoring thanks to an internal asynchronous loop.
 
 Specialized devices must provide implementations for:
 
 ```csharp
 protected abstract Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason );
 protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
-protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
+protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
 protected abstract Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason );
 protected abstract Task DoDestroyAsync( IActivityMonitor monitor );
+```
+Optional extension points of a Device are:
+```csharp
+protected virtual DeviceCommandStoppedBehavior OnStoppedDeviceCommand( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual DeviceImmediateCommandStoppedBehavior OnStoppedDeviceImmediateCommand( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state );
+protected virtual ValueTask<bool> OnUnhandledExceptionAsync( IActivityMonitor monitor, BaseDeviceCommand command, Exception ex );
+protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 ```
 
 ## Commands
@@ -44,17 +53,51 @@ Key features of the Commands support are:
 - Command execution is serialized thanks to [channels](https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels/) 
 and an internally managed asynchronous command loop with its own ActivityMonitor.
 - Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](../Command/DeviceCommandT.cs)) or not (see [DeviceCommand](../Command/DeviceCommand.cs).
-- Commands completion MUST be signaled explicitly.
-- Commands may transform errors or cancellation into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
-is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
 - Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
  starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs).
+- Commands can be sent immediately (highest priority) or delayed, waiting for their `SendingTimeUtc`.
+- Commands can have one timeout (in milliseconds) and any number of associated CancellationTokens.
+- Commands completion MUST be signaled explicitly.
+- Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
+is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
+- Completed commands (even the ones that are completed outside of the command loop and regardless of their state - error, canceled or success) 
+can be safely "continued" thanks to the Device's `OnCommandCompletedAsync` method.
 
 More on Commands [here](../Command).
 
+## Reminders
+
+Devices support time delayed operations thanks to "Reminders". This is of course a protected API that can be called from
+the Device's code only:
+
+```csharp
+/// <summary>
+/// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
+/// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
+/// eventually be called.
+/// </summary>
+/// <param name="timeUtc">The time in the future at which <see cref="OnReminderAsync"/> will be called.</param>
+/// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
+/// <param name="throwIfPast">False to returns false instead of throwing an ArgumentExcetion if the reminder cannot be registered.</param>
+/// <returns>True on success or false if the reminder cannot be set and <paramref name="throwIfPast"/> is false.</returns>
+protected bool AddReminder( DateTime timeUtc, object? state, bool throwIfPast = true );
+
+/// <summary>
+/// Reminder callback triggered by <see cref="AddReminder(DateTime, object?, bool)"/>.
+/// This does nothing at this level.
+/// </summary>
+/// <param name="monitor">The monitor to use.</param>
+/// <param name="reminderTimeUtc">The exact time configured on the reminder.</param>
+/// <param name="state">The optional state.</param>
+/// <returns>The awaitable.</returns>
+protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state );
+```
+
+Reminders can be added and are triggered regardless of the Device status (stopped or running).
+
 ## Configuration
 
-Device are instantiated with an initial configuration and can be reconfigured at any time. [DeviceConfiguration](../DeviceConfiguration.cs)
+Devices are instantiated with an initial configuration and can be reconfigured at any time. [DeviceConfiguration](../DeviceConfiguration.cs)
 are basic, Poco-like, mutable objects that must be binary serializable. Thanks to the binary serialization, Configuration can be
 deep cloned: we use this to isolate the actual running configuration (that can be accessed through the protected `CurrentConfiguration`
 property from device's code) and the device's publicly exposed `ExternalConfiguration` that is an independent clone.

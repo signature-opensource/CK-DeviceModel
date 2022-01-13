@@ -99,17 +99,17 @@ namespace CK.DeviceModel
                     }
                     if( signalTask.IsCompleted )
                     {
-                        _daemonMonitor.CloseGroup( $"Host has been signaled. Repeat." );
+                        _daemonMonitor.CloseGroup( $"Daemon has been signaled. Repeat." );
                     }
                     else if( wait != Int64.MaxValue )
                     {
                         int w = (int)(wait / TimeSpan.TicksPerMillisecond);
-                        _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a host's signal." );
+                        _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a signal." );
                         await Task.WhenAny( Task.Delay( w ), signalTask ).ConfigureAwait( false );
                     }
                     else
                     {
-                        _daemonMonitor.CloseGroup( $"Waiting for a host's signal." );
+                        _daemonMonitor.CloseGroup( $"Waiting for a signal." );
                         await signalTask.ConfigureAwait( false );
                     }
                 }

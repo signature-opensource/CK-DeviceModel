@@ -142,7 +142,8 @@ Thanks to the `void Execute( Action<IActivityMonitor> action )` and `void Execut
 methods, any actions (synchronous as well as asynchronous) can be posted to be executed in the context of the event loop:
 any visible side-effect of a running device should go through this loop.
 
-*Note:* The `EventLoop` property is protected. Often, it must be exposed to its whole assembly:
+*Note:* The `EventLoop` property is protected. Often, it must be exposed to its whole assembly. To expose it simply use
+the `new` masking operator:
 
 ```csharp
   public sealed class SignatureDevice : ActiveDevice<SignatureDeviceConfiguration,SignatureDeviceEvent>
@@ -152,3 +153,4 @@ any visible side-effect of a running device should go through this loop.
     ...
   }  
 ```
+

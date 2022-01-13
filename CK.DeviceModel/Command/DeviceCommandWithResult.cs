@@ -18,7 +18,7 @@ namespace CK.DeviceModel
             : base( locked )
         {
             Completion = new CompletionSource<TResult>( this );
-            _commandToString = GetType().Name + '<' + typeof( TResult ).Name + '>';
+            _commandToString = GetType().ToCSharpName( withNamespace: false );
         }
 
         /// <summary>
@@ -34,7 +34,10 @@ namespace CK.DeviceModel
         internal override ICompletionSource InternalCompletion => Completion;
 
         void ICompletable<TResult>.OnError( Exception ex, ref CompletionSource<TResult>.OnError result ) => OnError( ex, ref result );
+
         void ICompletable<TResult>.OnCanceled( ref CompletionSource<TResult>.OnCanceled result ) => OnCanceled( ref result );
+
+        void ICompletable<TResult>.OnCompleted() => OnInternalCommandCompleted();
 
         /// <summary>
         /// Called by the CompletionSource when a error is set.

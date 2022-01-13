@@ -76,16 +76,16 @@ namespace CK.DeviceModel.Tests
                 return Task.CompletedTask;
             }
 
-            protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
+            protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
             {
                 if( command is DCommand cmd )
                 {
                     Traces.Add( $"Command {cmd.Trace}" );
-                    await Task.Delay( cmd.ExecutionTime, token ).ConfigureAwait( false );
+                    await Task.Delay( cmd.ExecutionTime, cmd.CancellationToken ).ConfigureAwait( false );
                     cmd.Completion.SetResult();
                     return;
                 }
-                await base.DoHandleCommandAsync( monitor, command, token );
+                await base.DoHandleCommandAsync( monitor, command );
             }
         }
 
@@ -100,9 +100,9 @@ namespace CK.DeviceModel.Tests
         }
 
         [TestCase( 40, 7784 )]
-        public async Task sending_immediate_commands_does_not_block_the_loop( int nb, int seed )
+        public async Task sending_immediate_commands_does_not_block_the_loop_Async( int nb, int seed )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_immediate_commands_does_not_block_the_loop )}-{nb}-{seed}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_immediate_commands_does_not_block_the_loop_Async )}-{nb}-{seed}" );
 
             var h = new DHost();
             var config = new DConfiguration() { Name = "First", Status = DeviceConfigurationStatus.RunnableStarted };
@@ -155,45 +155,52 @@ namespace CK.DeviceModel.Tests
 
 
         [TestCase( 30 )]
-        public async Task BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works( int nb )
+        [Timeout(2000)]
+        public async Task BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works_Async( int nb )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works )}-{nb}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works_Async )}-{nb}" );
 
             static List<DCommand> SendCommands( IDevice d, int nb )
             {
-                var commands = new List<DCommand>();
-                for( int i = 0; i < nb; ++i )
+                using( TestHelper.Monitor.OpenInfo( $"Sending {nb * 3} commands." ) )
                 {
-                    var cI = new DCommand()
+                    var commands = new List<DCommand>();
+                    for( int i = 0; i < nb; ++i )
                     {
-                        DeviceName = "D",
-                        Trace = $"I°{i}",
-                        ExecutionTime = i == 0 ? 50 : 0,
-                        ImmediateSending = true
-                    };
-                    commands.Add( cI );
-                    d.SendCommand( TestHelper.Monitor, cI ).Should().BeTrue();
-                    var cRegular1 = new DCommand()
-                    {
-                        DeviceName = "D",
-                        Trace = $"N°{i}",
-                    };
-                    commands.Add( cRegular1 );
-                    d.SendCommand( TestHelper.Monitor, cRegular1 ).Should().BeTrue();
-                    var cRegular2 = new DCommand()
-                    {
-                        DeviceName = "D",
-                        Trace = $"N°{i}-2",
-                    };
-                    commands.Add( cRegular2 );
-                    d.SendCommand( TestHelper.Monitor, cRegular2 ).Should().BeTrue();
+                        var cI = new DCommand()
+                        {
+                            DeviceName = "D",
+                            Trace = $"I°{i}",
+                            ExecutionTime = i == 0 ? 50 : 0,
+                            ImmediateSending = true
+                        };
+                        commands.Add( cI );
+                        d.SendCommand( TestHelper.Monitor, cI ).Should().BeTrue();
+                        var cRegular1 = new DCommand()
+                        {
+                            DeviceName = "D",
+                            Trace = $"N°{i}",
+                        };
+                        commands.Add( cRegular1 );
+                        d.SendCommand( TestHelper.Monitor, cRegular1 ).Should().BeTrue();
+                        var cRegular2 = new DCommand()
+                        {
+                            DeviceName = "D",
+                            Trace = $"N°{i}-2",
+                        };
+                        commands.Add( cRegular2 );
+                        d.SendCommand( TestHelper.Monitor, cRegular2 ).Should().BeTrue();
+                    }
+                    TestHelper.Monitor.CloseGroup( "Done." );
+                    return commands;
                 }
-                return commands;
             }
 
             static void CheckCommandTraces( List<string> traces, int limit, int nb )
             {
+                using var g = TestHelper.Monitor.OpenInfo( $"Checking traces. Expected consecutive {limit} immediate commands for {nb} immediate and {2 * nb} regular commands." );
                 var profile = traces.Where( t => t.StartsWith( "Command " ) ).Select( t => t[8] ).ToArray();
+                TestHelper.Monitor.Info( $"Commands order: {profile.Select( x => x.ToString()).Concatenate()}." );
                 profile.Length.Should().Be( 3 * nb, "We have nb 'I' and 2*nb 'N'." );
                 profile.All( c => c == 'I' || c == 'N' ).Should().BeTrue();
                 profile.Count( c => c == 'I' ).Should().Be( nb );
@@ -228,14 +235,21 @@ namespace CK.DeviceModel.Tests
             D? d = h["D"];
             Debug.Assert( d != null && d.IsRunning );
 
-            foreach( var c in SendCommands( d, nb ) ) await c.Completion;
-
+            foreach( var c in SendCommands( d, nb ) )
+            {
+                await c.Completion;
+            }
+            TestHelper.Monitor.Info( "Got all command completions." );
             CheckCommandTraces( d.Traces, 5, nb );
 
             d.Traces.Clear();
             // This results in a 1 actual limit.
             d.ImmediateCommandLimitOffset = -13;
-            foreach( var c in SendCommands( d, nb ) ) await c.Completion;
+            foreach( var c in SendCommands( d, nb ) )
+            {
+                await c.Completion;
+            }
+            TestHelper.Monitor.Info( "Got all command completions." );
             CheckCommandTraces( d.Traces, 1, nb );
 
             d.Traces.Clear();
@@ -245,7 +259,11 @@ namespace CK.DeviceModel.Tests
             d.Traces.Should().BeEquivalentTo( "Reconfigure " );
             d.Traces.Clear();
 
-            foreach( var c in SendCommands( d, nb ) ) await c.Completion;
+            foreach( var c in SendCommands( d, nb ) )
+            {
+                await c.Completion;
+            }
+            TestHelper.Monitor.Info( "Got all command completions." );
             CheckCommandTraces( d.Traces, 7, nb );
         }
 

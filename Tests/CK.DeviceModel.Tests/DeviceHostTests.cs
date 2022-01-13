@@ -15,12 +15,13 @@ namespace CK.DeviceModel.Tests
     {
 
         [Test]
-        public async Task playing_with_configurations()
+        public async Task playing_with_configurations_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations_Async ) );
 
             FlashBulb.TotalCount.Should().Be( 0 );
             FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.OnCommandComplededCount = 0;
 
             var config1 = new FlashBulbConfiguration() { Name = "First" };
             var config2 = new FlashBulbConfiguration { Name = "Another", Status = DeviceConfigurationStatus.Runnable };
@@ -96,13 +97,14 @@ namespace CK.DeviceModel.Tests
             await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
             FlashBulb.TotalCount.Should().Be( 0 );
             FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 0, "Basic command (Start/Stop/Configure/Destroy) don't call OnCommandCompletedAsync." );
 
         }
 
         [Test]
-        public async Task testing_state_changed_PerfectEvent()
+        public async Task testing_state_changed_PerfectEvent_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( testing_state_changed_PerfectEvent ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( testing_state_changed_PerfectEvent_Async ) );
 
             FlashBulb.TotalCount.Should().Be( 0 );
             FlashBulb.TotalRunning.Should().Be( 0 );
@@ -231,9 +233,9 @@ namespace CK.DeviceModel.Tests
 
 
         [Test]
-        public async Task ensure_device()
+        public async Task ensure_device_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( ensure_device ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( ensure_device_Async ) );
 
             FlashBulb.TotalCount.Should().Be( 0 );
             FlashBulb.TotalRunning.Should().Be( 0 );
@@ -355,12 +357,13 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( "UseSendCommand" )]
         [TestCase( "UseSendCommandImmediate" )]
-        public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey( string mode )
+        public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async( string mode )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( sending_commands_checks_DeviceName_and_executing_checks_ControllerKey ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async ) );
 
             FlashBulb.TotalCount.Should().Be( 0 );
             FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.OnCommandComplededCount = 0;
 
             var host = new FlashBulbHost();
             var config = new FlashBulbConfiguration()
@@ -397,6 +400,9 @@ namespace CK.DeviceModel.Tests
             (await cmdSet.Completion).Should().Be( 78 );
             await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 6 );
+            // Completion is signaled and then OnCommandComplededAsyc is called.
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 2 ); 
 
             // Use the basic command to set a ControllerKey.
             var setControllerKey = new SetControllerKeyDeviceCommand<FlashBulbHost>()
@@ -424,12 +430,17 @@ namespace CK.DeviceModel.Tests
             await FluentActions.Awaiting( () => cmdRaiseFlash.Completion.Task ).Should().ThrowAsync<InvalidControllerKeyException>();
 
             flashLastColor.Should().Be( 6 );
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 5 );
 
             cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1", ControllerKey = "I'm controlling." };
             SendCommand( cmdRaiseFlash );
 
             await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 18 );
+
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 6 );
 
             cmdSet = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "I'm NOT controlling, but checkControllerKey: false is used.", Color = 1 };
             cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1", ControllerKey = "I'm NOT controlling too." };
@@ -438,12 +449,17 @@ namespace CK.DeviceModel.Tests
             await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 1 );
 
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 8 );
+
             cmdSet = new SetFlashColorCommand() { DeviceName = "Not the right device name: this will throw an ArgumentException.", ControllerKey = "I'm controlling.", Color = 1 };
             FluentActions.Invoking( () => SendCommand( cmdSet ) ).Should().Throw<ArgumentException>();
 
             cmdRaiseFlash = new FlashCommand() { DeviceName = "Not the right device name: this will throw an ArgumentException.", ControllerKey = "I'm controlling." };
             cmdRaiseFlash.DeviceName = "Not the right device name: this will throw an ArgumentException.";
             FluentActions.Invoking( () => SendCommand( cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
+
+            FlashBulb.OnCommandComplededCount.Should().Be( 8 );
 
             cmdSet = new SetFlashColorCommand() { DeviceName = "Not the right device name but checkDeviceName: false is used.", ControllerKey = "I'm controlling.", Color = 3712 };
             cmdRaiseFlash = new FlashCommand() { DeviceName = "Not the right device name too.", ControllerKey = "I'm controlling." };
@@ -452,17 +468,22 @@ namespace CK.DeviceModel.Tests
             await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 3712 );
 
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 10 );
+
             await d.DestroyAsync( TestHelper.Monitor );
 
             FlashBulb.TotalCount.Should().Be( 0 );
             FlashBulb.TotalRunning.Should().Be( 0 );
 
+            FlashBulb.OnCommandComplededCount.Should().Be( 10 );
+
         }
 
         [Test]
-        public async Task Disabling_sends_a_stop_status_change()
+        public async Task Disabling_sends_a_stop_status_change_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( Disabling_sends_a_stop_status_change ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( Disabling_sends_a_stop_status_change_Async ) );
             var host = new MachineHost();
 
             var config = new MachineConfiguration()

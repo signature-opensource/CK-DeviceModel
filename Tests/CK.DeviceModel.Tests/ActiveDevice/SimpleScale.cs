@@ -105,7 +105,7 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token )
+        protected override Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
         {
             switch( command )
             {
@@ -113,7 +113,7 @@ namespace CK.DeviceModel.Tests
                     Reset();
                     return Task.CompletedTask;
                 default:
-                    return base.DoHandleCommandAsync( monitor, command, token );
+                    return base.DoHandleCommandAsync( monitor, command );
             }
         }
     }

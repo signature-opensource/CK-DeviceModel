@@ -19,17 +19,13 @@ namespace CK.DeviceModel
         /// </summary>
         readonly List<(IInternalDevice Device, int Count, DateTime NextCall)> _alwayRunningStopped;
         DeviceHostDaemon? _daemon;
+        volatile bool _daemonCheckRequired;
 
         /// <summary>
         /// Gets the <see cref="DeviceHostDaemon.StoppedToken"/>.
         /// </summary>
         public CancellationToken DaemonStoppedToken => _daemon != null ? _daemon.StoppedToken : CancellationToken.None;
 
-        /// <summary>
-        /// This is a snapshot of the _alwayRunningStopped list.
-        /// The daemon uses this without lock.
-        /// </summary>
-        volatile (IInternalDevice Device, int Count, DateTime NextCall)[] _alwayRunningStoppedSafe;
 
         /// <summary>
         /// Extension point that enables this host to handle its own <see cref="DeviceConfigurationStatus.AlwaysRunning"/> retry policy.
@@ -48,6 +44,7 @@ namespace CK.DeviceModel
         /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
         protected virtual Task<int> TryAlwaysRunningRestartAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, IDevice device, int retryCount )
         {
+            monitor.Trace( $"Using '{global.GetType().Name}' global running policy." );
             return global.RetryStartAsync( monitor, this, device, retryCount );
         }
 
@@ -66,27 +63,28 @@ namespace CK.DeviceModel
                     int idx = _alwayRunningStopped.IndexOf( e => e.Device == d );
                     if( idx >= 0 )
                     {
-                        monitor.Debug( "Device is registered." );
                         if( d.IsRunning || d.ConfigStatus != DeviceConfigurationStatus.AlwaysRunning )
                         {
+                            monitor.Debug( "Removing Device from Always Running Stopped list." );
                             _alwayRunningStopped.RemoveAt( idx );
-                            CaptureAlwayRunningStoppedSafe( monitor, false );
                         }
                         else
                         {
                             Debug.Assert( d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning );
+                            monitor.Debug( "Updated Device retry count in Always Running Stopped list." );
                             // Let the NextCall unchanged: manual Starts are ignored.
                             _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count + 1, _alwayRunningStopped[idx].NextCall);
-                            CaptureAlwayRunningStoppedSafe( monitor, true );
                         }
                     }
                     else
                     {
                         if( !d.IsRunning && d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning )
                         {
+                            monitor.Debug( "Adding Device to Always Running Stopped list and signaling the Daemon." );
+                            _daemonCheckRequired = true;
                             // Next call (Count = 0) is asap.
                             _alwayRunningStopped.Add( (d, 0, DateTime.UtcNow) );
-                            CaptureAlwayRunningStoppedSafe( monitor, true );
+                            _daemon?.Signal();
                         }
                         else
                         {
@@ -100,32 +98,53 @@ namespace CK.DeviceModel
         async ValueTask<long> IInternalDeviceHost.DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, DateTime now )
         {
             // Fast path: nothing to do (hence the ValueTask).
-            var devices = _alwayRunningStoppedSafe;
-            if( devices.Length == 0 ) return Int64.MaxValue;
+            if( !_daemonCheckRequired ) return Int64.MaxValue;
 
-            // Slow path: Check times and call Policy.RetryStartAsync if needed.
-            //            We work on the current devices array that has been captured (_alwayRunningStoppedSafe), no lock needed
-            //            and this is for the best: we may call the async policy RetryStartAsync, that prevents us to use a sync lock.
-            long[] updatedDeltas = new long[devices.Length];
+            (IInternalDevice Device, int Count, DateTime NextCall)[] copy;
+            lock( _alwayRunningStopped )
+            {
+                copy = _alwayRunningStopped.ToArray();
+            }
+            monitor.Debug( $"Handling Always Running Stopped list of '{DeviceHostName}' (Count: {copy.Length}): ({copy.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall.ToString( "HH:mm.ss.ff" )})" ).Concatenate( ", (" )})." );
+
+            // Check times and call RetryStartAsync if needed outside of any lock: since we may call the async RetryStartAsync,
+            // that prevents us to use a sync lock and any lock here may lead to deadlocks.
+
+            long[] updatedDeltas = new long[copy.Length];
             try
             {
                 int idx = 0;
-                foreach( var e in devices )
+                foreach( var e in copy )
                 {
                     var d = e.Device;
-                    // Delta 0 means: the device should be removed from the _alwayRunningStopped list.
+                    // Delta 0 means: the device should not be anymore in _alwayRunningStopped list (we'll ignore it).
                     long delta = 0;
                     if( !d.IsRunning && d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning )
                     {
                         delta = (e.NextCall - now).Ticks;
                         if( delta <= 0 )
                         {
-                            delta = await TryAlwaysRunningRestartAsync( monitor, global, d, e.Count ).ConfigureAwait( false );
-                            if( d.IsRunning || delta < 0 ) delta = 0;
-                            else
+                            using( monitor.OpenInfo( $"Attempt n°{e.Count} to restart the device '{d.FullName}'." ) )
                             {
-                                delta *= TimeSpan.TicksPerMillisecond;
-                                // A positive Delta means that the NextCallDate in the _alwayRunningStopped list must be updated.
+                                delta = await TryAlwaysRunningRestartAsync( monitor, global, d, e.Count ).ConfigureAwait( false );
+                                if( d.IsRunning || delta < 0 )
+                                {
+                                    monitor.CloseGroup( $"Successfully restarted." );
+                                    delta = 0;
+                                }
+                                else
+                                {
+                                    if( delta == 0 )
+                                    {
+                                        monitor.CloseGroup( $"Restart failed. No more retries will be done." );
+                                    }
+                                    else
+                                    {
+                                        monitor.CloseGroup( $"Restart failed. Retrying in {delta} ms." );
+                                        delta *= TimeSpan.TicksPerMillisecond;
+                                        // Delta is positive: means that the NextCallDate in the _alwayRunningStopped list must be updated.
+                                    }
+                                }
                             }
                         }
                         else
@@ -143,52 +162,35 @@ namespace CK.DeviceModel
                 return Int32.MaxValue;
             }
             // Take the lock to update the _alwayRunningStopped list by merging it with the updatedDeltas.
-            bool changed = false;
             long minDelta = Int64.MaxValue;
             lock( _alwayRunningStopped )
             {
-                for( int i = 0; i < devices.Length; ++i )
+                for( int i = 0; i < copy.Length; i++ )
                 {
-                    var d = devices[i].Device;
-                    int idx = _alwayRunningStopped.IndexOf( e => e.Device == d );
-                    if( idx >= 0 )
+                    var (d,count,nextCall) = copy[i];
+                    int existIdx = _alwayRunningStopped.IndexOf( e => e.Device == d );
+                    if( existIdx >= 0 )
                     {
                         var delta = updatedDeltas[i];
-                        if( d.IsRunning || d.ConfigStatus != DeviceConfigurationStatus.AlwaysRunning ) delta = 0;
-                        if( delta > 0 )
+                        // It doesn't cost much to check if, right now, the device is still in trouble.
+                        if( delta != 0 && !d.IsRunning && d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning )
                         {
-                            changed = true;
-                            _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count + 1, now.AddTicks( delta ));
-                            if( minDelta > delta ) minDelta = delta;
-                        }
-                        else if( delta == 0 )
-                        {
-                            changed = true;
-                            _alwayRunningStopped.RemoveAt( idx );
-                        }
-                        else
-                        {
-                            // Not touched.
-                            delta = -delta;
-                            Debug.Assert( delta > 0 );
+                            if( delta > 0 )
+                            {
+                                _alwayRunningStopped[existIdx] = (d, _alwayRunningStopped[existIdx].Count + 1, now.AddTicks( delta ));
+                            }
+                            else
+                            {
+                                // Not touched.
+                                delta = -delta;
+                                Debug.Assert( delta > 0 );
+                            }
                             if( minDelta > delta ) minDelta = delta;
                         }
                     }
                 }
-                if( changed )
-                {
-                    CaptureAlwayRunningStoppedSafe( monitor, false );
-                }
             }
             return minDelta;
-        }
-
-        void CaptureAlwayRunningStoppedSafe( IActivityMonitor monitor, bool signalHost )
-        {
-            Debug.Assert( System.Threading.Monitor.IsEntered( _alwayRunningStopped ) );
-            _alwayRunningStoppedSafe = _alwayRunningStopped.ToArray();
-            monitor.Debug( $"{(signalHost ? "Host signaled!" : "(no signal.)")}. Updated Always Running Stopped list of '{DeviceHostName}': ({_alwayRunningStoppedSafe.Select( e => $"{e.Device.Name}, {e.Count}, { e.NextCall:HH:mm.ss.ff})" ).Concatenate( ", (" )})." );
-            if( signalHost ) _daemon?.Signal();
         }
     }
 

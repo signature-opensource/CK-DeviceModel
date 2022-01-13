@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\Common\Shared.props" />
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -6,10 +6,10 @@
     <LangVersion>9</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r02" />
-    <PackageReference Include="CK.StObj.Model" Version="19.0.0-r03" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r03" />
+    <PackageReference Include="CK.StObj.Model" Version="19.0.0-r04" />
     <PackageReference Include="Nullable" Version="1.3.0" />
-    <PackageReference Include="CK.PerfectEvent" Version="15.0.0-r02" />
+    <PackageReference Include="CK.PerfectEvent" Version="15.0.0-r03" />
     <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
   </ItemGroup>

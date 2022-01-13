@@ -4,18 +4,22 @@ using System.Threading.Tasks;
 using CK.Core;
 using CK.PerfectEvent;
 
+#pragma warning disable CA2211 // Non-constant fields should not be visible
+
 namespace CK.DeviceModel.Tests
 {
     public class FlashBulb : Device<FlashBulbConfiguration>
     {
         public static int TotalCount;
         public static int TotalRunning;
+        public static int OnCommandComplededCount;
 
         int _color;
         bool _colorFromConfig;
 
+
         // For test, not for doc.
-        PerfectEventSender<IDevice, int> _testFlash;
+        readonly PerfectEventSender<IDevice, int> _testFlash;
         public PerfectEvent<IDevice, int> TestFlash => _testFlash.PerfectEvent;
 
         public FlashBulb( IActivityMonitor monitor, CreateInfo info )
@@ -68,9 +72,7 @@ namespace CK.DeviceModel.Tests
             return true;
         }
 
-        protected override async Task DoHandleCommandAsync( IActivityMonitor monitor,
-                                                            BaseDeviceCommand command,
-                                                            CancellationToken token )
+        protected override async Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
         {
             switch( command )
             {
@@ -98,7 +100,13 @@ namespace CK.DeviceModel.Tests
                     }
             }
             // The base.DoHandleCommandAsync throws a NotSupportedException: all defined commands MUST be handled above.
-            await base.DoHandleCommandAsync( monitor, command, token );
+            await base.DoHandleCommandAsync( monitor, command );
+        }
+
+        protected override Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command )
+        {
+            Interlocked.Increment( ref OnCommandComplededCount );
+            return base.OnCommandCompletedAsync( monitor, command );
         }
 
         protected override Task DoDestroyAsync( IActivityMonitor monitor )

@@ -24,6 +24,7 @@ namespace CK.DeviceModel
         readonly CancellationTokenSource _destroyed;
         volatile TConfiguration _externalConfiguration;
         TConfiguration _currentConfiguration;
+        long _failedChangeTimerNextTick;
 
         // For safety, ConfigurationStatus is copied: we don't trust the ExternalConfiguration.
         // This is internal so that the DeviceHostDaemon can use
@@ -105,9 +106,9 @@ namespace CK.DeviceModel
             _lifetimeChanged = new PerfectEventSender<DeviceLifetimeEvent>();
 
             _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}." );
-            _commandQueue = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
-            _commandQueueImmediate = Channel.CreateUnbounded<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>( new UnboundedChannelOptions() { SingleReader = true } );
-            _deferredCommands = new Queue<(BaseDeviceCommand Command, CancellationToken Token, bool CheckKey)>();
+            _commandQueue = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
+            _commandQueueImmediate = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
+            _deferredCommands = new Queue<BaseDeviceCommand>();
             _destroyed = new CancellationTokenSource();
             _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
             _immediateCommandLimitDirty = true;
@@ -191,7 +192,7 @@ namespace CK.DeviceModel
         /// Configuration are mutable but device's code should avoid to alter it.
         /// </para>
         /// From the implementation methods (<see cref="DoReconfigureAsync"/>, <see cref="DoStartAsync"/>,
-        /// <see cref="DoStopAsync"/>, <see cref="DoDestroyAsync"/> and <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand, CancellationToken)"/>)
+        /// <see cref="DoStopAsync"/>, <see cref="DoDestroyAsync"/> and <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/>)
         /// this is stable and can be used freely.
         /// <para>
         /// <para>
@@ -239,9 +240,9 @@ namespace CK.DeviceModel
         }
 
         internal async Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
-                                                                                TConfiguration config,
-                                                                                TConfiguration clonedconfig,
-                                                                                CancellationToken token )
+                                                                                      TConfiguration config,
+                                                                                      TConfiguration clonedconfig,
+                                                                                      CancellationToken token )
         {
             var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, config, clonedconfig );
             if( cmd == null || !UnsafeSendCommand( monitor, cmd, token ) )
@@ -251,7 +252,7 @@ namespace CK.DeviceModel
             return await cmd.Completion.Task.ConfigureAwait( false );
         }
 
-        async Task HandleReconfigureAsync( BaseConfigureDeviceCommand<TConfiguration> cmd, CancellationToken token )
+        async Task HandleReconfigureAsync( BaseConfigureDeviceCommand<TConfiguration> cmd )
         {
             Debug.Assert( cmd.ClonedConfig != null );
             TConfiguration config = cmd.ClonedConfig;

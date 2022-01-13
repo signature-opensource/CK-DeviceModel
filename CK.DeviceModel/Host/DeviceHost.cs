@@ -106,7 +106,6 @@ namespace CK.DeviceModel
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
             _reconfigureSyncLock = new object();
             _alwayRunningStopped = new List<(IInternalDevice Device, int Count, DateTime NextCall)>();
-            _alwayRunningStoppedSafe = Array.Empty<(IInternalDevice, int, DateTime)>();
             // Shut up the CS8618 warning is raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
             // (But keep the warning for any other fields.)
             _applyConfigAsynclock = null!;
@@ -122,7 +121,13 @@ namespace CK.DeviceModel
 
         Type IDeviceHost.GetDeviceConfigurationType() => typeof( TConfiguration );
 
-        BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name, string? controllerKey, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration ) => new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, clonedConfiguration, ( name, controllerKey ) );
+        BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name,
+                                                                                     string? controllerKey,
+                                                                                     DeviceConfiguration? configuration,
+                                                                                     DeviceConfiguration? clonedConfiguration )
+        {
+            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, clonedConfiguration, (name, controllerKey) );
+        }
 
         BaseStartDeviceCommand IInternalDeviceHost.CreateStartCommand( string name ) => new InternalStartDeviceCommand( GetType(), name );
 
@@ -218,7 +223,7 @@ namespace CK.DeviceModel
                 Success = success;
                 HostConfiguration = initialConfiguration;
                 Results = r;
-                _destroyedNames = destroyedNames;
+                _destroyedNames = (IReadOnlyCollection<string>?)destroyedNames ?? Array.Empty<string>();
             }
 
             /// <summary>
