@@ -48,7 +48,7 @@ namespace CK.DeviceModel
         private protected virtual Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e ) => _lifetimeChanged.SafeRaiseAsync( monitor, e );
 
         /// <summary>
-        /// Factory information (opaque token).
+        /// Factory information (opaque token) that exposes the device's initial configuration.
         /// </summary>
         public readonly struct CreateInfo
         {
@@ -88,7 +88,7 @@ namespace CK.DeviceModel
         /// </param>
         protected Device( IActivityMonitor monitor, CreateInfo info )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            Throw.CheckNotNullArgument( monitor );
             TConfiguration config = info.Configuration;
             Debug.Assert( config != null && config.CheckValid( monitor ), "config != null && config.CheckValid( monitor )" );
 
@@ -106,6 +106,7 @@ namespace CK.DeviceModel
             _lifetimeChanged = new PerfectEventSender<DeviceLifetimeEvent>();
 
             _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}." );
+            _commandMonitor.AutoTags = IDeviceHost.DeviceModel;
             _commandQueue = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
             _commandQueueImmediate = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
             _deferredCommands = new Queue<BaseDeviceCommand>();
@@ -318,6 +319,8 @@ namespace CK.DeviceModel
             }
             #endregion
             // Calls DoReconfigureAsync. It may fail.
+            // The error is captured and the completion is resolved at the end of process.
+            Exception? error = null;
             DeviceReconfiguredResult reconfigResult;
             try
             {
@@ -325,6 +328,7 @@ namespace CK.DeviceModel
             }
             catch( Exception ex )
             {
+                error = ex;
                 _commandMonitor.Error( ex );
                 reconfigResult = DeviceReconfiguredResult.UpdateFailed;
             }
@@ -409,7 +413,14 @@ namespace CK.DeviceModel
             {
                 await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceConfigurationChangedEvent( this, _externalConfiguration ) );
             }
-            cmd.Completion.SetResult( applyResult );
+            // Sets the completion last.
+            // We use TrySet to handle any cancellation but this should be weird: the cancellation occurred in the middle
+            // of the reconfiguration :(.
+            bool complete = error != null ? cmd.Completion.TrySetException( error ) : cmd.Completion.TrySetResult( applyResult );
+            if( !complete )
+            {
+                _commandMonitor.Warn( $"Reconfigure command has been completed outside of the normal process." );
+            }
         }
         #endregion
 
@@ -461,7 +472,10 @@ namespace CK.DeviceModel
                 _controllerKey = key;
                 await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, key ) ).ConfigureAwait( false );
             }
-            cmd.Completion.SetResult( true );
+            if( !cmd.Completion.TrySetResult( true ) )
+            {
+                _commandMonitor.Warn( $"Command has been completed outside of the normal process. This has been ignored." );
+            }
         }
 
         #endregion
@@ -517,6 +531,7 @@ namespace CK.DeviceModel
                     cmd?.Completion.SetResult( check.Value );
                     return;
                 }
+                Exception? error = null;
                 Debug.Assert( _isRunning == false );
                 try
                 {
@@ -527,6 +542,7 @@ namespace CK.DeviceModel
                 }
                 catch( Exception ex )
                 {
+                    error = ex;
                     _commandMonitor.Error( $"While starting '{FullName}'.", ex );
                 }
                 if( _isRunning && reason != DeviceStartedReason.SilentAutoStartAndStopStoppedBehavior )
@@ -537,7 +553,15 @@ namespace CK.DeviceModel
                 {
                     _host.OnAlwaysRunningCheck( this, _commandMonitor );
                 }
-                cmd?.Completion.SetResult( _isRunning );
+                // Sets the completion last.
+                if( cmd != null )
+                {
+                    bool complete = error != null ? cmd.Completion.TrySetException( error ) : cmd.Completion.TrySetResult( _isRunning );
+                    if( !complete )
+                    {
+                        _commandMonitor.Warn( $"Command has been completed outside of the normal process." );
+                    }
+                }
             }
         }
 
@@ -607,6 +631,7 @@ namespace CK.DeviceModel
                                                                 || reason == DeviceStoppedReason.SelfStoppedForceCall
                                                                 || reason == DeviceStoppedReason.Destroyed
                                                                 || reason == DeviceStoppedReason.SelfDestroyed );
+                Exception? error = null;
                 if( !r.HasValue )
                 {
                     // From now on, Stop always succeeds, even if an error occurred.
@@ -618,6 +643,7 @@ namespace CK.DeviceModel
                     }
                     catch( Exception ex )
                     {
+                        error = ex;
                         _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
                     }
                     if( reason != DeviceStoppedReason.Destroyed
@@ -631,7 +657,15 @@ namespace CK.DeviceModel
                         _host.OnAlwaysRunningCheck( this, _commandMonitor );
                     }
                 }
-                cmd?.Completion.SetResult( r.Value );
+                // Sets Completion last.
+                if( cmd != null )
+                {
+                    bool complete = error != null ? cmd.Completion.TrySetException( error ) : cmd.Completion.TrySetResult( r.Value );
+                    if( !complete )
+                    {
+                        _commandMonitor.Warn( $"Command has been completed outside of the normal process." );
+                    }
+                }
             }
         }
 
@@ -679,12 +713,14 @@ namespace CK.DeviceModel
                 await HandleStopAsync( null, autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
                 Debug.Assert( !_isRunning );
             }
+            Exception? error = null;
             try
             {
                 await DoDestroyAsync( _commandMonitor ).ConfigureAwait( false );
             }
             catch( Exception ex )
             {
+                error = ex;
                 _commandMonitor.Warn( $"'{FullName}'.OnDestroyAsync error. This is ignored.", ex );
             }
             FullName += " (Destroyed)";
@@ -696,9 +732,16 @@ namespace CK.DeviceModel
                 await h.RaiseDevicesChangedEventAsync( _commandMonitor ).ConfigureAwait( false );
             }
             await SetDeviceStatusAsync( new DeviceStatus( autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed, h.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
-            cmd?.Completion.SetResult();
             _lifetimeChanged.RemoveAll();
             await h.OnDeviceDestroyedAsync( _commandMonitor, this ).ConfigureAwait( false );
+            if( cmd != null )
+            {
+                bool complete = error != null ? cmd.Completion.TrySetException( error ) : cmd.Completion.TrySetResult();
+                if( !complete )
+                {
+                    _commandMonitor.Warn( $"Command has been completed outside of the normal process." );
+                }
+            }
         }
 
         #endregion
