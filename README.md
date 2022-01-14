@@ -49,7 +49,7 @@ is an example where errors or cancellation are mapped to [DeviceApplyConfigurati
 - Completed commands (even the ones that are completed outside of the command loop and regardless of their state - error, canceled or success) 
 can be safely "continued" thanks to the Device's `OnCommandCompletedAsync` method.
 
-More details on Command can be found [here](Command#commands).
+More details on Command can be found [here](CK.DeviceModel/Command#commands).
 
 ## Passive and Active devices
 
@@ -244,7 +244,7 @@ protected override async Task DoHandleCommandAsync( IActivityMonitor monitor,
     await base.DoHandleCommandAsync( monitor, command, token ).ConfigureAwait( false );
 }
 ```
->  There is much more to say about Commands: [see here](CK.DeviceModel/Command).
+>  There is much more to say about Commands: [see here](CK.DeviceModel/Command#commands).
 
 - Finally, a simple helper that triggers a flash directly on the device: such specific device API must 
 always be simple helpers that eventually send a command (an await its completion).
