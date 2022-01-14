@@ -41,7 +41,7 @@ and an internally managed asynchronous command loop with its own ActivityMonitor
 - Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
  starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs)).
 - Commands can be sent immediately (highest priority) or delayed, waiting for their `SendingTimeUtc`.
-- Commands can have one timeout (in milliseconds) (that is computed and starts right before the command is handled) but can also be bound to 
+- Commands can have one timeout (in milliseconds that is computed and starts right before the command is handled) but can also be bound to 
 any number of CancellationTokens.
 - Commands completion MUST be signaled explicitly.
 - Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
