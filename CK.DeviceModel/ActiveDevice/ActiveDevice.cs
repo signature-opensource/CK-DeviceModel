@@ -32,6 +32,8 @@ namespace CK.DeviceModel
         {
             _events = Channel.CreateUnbounded<object>( new UnboundedChannelOptions() { SingleReader = true } );
             _eventMonitor = new ActivityMonitor( $"Event loop for device {FullName}." );
+            _eventMonitor.AutoTags += IDeviceHost.DeviceModel;
+
             _deviceEvent = new PerfectEventSender<TEvent>();
             _allEvent = new PerfectEventSender<BaseDeviceEvent>();
             _ = Task.Run( RunEventLoopAsync );

@@ -15,6 +15,12 @@ namespace CK.DeviceModel
     public interface IDeviceHost : ISingletonAutoService
     {
         /// <summary>
+        /// Log tag set on the command and any event loop monitors.
+        /// This tag is configured to <see cref="LogFilter.Monitor"/> in <see cref="ActivityMonitor.Tags.DefaultFilters"/>.
+        /// </summary>
+        public static CKTrait DeviceModel = ActivityMonitor.Tags.Register( "Device-Model" );
+
+        /// <summary>
         /// Gets the host name that SHOULD identify this host instance unambiguously in a running context.
         /// (this should be used as the configuration key name for instance).
         /// <para>

@@ -39,6 +39,8 @@ namespace CK.DeviceModel
             _daemon = daemon;
             _configurationRoot = configuration;
             _changeMonitor = new ActivityMonitor( "CK-DeviceModel Configurator (Initializing)" );
+            _changeMonitor.AutoTags += IDeviceHost.DeviceModel;
+
             _run = new CancellationTokenSource();
             _configuration = configuration.GetSection( "CK-DeviceModel" );
             _deviceHosts = deviceHosts.ToArray();

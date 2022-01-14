@@ -57,11 +57,11 @@ namespace CK.DeviceModel
         /// </para>
         /// <para>
         /// The device's DestroyAsync method calls the synchronous OnDeviceDestroyed.
-        /// OnDeviceDestroyed enters the _reconfigureSyncLock and updates the _reconfiguringDevices
+        /// OnDeviceDestroyed enters the _reconfigureSyncLock and updates the _reconfiguringDevices field
         /// if it's not null or creates a new dictionary (copying the _devices), update it and set it as the new _devices.
         /// </para>
         /// <para>
-        /// Once ApplyConfigurationAsync is done calling its DestroyAsync methods,
+        /// Once ApplyConfigurationAsync has called all required DestroyAsync methods,
         /// it enters the _reconfigureSyncLock for the last time to set the _devices to the _reconfiguringDevices
         /// and to reset the _reconfiguringDevices to null. It finally returns the array of DeviceConfigurationResult.
         /// </para>
@@ -83,7 +83,8 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Initializes a new host with a <see cref="DeviceHostName"/> sets to its type name.
+        /// Initializes a new host with a <see cref="DeviceHostName"/> sets to its simple type name
+        /// (that should end, by convention, with "Host").
         /// </summary>
         protected DeviceHost()
             : this( true )
@@ -96,6 +97,8 @@ namespace CK.DeviceModel
             _devices = new Dictionary<string, T>();
             _devicesChanged = new PerfectEventSender<IDeviceHost>();
 
+            // Generates a typed delegate to instantiate the THostConfiguration dynamically used
+            // to apply a partial configuration.
             var t = typeof( THostConfiguration );
             var ctor = t.GetConstructor( Type.EmptyTypes );
             if( ctor == null ) throw new InvalidOperationException( $"Type '{t.Name}' must have a default public constructor." );
@@ -104,7 +107,8 @@ namespace CK.DeviceModel
             ilGenerator.Emit( OpCodes.Newobj, ctor );
             ilGenerator.Emit( OpCodes.Ret );
             _hostConfigFactory = (Func<THostConfiguration>)m.CreateDelegate( typeof( Func<THostConfiguration> ) );
-            _reconfigureSyncLock = new object();
+
+            _reconfigureSyncLock = new DeviceHostLock();
             _alwayRunningStopped = new List<(IInternalDevice Device, int Count, DateTime NextCall)>();
             // Shut up the CS8618 warning is raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
             // (But keep the warning for any other fields.)
@@ -302,6 +306,8 @@ namespace CK.DeviceModel
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
 
+            using var autoTag = monitor.TemporarilySetAutoTags( IDeviceHost.DeviceModel );
+
             var safeConfig = configuration.DeepClone();
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );
 
@@ -447,6 +453,8 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed )
         {
+            using var autoTag = monitor.TemporarilySetAutoTags( IDeviceHost.DeviceModel );
+
             if( waitForDeviceDestroyed )
             {
                 await Task.WhenAll( ParrallelStartDestroy( monitor ) ).ConfigureAwait( false );
@@ -597,7 +605,7 @@ namespace CK.DeviceModel
             var (status, device) = ValidateAndRouteCommand( monitor, command );
             if( status != DeviceHostCommandResult.Success ) return status;
             Debug.Assert( device != null );
-            monitor.Debug( $"{DeviceHostName}: sending {(command.ImmediateSending ? "immediate" : "")} '{command}' to '{device.Name}'." );
+            monitor.Trace( IDeviceHost.DeviceModel, $"{DeviceHostName}: sending {(command.ImmediateSending ? "immediate" : "")} '{command}' to '{device.Name}'." );
             if( !(command.ImmediateSending
                     ? device.SendRoutedCommandImmediate( command, checkControllerKey, token )
                     : device.SendRoutedCommand( command, checkControllerKey, token )) )
@@ -615,8 +623,8 @@ namespace CK.DeviceModel
         /// <returns>The status and the device if found.</returns>
         protected (DeviceHostCommandResult,T?) ValidateAndRouteCommand( IActivityMonitor monitor, BaseDeviceCommand command )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            if( command == null ) throw new ArgumentNullException( nameof( command ) );
+            Throw.CheckNotNullArgument( monitor );
+            Throw.CheckNotNullArgument( command );
             if( !command.HostType.IsAssignableFrom( GetType() ) ) return (DeviceHostCommandResult.InvalidHostType, null);
             if( !command.CheckValidity( monitor ) ) return (DeviceHostCommandResult.CommandCheckValidityFailed, null );
 
