@@ -124,14 +124,19 @@ or `DeviceCommandWithResult<TResult>.Completion` is eventually resolved
 by calling `SetResult`, `SetCanceled` or `SetException` on the Completion otherwise the caller 
 may indefinitely wait for the command completion.
 
+`DoHandleCommandAsync` has no CancellationToken parameter: the command exposes a unique token that unifies the
+multiple ways to cancel a command: `DoHandleCommandAsync` have just to use this unique token when calling
+any external asynchronous methods (more on this below).
+
+## Error or Cancellation as Command results
 Error management is never simple. Consider the Destroy command for instance: can it fail? Actually not:
 - First, when destroying a device, any error that occurred must not prevent the device to be destroyed.
 - Second, this is an idempotent action: regardless of any race condition or concurrency issues, destroying an already destroyed
 device is fine.
 
 Of course, this doesn't prevent a buggy device to hang forever (there is currently no timeout on the destroy) or to leave opened
-resources (handles, pipes, etc.), but the developer that uses a device has almost none possibilities to handle these bugs in the
-device.
+resources (handles, pipes, etc.), but the developer that uses a device has almost none possibilities to handle these
+bugs in the device.
 
 Commands and their Completion offer a solid way to handle this scenario: Commands can hook the error and/or canceled case and
 transform their task's result according to their semantics. The destroy command for instance does just that
@@ -161,10 +166,6 @@ protected override void OnError( Exception ex, ref CompletionSource<DeviceApplyC
 
 If it is needed, the original exception or the fact that the command has actually been canceled is available on the `ICompletion` (that comes from
 CK.Core assembly).
-
-`DoHandleCommandAsync` has no CancellationToken parameter: the command exposes a unique token that unifies the
-multiple ways to cancel a command: `DoHandleCommandAsync` have just to use this unique token when calling
-any external asynchronous methods (more on this below).
 
 ## StoppedBehavior and ImmediateStoppedBehavior
 
