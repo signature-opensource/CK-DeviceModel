@@ -104,8 +104,7 @@ systematically throws a `NotSupportedException`.
 
 ```csharp
 protected virtual Task DoHandleCommandAsync( IActivityMonitor monitor,
-                                             BaseDeviceCommand command,
-                                             CancellationToken token )
+                                             BaseDeviceCommand command )
 ```
 
 When `DoHandleCommandAsync` is called, the command has been validated:
@@ -162,6 +161,10 @@ protected override void OnError( Exception ex, ref CompletionSource<DeviceApplyC
 
 If it is needed, the original exception or the fact that the command has actually been canceled is available on the `ICompletion` (that comes from
 CK.Core assembly).
+
+`DoHandleCommandAsync` has no CancellationToken parameter: the command exposes a unique token that unifies the
+multiple ways to cancel a command: `DoHandleCommandAsync` have just to use this unique token when calling
+any external asynchronous methods (more on this below).
 
 ## StoppedBehavior and ImmediateStoppedBehavior
 
