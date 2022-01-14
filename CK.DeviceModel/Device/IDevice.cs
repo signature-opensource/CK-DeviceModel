@@ -204,7 +204,7 @@ namespace CK.DeviceModel
         /// By default, the <see cref="BaseDeviceCommand.ControllerKey"/> must match this <see cref="ControllerKey"/> (when not null).
         /// Using false here skips this check.
         /// </param>
-        /// <param name="token">Optional cancellation token (added to <see cref="BaseDeviceCommand.AddCancellationSource(CancellationToken)"/>).</param>
+        /// <param name="token">Optional cancellation token (added to <see cref="BaseDeviceCommand.AddCancellationSource(CancellationToken, string)"/>).</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         bool SendCommand( IActivityMonitor monitor,
                           BaseDeviceCommand command,
@@ -219,7 +219,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="command">The command to execute.</param>
-        /// <param name="token">Optional cancellation token (added to <see cref="BaseDeviceCommand.AddCancellationSource(CancellationToken)"/>).</param>
+        /// <param name="token">Optional cancellation token (added to <see cref="BaseDeviceCommand.AddCancellationSource(CancellationToken,string)"/>).</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         bool UnsafeSendCommand( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default );
     }

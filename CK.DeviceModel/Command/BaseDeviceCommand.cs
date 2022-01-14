@@ -22,7 +22,7 @@ namespace CK.DeviceModel
         public const string CommandCompletionCanceledReason = "CommandCompletionCanceled";
 
         /// <summary>
-        /// Cancellation reason used when the timeout computed by <see cref="Device.GetCommandTimeoutAsync(IActivityMonitor, BaseDeviceCommand)"/>
+        /// Cancellation reason used when the timeout computed by <see cref="Device{TConfiguration}.GetCommandTimeoutAsync(IActivityMonitor, BaseDeviceCommand)"/>
         /// elapsed.
         /// </summary>
         public const string CommandTimeoutReason = "CommandTimeout";
