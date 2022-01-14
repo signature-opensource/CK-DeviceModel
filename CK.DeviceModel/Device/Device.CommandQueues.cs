@@ -139,7 +139,7 @@ namespace CK.DeviceModel
             }
         }
 
-        #endregion        /// <inheritdoc />
+        #endregion
 
         #region SendCommand methods
         /// <inheritdoc />

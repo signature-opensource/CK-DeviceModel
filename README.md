@@ -37,17 +37,19 @@ Key features that Commands support are:
 
 - Command execution is serialized thanks to [channels](https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels/) 
 and an internally managed asynchronous command loop with its own ActivityMonitor.
-- Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](../Command/DeviceCommandT.cs)) or not (see [DeviceCommand](../Command/DeviceCommand.cs).
+- Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](../Command/DeviceCommandT.cs)) or not (see [DeviceCommand](../Command/DeviceCommand.cs)).
 - Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
- starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs).
+ starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs)).
 - Commands can be sent immediately (highest priority) or delayed, waiting for their `SendingTimeUtc`.
-- Commands can have one timeout (in milliseconds) (that is computed and starts when the command is handled) and be bound to 
+- Commands can have one timeout (in milliseconds) (that is computed and starts right before the command is handled) but can also be bound to 
 any number of CancellationTokens.
 - Commands completion MUST be signaled explicitly.
 - Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
 is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
 - Completed commands (even the ones that are completed outside of the command loop and regardless of their state - error, canceled or success) 
 can be safely "continued" thanks to the Device's `OnCommandCompletedAsync` method.
+
+More details on Command can be found [here](../Command#commands).
 
 ## Passive and Active devices
 
