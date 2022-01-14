@@ -19,7 +19,7 @@ And some methods:
 that send their respective [5 basic commands](../Command/Basic)).
 
 The Device implementation handles the nitty-gritty details of device life cycle and provide
-any implementation for really safe asynchronous command handling (including delayed executions, cancellations) and
+any implementation for really safe asynchronous command handling (including delayed executions and cancellations) and
 independent monitoring thanks to an internal asynchronous loop.
 
 Specialized devices must provide implementations for:
@@ -41,29 +41,7 @@ protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monito
 protected virtual Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 ```
 
-## Commands
-
-Devices can support any number of specific methods (devices can be seen as multiple instances of micro [IHostedService](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.hosting.ihostedservice)
-that support dynamic reconfiguration), but their implementations SHOULD only be helpers that send Commands.
-
-> Any device implementation MUST rely on Commands. This is the only way to prevent concurrency issues.
-
-Key features of the Commands support are:
-
-- Command execution is serialized thanks to [channels](https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels/) 
-and an internally managed asynchronous command loop with its own ActivityMonitor.
-- Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](../Command/DeviceCommandT.cs)) or not (see [DeviceCommand](../Command/DeviceCommand.cs).
-- Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
- starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs).
-- Commands can be sent immediately (highest priority) or delayed, waiting for their `SendingTimeUtc`.
-- Commands can have one timeout (in milliseconds) and any number of associated CancellationTokens.
-- Commands completion MUST be signaled explicitly.
-- Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
-is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
-- Completed commands (even the ones that are completed outside of the command loop and regardless of their state - error, canceled or success) 
-can be safely "continued" thanks to the Device's `OnCommandCompletedAsync` method.
-
-More on Commands [here](../Command).
+Details about Command handling can be found [here](../Command).
 
 ## Reminders
 

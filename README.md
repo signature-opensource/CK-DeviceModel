@@ -22,6 +22,33 @@ See also:
 [Daemon](CK.DeviceModel/Daemon), 
 [CK.DeviceModel.Configuration package](CK.DeviceModel.Configuration).
 
+Logs emitted by this library are tagged with `"Device-Model"` (exposed by `IDeviceHost.DeviceModel`) and this
+tag is configured in the `ActivityMonitor.Tags.DefaultFilters` to clamp logs to 'Monitor' LogFilter (log groups in Trace
+and log lines in warning).
+
+## Commands
+
+Devices can support any number of specific methods (devices can be seen as multiple instances of micro [IHostedService](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.hosting.ihostedservice)
+that support dynamic reconfiguration), but their implementations SHOULD only be helpers that send Commands.
+
+> Any device implementation MUST rely on Commands. This is the only way to prevent concurrency issues.
+
+Key features that Commands support are:
+
+- Command execution is serialized thanks to [channels](https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels/) 
+and an internally managed asynchronous command loop with its own ActivityMonitor.
+- Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](../Command/DeviceCommandT.cs)) or not (see [DeviceCommand](../Command/DeviceCommand.cs).
+- Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
+ starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs).
+- Commands can be sent immediately (highest priority) or delayed, waiting for their `SendingTimeUtc`.
+- Commands can have one timeout (in milliseconds) (that is computed and starts when the command is handled) and be bound to 
+any number of CancellationTokens.
+- Commands completion MUST be signaled explicitly.
+- Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
+is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
+- Completed commands (even the ones that are completed outside of the command loop and regardless of their state - error, canceled or success) 
+can be safely "continued" thanks to the Device's `OnCommandCompletedAsync` method.
+
 ## Passive and Active devices
 
 There are 2 kind of devices:
@@ -215,9 +242,10 @@ protected override async Task DoHandleCommandAsync( IActivityMonitor monitor,
     await base.DoHandleCommandAsync( monitor, command, token ).ConfigureAwait( false );
 }
 ```
->  More documentation on Commands can be found [here](CK.DeviceModel/Command#command-handling-its-all-about-command-completion).
+>  There is much more to say about Commands: [see here](CK.DeviceModel/Command).
 
-- Finally, a simple helper that triggers a flash directly on the device: such specific device API must always be simple helpers that eventually send a command (an await its completion).
+- Finally, a simple helper that triggers a flash directly on the device: such specific device API must 
+always be simple helpers that eventually send a command (an await its completion).
 
 ```csharp
 public async Task<bool> FlashAsync( IActivityMonitor monitor )

@@ -114,7 +114,7 @@ When `DoHandleCommandAsync` is called, the command has been validated:
 - The `BaseDeviceCommand.DeviceName` matches this `IDevice.Name" (or Device.UnsafeSendCommand has been used). 
 - The `BaseDeviceCommand.ControllerKey` is either null or match the current `IDevice.ControllerKey` (or an Unsafe send has been used).
 - `BaseDeviceCommand.StoppedBehavior` is coherent with this current `IsRunning` state.
-- The `BaseDeviceCommand.SendingTimeUtc` is in the past.
+- The `BaseDeviceCommand.SendingTimeUtc` is in the now (or in the past).
 - `GetCommandTimeoutAsync` has been called and the command's timeout is configured.
 
 Typical `DoHandleCommandAsync` implementation applies pattern matching on the command type and handles
@@ -131,7 +131,8 @@ Error management is never simple. Consider the Destroy command for instance: can
 device is fine.
 
 Of course, this doesn't prevent a buggy device to hang forever (there is currently no timeout on the destroy) or to leave opened
-resources (handles, pipes, etc.), but the developer that uses a device has almost none possibilities to handle these.
+resources (handles, pipes, etc.), but the developer that uses a device has almost none possibilities to handle these bugs in the
+device.
 
 Commands and their Completion offer a solid way to handle this scenario: Commands can hook the error and/or canceled case and
 transform their task's result according to their semantics. The destroy command for instance does just that

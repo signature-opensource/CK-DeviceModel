@@ -209,25 +209,27 @@ namespace CK.DeviceModel.Tests
                 devices[i].UnsafeSendCommand( TestHelper.Monitor, commands[i] );
             }
             var deferred = new List<DCommand>();
-            using( TestHelper.Monitor.OpenInfo( "Waiting for commands completion." ) )
+            using( TestHelper.Monitor.OpenInfo( "Waiting for commands completion that can be completed." ) )
             {
                 for( int i = 0; i < nbDevice; i++ )
                 {
                     var d = devices[i];
                     var c = commands[i];
-                    if( d.Fail == FailureType.None )
+                    switch( d.Fail )
                     {
-                        (await c.Completion).Should().Be( CommandResult.Success, $"{c.Trace} should have succeeded." );
-                    }
-                    else if( d.Fail == FailureType.CommandSync || d.Fail == FailureType.CommandSync )
-                    {
-                        (await c.Completion).Should().Be( CommandResult.Failure, $"{c.Trace} should have failed." );
-                    }
-                    else
-                    {
-                        // The command is in the deferred queue.
-                        c.Completion.IsCompleted.Should().BeFalse( $"{c.Trace} should be in the deferred queue." );
-                        deferred.Add( c );
+                        case FailureType.None:
+                            (await c.Completion).Should().Be( CommandResult.Success, $"{c.Trace} should have succeeded." );
+                            break;
+                        case FailureType.CommandSync:
+                        case FailureType.CommandAsync:
+                            (await c.Completion).Should().Be( CommandResult.Failure, $"{c.Trace} should have failed." );
+                            break;
+                        case FailureType.StartSync:
+                        case FailureType.StartAsync:
+                            c.Completion.IsCompleted.Should().BeFalse( $"Command {c} ({c.Trace}) should be in the deferred queue and not completed yet." );
+                            deferred.Add( c );
+                            break;
+                        default: throw new NotSupportedException();
                     }
                 }
                 TestHelper.Monitor.CloseGroup( $"{deferred.Count} commands deferred." );
