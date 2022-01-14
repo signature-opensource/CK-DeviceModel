@@ -96,7 +96,7 @@ namespace CK.DeviceModel.Tests
 
             public int ExecutionTime { get; set; }
 
-            public override string ToString() => $"{base.ToString()} - {Trace}";
+            protected override string? ToStringSuffix => Trace;
         }
 
         [TestCase( 40, 7784 )]

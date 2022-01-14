@@ -149,13 +149,14 @@ namespace CK.DeviceModel.Tests
         {
             public string? Trace { get; set; }
 
-            public override string ToString() => $"{base.ToString()} - {Trace}";
+            protected override string? ToStringSuffix => Trace;
         }
 
         [TestCase(50, 200, 20)]
         [TestCase(50, 150, 20)]
         public async Task SendingTimeUtc_stress_test_Async( int nb, int deltaMS, int execTimeMS )
         {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{deltaMS},{execTimeMS})" );
             var rnd = new Random();
             var dSpan = TimeSpan.FromMilliseconds( deltaMS );
 

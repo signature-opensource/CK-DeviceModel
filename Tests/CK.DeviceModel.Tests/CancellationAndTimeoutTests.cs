@@ -144,7 +144,7 @@ namespace CK.DeviceModel.Tests
             // Avoids exception while awaiting. Using Completion.HasBeenCanceled.
             protected override void OnCanceled( ref CompletionSource.OnCanceled result ) => result.SetResult();
 
-            public override string ToString() => $"{base.ToString()} - {Trace}";
+            protected override string? ToStringSuffix => Trace;
         }
 
         [TestCase( 11, 3713 )]

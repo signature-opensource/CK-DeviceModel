@@ -78,7 +78,7 @@ namespace CK.DeviceModel
             }
             public override Type HostType => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            public override string ToString() => $"CommandCanceler( Queued:{QueuedCommands}, Delayed:{DelayedCommands}, Deferred:{DelayedCommands} )";
+            protected override string ToStringSuffix => $"( Queued:{QueuedCommands}, Delayed:{DelayedCommands}, Deferred:{DelayedCommands} )";
         }
 
         /// <inheritdoc />

@@ -11,6 +11,8 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class DeviceCommandNoResult : BaseDeviceCommand, ICompletable
     {
+        // Name is not factorized in BaseDeviceCommand because of DeviceCommandWithResult
+        // that computes a clean name with the <TResult> and it wouldn't be readonly.
         readonly string _commandToString;
         
         /// <inheritdoc />
@@ -52,9 +54,19 @@ namespace CK.DeviceModel
         protected virtual void OnCanceled( ref CompletionSource.OnCanceled result ) => result.SetCanceled();
 
         /// <summary>
-        /// Overridden to return this type name and <see cref="Completion"/> status.
+        /// Overridden to return this type name, <see cref="Completion"/> status and <see cref="BaseDeviceCommand.CancellationReason"/>.
+        /// This cannot be overridden to secure how a command appears in the logs. You may use the protected <see cref="ToStringSuffix"/>
+        /// virtual property to append more details if required.
         /// </summary>
         /// <returns>This type name and current completion status.</returns>
-        public override string ToString() => $"{_commandToString}[{Completion}]";
+        public override sealed string ToString() => CancellationReason == null
+                                                    ? $"{_commandToString}[{Completion}]{ToStringSuffix}"
+                                                    : $"{_commandToString}[{Completion}: {CancellationReason}]{ToStringSuffix}";
+
+        /// <summary>
+        /// Optional string that is appended to command <see cref="ToString()"/> (that cannot be overridden).
+        /// It will appear after the type name and completion status.
+        /// </summary>
+        protected virtual string? ToStringSuffix => null;
     }
 }

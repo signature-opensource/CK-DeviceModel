@@ -151,7 +151,7 @@ namespace CK.DeviceModel.Tests
 
             public int ExecutionTime { get; set; }
 
-            public override string ToString() => $"{base.ToString()} - {Trace}";
+            protected override string? ToStringSuffix => Trace;
 
             // Using result rewriting to avoid try/catch in tests.
             protected override void OnCanceled( ref CompletionSource<CommandResult>.OnCanceled result ) => result.SetResult( CommandResult.Cancel );

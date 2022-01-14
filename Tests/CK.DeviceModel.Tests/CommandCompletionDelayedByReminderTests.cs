@@ -110,7 +110,7 @@ namespace CK.DeviceModel.Tests
         {
             public string? Trace { get; set; }
 
-            public override string ToString() => $"{base.ToString()} - {Trace}";
+            protected override string? ToStringSuffix => Trace;
         }
 
         [TestCase( 20, 3712 )]
