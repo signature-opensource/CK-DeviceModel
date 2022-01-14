@@ -6,7 +6,7 @@
     <Nullable>annotations</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Core" Version="15.0.0-r03" />
+    <PackageReference Include="CK.Core" Version="15.0.0-r03-00-0001-develop" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NUnit.Runners.Net4" Version="2.6.4" />
