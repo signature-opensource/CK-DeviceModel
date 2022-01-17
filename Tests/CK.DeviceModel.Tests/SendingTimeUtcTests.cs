@@ -157,6 +157,7 @@ namespace CK.DeviceModel.Tests
         public async Task SendingTimeUtc_stress_test_Async( int nb, int deltaMS, int execTimeMS )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{deltaMS},{execTimeMS})" );
+
             var rnd = new Random();
             var dSpan = TimeSpan.FromMilliseconds( deltaMS );
 
@@ -206,14 +207,15 @@ namespace CK.DeviceModel.Tests
 
             // We have 2 execTimeMS per command: one for the delay in DoHandleCommandAsync and one for the reminder.
             // The first one "blocks" the device, the other one is "in parallel" since it is a reminder (all of them can fire "at the same time").
-            int minimalExecTime = (nb * 3) * execTimeMS;
+            int minimalExecTime = (nb * 3) * execTimeMS + execTimeMS;
             // The latest starts at nb*deltaMS and spans 2 execTimeMS.
             int latestMinimalTime = nb * deltaMS + 2 * execTimeMS;
             int minTime = Math.Max( minimalExecTime, latestMinimalTime );
-            TestHelper.Monitor.Info( $"Waiting for {minTime*3} ms." );
-            // This is very theoretical. But we should not wait 10% this time for the last reminder to be executed.
+            // This is very theoretical. But we should not wait 10% this time more for the last reminder to be executed.
             // This depends on the machine and on the deltaMS: for small deltaMS this doesn't work!
-            await Task.Delay( (minTime * 110)/100 );
+            int waitTime = (minTime * 110) / 100;
+            TestHelper.Monitor.Info( $"Waiting for {waitTime} ms." );
+            await Task.Delay( waitTime );
             TestHelper.Monitor.Info( $"Done waiting." );
 
             d.ReminderCount.Should().Be( nb * 3 );
