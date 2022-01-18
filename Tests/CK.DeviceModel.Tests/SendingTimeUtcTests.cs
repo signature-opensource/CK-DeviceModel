@@ -16,6 +16,7 @@ namespace CK.DeviceModel.Tests
     public class SendingTimeUtcTests
     {
         [Test]
+        [Timeout( 200 )]
         public void SendingTimeUtc_and_ImmediateSending_are_exclusive()
         {
             var d = DateTime.UtcNow;
@@ -47,7 +48,6 @@ namespace CK.DeviceModel.Tests
 
             FluentActions.Invoking( () => cmd.SendingTimeUtc = DateTime.Now ).Should().Throw<ArgumentException>();
         }
-
 
         public class DHost : DeviceHost<D, DeviceHostConfiguration<DConfiguration>, DConfiguration>
         {
@@ -154,6 +154,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase(50, 200, 20)]
         [TestCase(50, 150, 20)]
+        [Timeout( 16000 )]
         public async Task SendingTimeUtc_stress_test_Async( int nb, int deltaMS, int execTimeMS )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{deltaMS},{execTimeMS})" );

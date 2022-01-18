@@ -65,6 +65,7 @@ namespace CK.DeviceModel.Tests
         [TestCase( "SimpleScale", "RunningReset", "UseLifetimeAndDeviceEvent" )]
         [TestCase( "SimpleScale", "StoppedReset", "UseAllEvent" )]
         [TestCase( "SimpleScale", "StoppedReset", "UseLifetimeAndDeviceEvent" )]
+        [Timeout(3000)]
         public async Task collecting_lifetime_reset_and_measure_events_Async( string type, string mode, string useAllEvent )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( collecting_lifetime_reset_and_measure_events_Async )}(\"{type}\",\"{mode}\",\"{useAllEvent}\")" );
@@ -139,6 +140,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( "SimpleScale" )]
         [TestCase( "Scale" )]
+        [Timeout( 3000 )]
         public async Task event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself_Async( string type )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself_Async )}(\"{type}\")" );
@@ -187,6 +189,7 @@ namespace CK.DeviceModel.Tests
         [TestCase( "DeviceEvent", "Scale" )]
         [TestCase( "UseAllEvent", "SimpleScale" )]
         [TestCase( "DeviceEvent", "SimpleScale" )]
+        [Timeout( 2000 )]
         public async Task stress_event_test_Async( string eType, string scaleType )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( stress_event_test_Async )}(\"{eType}\",\"{scaleType}\")" );

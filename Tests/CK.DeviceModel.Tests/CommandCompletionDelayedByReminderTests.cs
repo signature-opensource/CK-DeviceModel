@@ -115,6 +115,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( 20, 3712 )]
         [TestCase( 500, 42 )]
+        [Timeout( 3000 )]
         public async Task completion_with_reminder_Async( int nb, int randomSeed )
         {
             var h = new DHost();

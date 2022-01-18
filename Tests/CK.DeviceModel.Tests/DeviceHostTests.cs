@@ -15,6 +15,7 @@ namespace CK.DeviceModel.Tests
     {
 
         [Test]
+        [Timeout( 200 )]
         public async Task playing_with_configurations_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations_Async ) );
@@ -102,6 +103,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 200 )]
         public async Task testing_state_changed_PerfectEvent_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( testing_state_changed_PerfectEvent_Async ) );
@@ -233,6 +235,7 @@ namespace CK.DeviceModel.Tests
 
 
         [Test]
+        [Timeout( 200 )]
         public async Task ensure_device_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( ensure_device_Async ) );
@@ -294,6 +297,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 200 )]
         public async Task executing_commands_from_the_host_without_ControllerKey_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( executing_commands_from_the_host_without_ControllerKey_Async ) );
@@ -357,6 +361,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( "UseSendCommand" )]
         [TestCase( "UseSendCommandImmediate" )]
+        [Timeout( 1000 )]
         public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async( string mode )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async ) );
@@ -481,6 +486,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 200 )]
         public async Task Disabling_sends_a_stop_status_change_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( Disabling_sends_a_stop_status_change_Async ) );

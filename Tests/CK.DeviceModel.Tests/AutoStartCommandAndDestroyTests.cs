@@ -112,6 +112,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 500 )]
         public async Task auto_starting_device_and_keep_running_eventually_execute_deferred_commands_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( auto_starting_device_and_keep_running_eventually_execute_deferred_commands_Async ) );
@@ -157,6 +158,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 500 )]
         public async Task auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async ) );
@@ -209,6 +211,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( "Deferred" )]
         [TestCase( "StartFirst" )]
+        [Timeout( 500 )]
         public async Task destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async( string mode )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async )}-{mode}" );

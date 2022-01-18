@@ -165,6 +165,7 @@ namespace CK.DeviceModel.Tests
         [TestCase( 20, 42, true )]
         [TestCase( 40, 587, true )]
         [TestCase( 60, 0, true )]
+        [Timeout( 3500 )]
         public async Task stress_test_Async( int nbDevice, int randomSeed, bool useDirectReconfiguration )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( stress_test_Async )}({nbDevice},{randomSeed},{useDirectReconfiguration})" );

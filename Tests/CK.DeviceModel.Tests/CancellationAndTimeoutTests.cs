@@ -149,6 +149,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( 11, 3713 )]
         [TestCase( 200, 42 )]
+        [Timeout( 1000 )]
         public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_cancellation_reasons_Async )}({nb},{randomSeed})" );

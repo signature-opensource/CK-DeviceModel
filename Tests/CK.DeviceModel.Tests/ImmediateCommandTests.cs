@@ -100,6 +100,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [TestCase( 40, 7784 )]
+        [Timeout( 9000 )]
         public async Task sending_immediate_commands_does_not_block_the_loop_Async( int nb, int seed )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_immediate_commands_does_not_block_the_loop_Async )}-{nb}-{seed}" );

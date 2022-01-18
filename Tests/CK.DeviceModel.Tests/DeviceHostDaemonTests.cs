@@ -52,6 +52,7 @@ namespace CK.DeviceModel.Tests
         [TestCase( "UseDestroyCommandImmediate" )]
         [TestCase( "UseDestroyCommand" )]
         [TestCase( "UseDestroyMethod" )]
+        [Timeout( 1000 )]
         public async Task simple_auto_restart_Async( string mode )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(simple_auto_restart_Async) );
@@ -105,6 +106,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 500 )]
         public async Task restart_can_be_fast_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(restart_can_be_fast_Async) );
@@ -133,6 +135,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 6000 )]
         public async Task multiple_devices_handling_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(multiple_devices_handling_Async) );
@@ -223,6 +226,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( OnStoppedDaemonBehavior.ClearAllHosts )]
         [TestCase( OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed )]
+        [Timeout( 2000 )]
         public async Task multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async( OnStoppedDaemonBehavior behavior )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async )}-{behavior}" );
@@ -282,6 +286,7 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
+        [Timeout( 6000 )]
         public async Task DefaultDeviceAlwaysRunningPolicy_always_retry_by_default_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( DefaultDeviceAlwaysRunningPolicy_always_retry_by_default_Async ) );
