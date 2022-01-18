@@ -9,13 +9,13 @@ using System.Threading.Tasks;
 namespace CK.DeviceModel.Tests
 {
 
-    public class SimpleScale : ActiveDevice<SimpleScaleConfiguration, SimpleScaleEvent>
+    public class Scale : ActiveDevice<CommonScaleConfiguration, ScaleEvent>
     {
         PhysicalMachine? _machine;
         int _stepCount;
         int _currentSum;
 
-        public SimpleScale( IActivityMonitor monitor, CreateInfo info )
+        public Scale( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
         {
         }
@@ -26,7 +26,7 @@ namespace CK.DeviceModel.Tests
             return Task.CompletedTask;
         }
 
-        protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, SimpleScaleConfiguration config )
+        protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, CommonScaleConfiguration config )
         {
             Debug.Assert( IsRunning == (_machine != null) );
             bool physicalRateChanged = config.PhysicalRate != CurrentConfiguration.PhysicalRate;
@@ -39,7 +39,7 @@ namespace CK.DeviceModel.Tests
             Debug.Assert( _machine == null );
             // We are in the command loop: the CurrentConfiguration cannot change: there
             // is no need to capture a reference to it.
-            _machine = new PhysicalMachine( CurrentConfiguration.PhysicalRate, OnPhysicalEvent );
+            _machine = new PhysicalMachine( CurrentConfiguration.PhysicalRate, OnPhysicalEvent, CurrentConfiguration.AlwaysPositiveMeasure );
             if( CurrentConfiguration.ResetOnStart ) Reset();
             return Task.FromResult( true );
         }
@@ -50,7 +50,7 @@ namespace CK.DeviceModel.Tests
             {
                 _currentSum = 0;
                 _stepCount = 0;
-                EventLoop.RaiseEvent( new SimpleScaleResetEvent( this ) );
+                EventLoop.RaiseEvent( new ScaleResetEvent( this ) );
             }
         }
 
@@ -64,7 +64,7 @@ namespace CK.DeviceModel.Tests
             {
                 // This is how to log Error/Warning/Info/Trace/Debug messages
                 // outside of the command loop.
-                EventLoop.LogWarn( "Received a negative value." );
+                EventLoop.LogWarn( $"Received a negative value (config.StopOnNegativeValue: {config.StopOnNegativeValue})." );
                 if( config.StopOnNegativeValue )
                 {
                     // Execute has 2 overloads: one with a synchronous Action<IActivityMonitor> and
@@ -77,6 +77,7 @@ namespace CK.DeviceModel.Tests
                         // This is awful and should never be done is real code!
                         // This is just for tests, to avoid subsequent stops.
                         config.StopOnNegativeValue = false;
+                        EventLoop.LogTrace( $"Task.Run() in {10 * config.PhysicalRate} ms will restart the device." );
                         _ = Task.Run( async () =>
                         {
                             await Task.Delay( 10 * config.PhysicalRate );
@@ -88,11 +89,15 @@ namespace CK.DeviceModel.Tests
             }
 
             _currentSum += value;
-            if( ++_stepCount > config.MeasureStep )
+            ++_stepCount;
+            EventLoop.LogDebug( $"Measure received: {value}, Sum: {_currentSum}, Step: {_stepCount} (MeasureStep = {CurrentConfiguration.MeasureStep})." );
+            if( _stepCount >= CurrentConfiguration.MeasureStep )
             {
                 var text = config.MeasurePattern ?? "{0}";
                 var m = (double)_currentSum / _stepCount;
-                EventLoop.RaiseEvent( new SimpleScaleMeasureEvent( this, m, string.Format( text, m ) ) );
+                var ev = new ScaleMeasureEvent( this, m, string.Format( text, m ) );
+                EventLoop.LogDebug( $"Raised ScaleMeasureEvent: {ev.Measure}." );
+                EventLoop.RaiseEvent( ev );
                 _stepCount = 0;
             }
         }
@@ -109,7 +114,7 @@ namespace CK.DeviceModel.Tests
         {
             switch( command )
             {
-                case SimpleScaleResetCommand _:
+                case ScaleResetCommand _:
                     Reset();
                     return Task.CompletedTask;
                 default:

@@ -11,11 +11,13 @@ namespace CK.DeviceModel.Tests
         Action<int>? _measure;
 
 
-        public PhysicalMachine( int delay, Action<int> m )
+        public PhysicalMachine( int delay, Action<int> m, bool alwaysPositiveMeasure )
         {
             _measure = m;
             _random = new Random( 3712 );
-            _timer = new Timer( _ => _measure?.Invoke( _random.Next( 10 ) - 1 ), null, 0, delay );
+            if( alwaysPositiveMeasure )
+                _timer = new Timer( _ => _measure?.Invoke( _random.Next( 10 ) + 1 ), null, 0, delay );
+            else _timer = new Timer( _ => _measure?.Invoke( _random.Next( 10 ) - 1 ), null, 0, delay );
         }
 
         public void Dispose()

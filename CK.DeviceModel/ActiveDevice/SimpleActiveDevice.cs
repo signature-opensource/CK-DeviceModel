@@ -49,7 +49,8 @@ namespace CK.DeviceModel
         private protected override Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
         {
             return base.SafeRaiseLifetimeEventAsync( monitor, e )
-                       .ContinueWith( _ => _allEvent.SafeRaiseAsync( monitor, e ), TaskScheduler.Default );
+                       .ContinueWith( _ => _allEvent.SafeRaiseAsync( monitor, e ), TaskScheduler.Default )
+                       .Unwrap();
         }
 
         /// <summary>
@@ -86,13 +87,20 @@ namespace CK.DeviceModel
         /// </param>
         public void DebugPostEvent( BaseActiveDeviceEvent e ) => SendRoutedCommandImmediate( new AutoSendEvent( (TEvent)e ) );
 
+
         /// <summary>
         /// Raises a <see cref="DeviceEvent"/>.
+        /// This MUST always be awaited.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="e">The device event to raise.</param>
         /// <returns>The awaitable.</returns>
-        protected Task RaiseEventAsync( IActivityMonitor monitor, TEvent e ) => _allEvent.SafeRaiseAsync( monitor, e );
+        protected Task RaiseEventAsync( IActivityMonitor monitor, TEvent e )
+        {
+            return _deviceEvent.SafeRaiseAsync( monitor, e )
+                               .ContinueWith( _ => _allEvent.SafeRaiseAsync( monitor, e ), TaskScheduler.Default )
+                               .Unwrap();
+        }
 
         /// <summary>
         /// Overridden to handle the internal command that raises events from <see cref="IActiveDevice.DebugPostEvent(BaseActiveDeviceEvent)"/> or
@@ -105,7 +113,7 @@ namespace CK.DeviceModel
         protected override Task DoHandleCommandAsync( IActivityMonitor monitor, BaseDeviceCommand command )
         {
             return command is AutoSendEvent s
-                    ? _allEvent.SafeRaiseAsync( monitor, s.Event )
+                    ? RaiseEventAsync( monitor, s.Event )
                     : base.DoHandleCommandAsync( monitor, command );
         }
 

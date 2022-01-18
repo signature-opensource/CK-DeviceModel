@@ -17,7 +17,9 @@ namespace CK.DeviceModel
     /// The event type.
     /// Each active device should be associated to a specialized <see cref="ActiveDeviceEvent{TDevice}"/>
     /// </typeparam>
-    public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>, IActiveDevice<TEvent>, ActiveDevice<TConfiguration,TEvent>.IEventLoop
+    public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>,
+                                                                        IActiveDevice<TEvent>,
+                                                                        ActiveDevice<TConfiguration,TEvent>.IEventLoop
         where TConfiguration : DeviceConfiguration
         where TEvent : BaseActiveDeviceEvent
     {
@@ -53,7 +55,7 @@ namespace CK.DeviceModel
         /// </remarks>
         public PerfectEvent<BaseDeviceEvent> AllEvent => _allEvent.PerfectEvent;
 
-        private protected override Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
+        private protected override sealed Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
         {
             DoPost( e );
             return base.SafeRaiseLifetimeEventAsync( monitor, e );

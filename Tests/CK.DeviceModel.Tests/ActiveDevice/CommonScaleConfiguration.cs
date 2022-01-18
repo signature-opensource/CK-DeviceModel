@@ -5,12 +5,19 @@ using System.Text;
 
 namespace CK.DeviceModel.Tests
 {
-    public class SimpleScaleConfiguration : DeviceConfiguration
+    /// <summary>
+    /// This configuration is common to <see cref="SimpleScale"/> and <see cref="Scale"/>.
+    /// </summary>
+    public class CommonScaleConfiguration : DeviceConfiguration
     {
-        public SimpleScaleConfiguration()
+        public CommonScaleConfiguration()
         {
         }
 
+        /// <summary>
+        /// Gets or sets the timer duration.
+        /// Defaults to 20 ms.
+        /// </summary>
         public int PhysicalRate { get; set; } = 20;
 
         public int MeasureStep { get; set; } = 10;
@@ -31,7 +38,13 @@ namespace CK.DeviceModel.Tests
         /// </summary>
         public bool AllowUnattendedRestartAfterStopOnNegativeValue { get; set; }
 
-        public SimpleScaleConfiguration( ICKBinaryReader r )
+        /// <summary>
+        /// True to always send positive measure (<see cref="StopOnNegativeValue"/>
+        /// and <see cref="AllowUnattendedRestartAfterStopOnNegativeValue"/> are useless).
+        /// </summary>
+        public bool AlwaysPositiveMeasure { get; set; }
+
+        public CommonScaleConfiguration( ICKBinaryReader r )
             : base( r )
         {
             r.ReadByte(); // version
@@ -41,6 +54,7 @@ namespace CK.DeviceModel.Tests
             ResetOnStart = r.ReadBoolean();
             StopOnNegativeValue = r.ReadBoolean();
             AllowUnattendedRestartAfterStopOnNegativeValue = r.ReadBoolean();
+            AlwaysPositiveMeasure = r.ReadBoolean();
         }
 
         public override void Write( ICKBinaryWriter w )
@@ -53,6 +67,7 @@ namespace CK.DeviceModel.Tests
             w.Write( ResetOnStart );
             w.Write( StopOnNegativeValue );
             w.Write( AllowUnattendedRestartAfterStopOnNegativeValue );
+            w.Write( AlwaysPositiveMeasure );
         }
     }
 }

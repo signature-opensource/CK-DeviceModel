@@ -4,9 +4,9 @@ using System.Text;
 
 namespace CK.DeviceModel.Tests
 {
-    public sealed class SimpleScaleMeasureEvent : SimpleScaleEvent
+    public sealed class ScaleMeasureEvent : ScaleEvent, ICommonScaleMeasureEvent
     {
-        internal SimpleScaleMeasureEvent( SimpleScale device, double measure, string text )
+        internal ScaleMeasureEvent( Scale device, double measure, string text )
             : base( device, text )
         {
             Measure = measure;
