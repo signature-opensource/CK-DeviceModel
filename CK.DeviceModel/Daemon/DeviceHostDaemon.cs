@@ -105,7 +105,7 @@ namespace CK.DeviceModel
                     {
                         int w = (int)(wait / TimeSpan.TicksPerMillisecond);
                         _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a signal." );
-                        await Task.WhenAny( Task.Delay( w ), signalTask ).ConfigureAwait( false );
+                        await signalTask.WaitAsync( w ).ConfigureAwait( false );
                     }
                     else
                     {
