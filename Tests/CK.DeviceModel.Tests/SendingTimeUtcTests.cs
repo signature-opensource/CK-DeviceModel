@@ -136,6 +136,10 @@ namespace CK.DeviceModel.Tests
                     AddReminder( DateTime.UtcNow.AddMilliseconds( CurrentConfiguration.DeltaMS ), cmd.Trace );
                     ++ReminderCount;
                 }
+                else if( command is GetReminderCountCommand get )
+                {
+                    get.Completion.SetResult( ReminderCount );
+                }
                 return Task.CompletedTask;
             }
 
@@ -151,6 +155,10 @@ namespace CK.DeviceModel.Tests
             public string? Trace { get; set; }
 
             protected override string? ToStringSuffix => Trace;
+        }
+
+        public class GetReminderCountCommand : DeviceCommand<DHost,int>
+        {
         }
 
         [TestCase(50, 200, 20)]
@@ -225,6 +233,13 @@ namespace CK.DeviceModel.Tests
             {
                 TestHelper.Monitor.Warn( "Read 0 ReminderCount! Using Volatile.Read." );
                 rc = Volatile.Read( ref d.ReminderCount );
+                if( rc == 0 )
+                {
+                    TestHelper.Monitor.Warn( "Using Volatile.Read: still 0. Using a GetReminderCountCommand." );
+                    var c = new GetReminderCountCommand();
+                    d.UnsafeSendCommand( TestHelper.Monitor, c );
+                    rc = await c.Completion;
+                }
             }
             rc.Should().Be( nb * 3, "ReminderCount is fine." );
         }
