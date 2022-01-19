@@ -214,7 +214,7 @@ namespace CK.DeviceModel.Tests
         [Timeout( 500 )]
         public async Task destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async( string mode )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async )}-{mode}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async )}(\"{mode}\")" );
 
             var h = new DHost();
             var config = new DConfiguration() { Name = "First", Status = DeviceConfigurationStatus.Runnable };

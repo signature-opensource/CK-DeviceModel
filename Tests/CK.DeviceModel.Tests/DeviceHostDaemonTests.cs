@@ -230,7 +230,7 @@ namespace CK.DeviceModel.Tests
         [Timeout( 2000 )]
         public async Task multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async( OnStoppedDaemonBehavior behavior )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async )}-{behavior}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async )}({behavior})" );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1 };
             var host1 = new MachineHost();

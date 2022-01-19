@@ -118,6 +118,7 @@ namespace CK.DeviceModel.Tests
         [Timeout( 3000 )]
         public async Task completion_with_reminder_Async( int nb, int randomSeed )
         {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( completion_with_reminder_Async )}({nb},{randomSeed})" );
             var h = new DHost();
             var config = new DConfiguration() { Name = "Single", Status = DeviceConfigurationStatus.RunnableStarted, RandomSeed = randomSeed };
             (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
