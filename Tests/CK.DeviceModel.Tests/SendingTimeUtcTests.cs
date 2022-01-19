@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
@@ -219,7 +220,13 @@ namespace CK.DeviceModel.Tests
             await Task.Delay( waitTime );
             TestHelper.Monitor.Info( $"Done waiting." );
 
-            d.ReminderCount.Should().Be( nb * 3 );
+            int rc = d.ReminderCount;
+            if( rc == 0 )
+            {
+                TestHelper.Monitor.Warn( "Read 0 ReminderCount! Using Volatile.Read." );
+                rc = Volatile.Read( ref d.ReminderCount );
+            }
+            rc.Should().Be( nb * 3, "ReminderCount is fine." );
         }
     }
 }
