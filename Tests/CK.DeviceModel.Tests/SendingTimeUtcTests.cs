@@ -64,11 +64,8 @@ namespace CK.DeviceModel.Tests
                 : base( r )
             {
                 r.ReadByte();
-                DeltaMS = r.ReadInt32();
                 ExecTimeMS = r.ReadInt32();
             }
-
-            public int DeltaMS { get; set; }
 
             public int ExecTimeMS { get; set; }
 
@@ -76,7 +73,6 @@ namespace CK.DeviceModel.Tests
             {
                 base.Write( w );
                 w.Write( (byte)0 );
-                w.Write( DeltaMS );
                 w.Write( ExecTimeMS );
             }
         }
@@ -89,6 +85,7 @@ namespace CK.DeviceModel.Tests
             }
 
             public int ReminderCount;
+            public int ReminderFiredCount;
 
             protected override Task DoDestroyAsync( IActivityMonitor monitor )
             {
@@ -114,16 +111,16 @@ namespace CK.DeviceModel.Tests
             {
                 if( command is DCommand cmd )
                 {
-                    monitor.Trace( $"Handling command '{cmd}': Waiting {CurrentConfiguration.ExecTimeMS} ms." );
+                    monitor.Trace( $"Handling command '{cmd}': Waiting {CurrentConfiguration.ExecTimeMS} ms before completing it." );
                     await Task.Delay( CurrentConfiguration.ExecTimeMS, cmd.CancellationToken ).ConfigureAwait( false );
-                    monitor.Trace( $"Completing command '{cmd}'." );
+                    monitor.Trace( $"Completing command '{cmd}'. (ReminderCount so far {ReminderCount})" );
                     cmd.Completion.SetResult();
                     return;
                 }
                 if( command is GetReminderCountCommand get )
                 {
-                    get.Completion.SetResult( ReminderCount );
-                    monitor.Trace( $"ReminderCount is '{ReminderCount}'." );
+                    get.Completion.SetResult( (ReminderCount,ReminderFiredCount) );
+                    monitor.Trace( $"ReminderCount is '({ReminderCount},{ReminderFiredCount})'." );
                     return;
                 }
                 await base.DoHandleCommandAsync( monitor, command );
@@ -133,16 +130,17 @@ namespace CK.DeviceModel.Tests
             {
                 if( command is DCommand cmd )
                 {
-                    AddReminder( DateTime.UtcNow.AddMilliseconds( CurrentConfiguration.DeltaMS ), cmd.Trace );
+                    AddReminder( DateTime.UtcNow.AddMilliseconds( 50 ), cmd.Trace );
                     ++ReminderCount;
-                    monitor.Trace( $"Completed: Command '{cmd}'. Added Reminder (ReminderCount = {ReminderCount})." );
+                    monitor.Trace( $"Completed: Command '{cmd}'. Added Reminder to fire in 50 ms (ReminderCount = {ReminderCount})." );
                 }
                 return Task.CompletedTask;
             }
 
             protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state )
             {
-                monitor.Trace( $"Reminder: Command {state}, Delta:{(int)(DateTime.UtcNow - reminderTimeUtc).TotalMilliseconds} ms." );
+                ++ReminderFiredCount;
+                monitor.Trace( $"Reminder: Command {state}, Delta:{(int)(DateTime.UtcNow - reminderTimeUtc).TotalMilliseconds} ms. (ReminderCount is {ReminderCount}, ReminderFiredCount is {ReminderFiredCount}.)" );
                 return Task.CompletedTask;
             }
         }
@@ -154,19 +152,19 @@ namespace CK.DeviceModel.Tests
             protected override string? ToStringSuffix => Trace;
         }
 
-        public class GetReminderCountCommand : DeviceCommand<DHost,int>
+        public class GetReminderCountCommand : DeviceCommand<DHost,(int,int)>
         {
         }
 
         [TestCase(50, 200, 20)]
         [TestCase(50, 150, 20)]
         [Timeout( 16000 )]
-        public async Task SendingTimeUtc_stress_test_Async( int nb, int deltaMS, int execTimeMS )
+        public async Task SendingTimeUtc_stress_test_Async( int nb, int sendingDeltaMS, int execTimeMS )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{deltaMS},{execTimeMS})" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{sendingDeltaMS},{execTimeMS})" );
 
             var rnd = new Random();
-            var dSpan = TimeSpan.FromMilliseconds( deltaMS );
+            var dSpan = TimeSpan.FromMilliseconds( sendingDeltaMS );
 
             void SendCommands( D device, bool? inc, List<DCommand> c )
             {
@@ -200,28 +198,25 @@ namespace CK.DeviceModel.Tests
             {
                 Name = "Single",
                 Status = DeviceConfigurationStatus.RunnableStarted,
-                ExecTimeMS = execTimeMS,
-                DeltaMS = deltaMS
+                ExecTimeMS = execTimeMS
             };
             (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
             D? d = h["Single"];
             Debug.Assert( d != null );
+
+            // The last command (n° nb) will start in nb * sendingDeltaMS and wait for execTimeMS before adding the reminder.
+            int lastAddedReminderTime = (nb * sendingDeltaMS) + execTimeMS;
+            int lastReminderTime = lastAddedReminderTime + 50;
+            // This is very theoretical. But we should not wait 20% this time more for the last reminder to be executed.
+            // This depends on the machine and on the deltaMS: for small deltaMS this doesn't work!
+            int waitTime = (lastReminderTime * 120) / 100;
 
             var all = new List<DCommand>();
             SendCommands( d, false, all );
             SendCommands( d, true, all );
             SendCommands( d, null, all );
 
-            // We have 2 execTimeMS per command: one for the delay in DoHandleCommandAsync and one for the reminder.
-            // The first one "blocks" the device, the other one is "in parallel" since it is a reminder (all of them can fire "at the same time").
-            int minimalExecTime = (nb * 3) * execTimeMS + execTimeMS;
-            // The latest starts at nb*deltaMS and spans 2 execTimeMS.
-            int latestMinimalTime = nb * deltaMS + 2 * execTimeMS;
-            int minTime = Math.Max( minimalExecTime, latestMinimalTime );
-            // This is very theoretical. But we should not wait 10% this time more for the last reminder to be executed.
-            // This depends on the machine and on the deltaMS: for small deltaMS this doesn't work!
-            int waitTime = (minTime * 110) / 100;
-            TestHelper.Monitor.Info( $"Waiting for {waitTime} ms." );
+            TestHelper.Monitor.Info( $"All the commands have been sent. Waiting for {waitTime} ms." );
             await Task.Delay( waitTime );
             TestHelper.Monitor.Info( $"Done waiting." );
 
@@ -235,10 +230,25 @@ namespace CK.DeviceModel.Tests
                     TestHelper.Monitor.Warn( "Using Volatile.Read: still 0. Using a GetReminderCountCommand." );
                     var c = new GetReminderCountCommand();
                     d.UnsafeSendCommand( TestHelper.Monitor, c );
-                    rc = await c.Completion;
+                    rc = (await c.Completion).Item1;
                 }
             }
+            int fc = d.ReminderFiredCount;
+            if( fc == 0 )
+            {
+                TestHelper.Monitor.Warn( "Read 0 ReminderFiredCount! Using Volatile.Read." );
+                fc = Volatile.Read( ref d.ReminderFiredCount );
+                if( fc == 0 )
+                {
+                    TestHelper.Monitor.Warn( "Using Volatile.Read: still 0. Using a GetReminderCountCommand." );
+                    var c = new GetReminderCountCommand();
+                    d.UnsafeSendCommand( TestHelper.Monitor, c );
+                    fc = (await c.Completion).Item2;
+                }
+            }
+            TestHelper.Monitor.Info( $"Final ReminderCount = {rc}, ReminderFiredCount = {fc}." );
             rc.Should().Be( nb * 3, "ReminderCount is fine." );
+            fc.Should().BeGreaterThan( 0, "At least One reminder fired." );
         }
     }
 }

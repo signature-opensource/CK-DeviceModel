@@ -332,7 +332,7 @@ namespace CK.DeviceModel
                     // Now that immediate and potential deferred have been handled, consider the SendingTimeUtc.
                     if( EnqueueDelayed( cmd ) )
                     {
-                        _commandMonitor.Trace( $"Delayed '{cmd}', SendingTimeUtc: {cmd.SendingTimeUtc:O}." );
+                        _commandMonitor.Trace( $"Delaying '{cmd}', SendingTimeUtc: {cmd.SendingTimeUtc:O}." );
                         continue;
                     }
                     await HandleCommandAsync( cmd, allowDefer: true, isImmediate: false ).ConfigureAwait( false );
