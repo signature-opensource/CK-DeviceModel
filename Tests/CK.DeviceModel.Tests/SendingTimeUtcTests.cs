@@ -86,33 +86,27 @@ namespace CK.DeviceModel.Tests
             public D( IActivityMonitor monitor, CreateInfo info )
                 : base( monitor, info )
             {
-                Traces = new List<string>();
             }
 
-            public List<string> Traces { get; }
             public int ReminderCount;
 
             protected override Task DoDestroyAsync( IActivityMonitor monitor )
             {
-                Traces.Add( $"Destroy" );
                 return Task.CompletedTask;
             }
 
             protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, DConfiguration config )
             {
-                Traces.Add( $"Reconfigure" );
                 return Task.FromResult( DeviceReconfiguredResult.None );
             }
 
             protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
             {
-                Traces.Add( $"Start {reason}" );
                 return Task.FromResult( true );
             }
 
             protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
             {
-                Traces.Add( $"Stop {reason}" );
                 return Task.CompletedTask;
             }
 
@@ -120,14 +114,16 @@ namespace CK.DeviceModel.Tests
             {
                 if( command is DCommand cmd )
                 {
-                    Traces.Add( $"Command {cmd.Trace}" );
+                    monitor.Trace( $"Handling command '{cmd}': Waiting {CurrentConfiguration.ExecTimeMS} ms." );
                     await Task.Delay( CurrentConfiguration.ExecTimeMS, cmd.CancellationToken ).ConfigureAwait( false );
+                    monitor.Trace( $"Completing command '{cmd}'." );
                     cmd.Completion.SetResult();
                     return;
                 }
                 if( command is GetReminderCountCommand get )
                 {
                     get.Completion.SetResult( ReminderCount );
+                    monitor.Trace( $"ReminderCount is '{ReminderCount}'." );
                     return;
                 }
                 await base.DoHandleCommandAsync( monitor, command );
@@ -137,16 +133,16 @@ namespace CK.DeviceModel.Tests
             {
                 if( command is DCommand cmd )
                 {
-                    Traces.Add( $"Completed: Command {cmd.Trace}" );
                     AddReminder( DateTime.UtcNow.AddMilliseconds( CurrentConfiguration.DeltaMS ), cmd.Trace );
                     ++ReminderCount;
+                    monitor.Trace( $"Completed: Command '{cmd}'. Added Reminder (ReminderCount = {ReminderCount})." );
                 }
                 return Task.CompletedTask;
             }
 
             protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state )
             {
-                Traces.Add( $"Reminder: Command {state}, Delta:{(DateTime.UtcNow - reminderTimeUtc).TotalMilliseconds} ms." );
+                monitor.Trace( $"Reminder: Command {state}, Delta:{(int)(DateTime.UtcNow - reminderTimeUtc).TotalMilliseconds} ms." );
                 return Task.CompletedTask;
             }
         }
