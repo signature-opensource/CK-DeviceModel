@@ -104,8 +104,15 @@ namespace CK.DeviceModel
                     else if( wait != Int64.MaxValue )
                     {
                         int w = (int)(wait / TimeSpan.TicksPerMillisecond);
-                        _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a signal." );
-                        await signalTask.WaitAsync( w ).ConfigureAwait( false );
+                        if( w > 2 )
+                        {
+                            _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a signal." );
+                            await signalTask.WaitAsync( w ).ConfigureAwait( false );
+                        }
+                        else
+                        {
+                            _daemonMonitor.CloseGroup( $"Should wait for a ridiculous {w} ms time. Repeat immediately." );
+                        }
                     }
                     else
                     {
