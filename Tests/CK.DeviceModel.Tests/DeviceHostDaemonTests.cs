@@ -32,20 +32,22 @@ namespace CK.DeviceModel.Tests
 
             public async Task<int> RetryStartAsync( IActivityMonitor monitor, IDeviceHost host, IDevice device, int retryCount )
             {
-                monitor.Trace( $"AlwaysRetryPolicy called. retryCount: {retryCount}." );
-                if( retryCount >= MinRetryCount )
+                using( monitor.OpenTrace( $"AlwaysRetryPolicy called. retryCount: {retryCount}." ) )
                 {
-                    monitor.Trace( $"AlwaysRetryPolicy: calling StartAsync." );
-                    if( await device.StartAsync( monitor ) )
+                    if( retryCount >= MinRetryCount )
                     {
-                        return 0;
+                        monitor.Trace( $"AlwaysRetryPolicy: calling StartAsync." );
+                        if( await device.StartAsync( monitor ) )
+                        {
+                            return 0;
+                        }
                     }
+                    var match = Regex.Match( device.Name, ".*\\*(\\d+)" );
+                    int mult = match.Success ? int.Parse( match.Groups[1].Value ) : 1;
+                    int deltaMS = host switch { FlashBulbHost _ => CameraDuration * mult, MachineHost _ => MachineDuration * mult, _ => OtherDuration * mult };
+                    monitor.CloseGroup( $"{device.FullName} -> {deltaMS} ms." );
+                    return deltaMS;
                 }
-                var match = Regex.Match( device.Name, ".*\\*(\\d+)" );
-                int mult = match.Success ? int.Parse( match.Groups[1].Value ) : 1;
-                int deltaMS = host switch { FlashBulbHost _ => CameraDuration * mult, MachineHost _ => MachineDuration * mult, _ => OtherDuration * mult };
-                monitor.Trace( $"{device.FullName} -> {deltaMS} ms." );
-                return deltaMS;
             }
         }
 
@@ -55,7 +57,7 @@ namespace CK.DeviceModel.Tests
         [Timeout( 1000 )]
         public async Task simple_auto_restart_Async( string mode )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof(simple_auto_restart_Async) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof(simple_auto_restart_Async)}(\"{mode}\")" );
 
             var policy = new AlwaysRetryPolicy() { MinRetryCount = 1, MachineDuration = 200 };
             var host = new MachineHost();
@@ -87,7 +89,7 @@ namespace CK.DeviceModel.Tests
             }
             if( mode == "UseDestroyCommand" )
             {
-                var destroy = new DestroyDeviceCommand<MachineHost>() { DeviceName = "M" };
+                var destroy = new DestroyDeviceCommand<MachineHost>() { DeviceName = "M", ImmediateSending = false };
                 d.SendCommand( TestHelper.Monitor, destroy );
                 await destroy.Completion.Task;
             }
@@ -218,7 +220,6 @@ namespace CK.DeviceModel.Tests
             d2.IsRunning.Should().BeTrue();
             d3.IsRunning.Should().BeTrue();
             d4.IsRunning.Should().BeTrue();
-
 
             await ((IHostedService)daemon).StopAsync( default );
             await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
