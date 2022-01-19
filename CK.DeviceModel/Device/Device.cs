@@ -551,7 +551,7 @@ namespace CK.DeviceModel
                 }
                 if( _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                 {
-                    _host.OnAlwaysRunningCheck( this, _commandMonitor );
+                    _host.DeviceOnAlwaysRunningCheck( this, _commandMonitor );
                 }
                 // Sets the completion last.
                 if( cmd != null )
@@ -654,7 +654,7 @@ namespace CK.DeviceModel
                     }
                     if( isAlwaysRunning )
                     {
-                        _host.OnAlwaysRunningCheck( this, _commandMonitor );
+                        _host.DeviceOnAlwaysRunningCheck( this, _commandMonitor );
                     }
                 }
                 // Sets Completion last.

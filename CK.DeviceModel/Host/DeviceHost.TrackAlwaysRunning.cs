@@ -54,7 +54,7 @@ namespace CK.DeviceModel
             _daemon = daemon;
         }
 
-        void IInternalDeviceHost.OnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor )
+        void IInternalDeviceHost.DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor )
         {
             using( monitor.OpenDebug( $"OnAlwaysRunningCheck for device '{d}'." ) )
             {
@@ -153,6 +153,10 @@ namespace CK.DeviceModel
                             delta = -delta;
                         }
                     }
+                    else
+                    {
+                        monitor.Debug( $"Device '{d.FullName}' is running or its ConfigStatus is no more DeviceConfigurationStatus.AlwaysRunning. It is ignored." );
+                    }
                     updatedDeltas[idx++] = delta;
                 }
             }
@@ -177,7 +181,7 @@ namespace CK.DeviceModel
                         {
                             if( delta > 0 )
                             {
-                                _alwayRunningStopped[existIdx] = (d, _alwayRunningStopped[existIdx].Count + 1, now.AddTicks( delta ));
+                                _alwayRunningStopped[existIdx] = (d, _alwayRunningStopped[existIdx].Count, now.AddTicks( delta ));
                             }
                             else
                             {

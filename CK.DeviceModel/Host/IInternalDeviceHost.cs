@@ -37,7 +37,7 @@ namespace CK.DeviceModel
         /// </summary>
         Task OnDeviceDestroyedAsync( IActivityMonitor monitor, IDevice device );
 
-        void OnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor );
+        void DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor );
 
         Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor );
 
