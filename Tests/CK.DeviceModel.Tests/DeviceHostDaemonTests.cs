@@ -329,9 +329,9 @@ namespace CK.DeviceModel.Tests
             TestHelper.Monitor.Info( $"Daemon has called Start {Machine.TotalRunning} times. This should be greater than {policy.RetryTimeouts.Count}." );
             Machine.TotalRunning.Should().BeGreaterThan( policy.RetryTimeouts.Count );
 
-            TestHelper.Monitor.Info( $"Let the device be started again and wait for the last timeout ({policy.RetryTimeouts[^1]} ms). The device must be started." );
+            TestHelper.Monitor.Info( $"Let the device be started again and wait for the last timeout ({policy.RetryTimeouts[^1]} + 50 ms). The device must be started." );
             d.FailToStart = false;
-            await Task.Delay( policy.RetryTimeouts[^1] );
+            await Task.Delay( policy.RetryTimeouts[^1] + 50 );
             d.IsRunning.Should().BeTrue();
 
             TestHelper.Monitor.Info( $"Destroy the device and stop the daemon." );
