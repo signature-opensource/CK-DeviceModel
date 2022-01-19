@@ -125,6 +125,11 @@ namespace CK.DeviceModel.Tests
                     cmd.Completion.SetResult();
                     return;
                 }
+                if( command is GetReminderCountCommand get )
+                {
+                    get.Completion.SetResult( ReminderCount );
+                    return;
+                }
                 await base.DoHandleCommandAsync( monitor, command );
             }
 
@@ -135,10 +140,6 @@ namespace CK.DeviceModel.Tests
                     Traces.Add( $"Completed: Command {cmd.Trace}" );
                     AddReminder( DateTime.UtcNow.AddMilliseconds( CurrentConfiguration.DeltaMS ), cmd.Trace );
                     ++ReminderCount;
-                }
-                else if( command is GetReminderCountCommand get )
-                {
-                    get.Completion.SetResult( ReminderCount );
                 }
                 return Task.CompletedTask;
             }
