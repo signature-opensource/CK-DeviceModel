@@ -31,7 +31,7 @@ namespace CK.DeviceModel
         /// The number of previous attempts to restart the device (since the last time the device has stopped).
         /// For the very first attempt, this is 0. 
         /// </param>
-        /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
+        /// <returns>The number of millisecond to wait before the next retry. 0 or negative to stop retrying.</returns>
         Task<int> RetryStartAsync( IActivityMonitor monitor, IDeviceHost host, IDevice device, int retryCount );
     }
 

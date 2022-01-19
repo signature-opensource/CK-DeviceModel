@@ -19,6 +19,7 @@ namespace CK.DeviceModel
         /// </summary>
         readonly List<(IInternalDevice Device, int Count, DateTime NextCall)> _alwayRunningStopped;
         DeviceHostDaemon? _daemon;
+        IInternalDevice? _currentRestarting;
         volatile bool _daemonCheckRequired;
 
         /// <summary>
@@ -41,7 +42,7 @@ namespace CK.DeviceModel
         /// The number of previous attempts to restart the device (since the last time the device has stopped).
         /// For the very first attempt, this is 0. 
         /// </param>
-        /// <returns>The number of millisecond to wait before the next retry or 0 to stop retrying.</returns>
+        /// <returns>The number of millisecond to wait before the next retry. 0 or negative to stop retrying.</returns>
         protected virtual Task<int> TryAlwaysRunningRestartAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, IDevice device, int retryCount )
         {
             monitor.Trace( $"Using '{global.GetType().Name}' global running policy." );
@@ -54,7 +55,7 @@ namespace CK.DeviceModel
             _daemon = daemon;
         }
 
-        void IInternalDeviceHost.DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor )
+        void IInternalDeviceHost.DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor, bool fromStart )
         {
             using( monitor.OpenDebug( $"OnAlwaysRunningCheck for device '{d}'." ) )
             {
@@ -71,9 +72,16 @@ namespace CK.DeviceModel
                         else
                         {
                             Debug.Assert( d.ConfigStatus == DeviceConfigurationStatus.AlwaysRunning );
-                            monitor.Debug( "Updated Device retry count in Always Running Stopped list." );
-                            // Let the NextCall unchanged: manual Starts are ignored.
-                            _alwayRunningStopped[idx] = (d, _alwayRunningStopped[idx].Count + 1, _alwayRunningStopped[idx].NextCall);
+                            // If the device is the one currently handled by DaemonCheckAlwaysRunningAsync,
+                            // we have nothing to do: the count will be incremented by DaemonCheckAlwaysRunningAsync.
+                            // We may "miss" a concurrent manual start here and we don't care.
+                            // If the device is another one AND Start is calling us (not Stop), then we increment the count.
+                            if( _currentRestarting != d && fromStart )
+                            {
+                                int newRetryCount = _alwayRunningStopped[idx].Count + 1;
+                                monitor.Debug( $"Updated Device retry count to {newRetryCount} in Always Running Stopped list." );
+                                _alwayRunningStopped[idx] = (d, newRetryCount, _alwayRunningStopped[idx].NextCall);
+                            }
                         }
                     }
                     else
@@ -126,15 +134,17 @@ namespace CK.DeviceModel
                         {
                             using( monitor.OpenInfo( $"Attempt n°{e.Count} to restart the device '{d.FullName}'." ) )
                             {
+                                _currentRestarting = d;
                                 delta = await TryAlwaysRunningRestartAsync( monitor, global, d, e.Count ).ConfigureAwait( false );
-                                if( d.IsRunning || delta < 0 )
+                                _currentRestarting = null;
+                                if( d.IsRunning )
                                 {
                                     monitor.CloseGroup( $"Successfully restarted." );
                                     delta = 0;
                                 }
                                 else
                                 {
-                                    if( delta == 0 )
+                                    if( delta <= 0 )
                                     {
                                         monitor.CloseGroup( $"Restart failed. No more retries will be done." );
                                     }
@@ -162,6 +172,7 @@ namespace CK.DeviceModel
             }
             catch( Exception ex )
             {
+                _currentRestarting = null;
                 monitor.Fatal( "Unexpected error during AlwaysRunning retry.", ex );
                 return Int32.MaxValue;
             }
@@ -181,7 +192,7 @@ namespace CK.DeviceModel
                         {
                             if( delta > 0 )
                             {
-                                _alwayRunningStopped[existIdx] = (d, _alwayRunningStopped[existIdx].Count, now.AddTicks( delta ));
+                                _alwayRunningStopped[existIdx] = (d, _alwayRunningStopped[existIdx].Count + 1, now.AddTicks( delta ));
                             }
                             else
                             {
