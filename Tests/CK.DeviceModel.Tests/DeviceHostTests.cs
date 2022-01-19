@@ -20,8 +20,8 @@ namespace CK.DeviceModel.Tests
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations_Async ) );
 
-            FlashBulb.TotalCount.Should().Be( 0 );
-            FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
             FlashBulb.OnCommandComplededCount = 0;
 
             var config1 = new FlashBulbConfiguration() { Name = "First" };
@@ -108,8 +108,8 @@ namespace CK.DeviceModel.Tests
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( testing_state_changed_PerfectEvent_Async ) );
 
-            FlashBulb.TotalCount.Should().Be( 0 );
-            FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
 
             int devicesCalled = 0;
             var lifetimeEvents = new System.Collections.Generic.List<DeviceLifetimeEvent>();
@@ -240,8 +240,8 @@ namespace CK.DeviceModel.Tests
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( ensure_device_Async ) );
 
-            FlashBulb.TotalCount.Should().Be( 0 );
-            FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
 
             var host = new FlashBulbHost();
             var d = host.Find( "n°1" );
@@ -302,8 +302,8 @@ namespace CK.DeviceModel.Tests
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( executing_commands_from_the_host_without_ControllerKey_Async ) );
 
-            FlashBulb.TotalCount.Should().Be( 0 );
-            FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
 
             var host = new FlashBulbHost();
             var config = new FlashBulbConfiguration()
@@ -364,10 +364,10 @@ namespace CK.DeviceModel.Tests
         [Timeout( 1000 )]
         public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async( string mode )
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async ) );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async )}(\"{mode}\")" );
 
-            FlashBulb.TotalCount.Should().Be( 0 );
-            FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
             FlashBulb.OnCommandComplededCount = 0;
 
             var host = new FlashBulbHost();
