@@ -121,21 +121,10 @@ namespace CK.DeviceModel
                     // We may catch a OperationCanceledException here.
                     try
                     {
-                        if( StoppedBehavior == OnStoppedDaemonBehavior.ClearAllHosts )
+                        foreach( var h in _deviceHosts )
                         {
-                            foreach( var h in _deviceHosts )
-                            {
-                                await h.ClearAsync( _daemonMonitor, waitForDeviceDestroyed: false ).ConfigureAwait( false );
-                            }
-                        }
-                        else
-                        {
-                            Task[] all = new Task[_deviceHosts.Length];
-                            for( int i = 0; i < _deviceHosts.Length; ++i )
-                            {
-                                all[i] = _deviceHosts[i].ClearAsync( _daemonMonitor, waitForDeviceDestroyed: true );
-                            }
-                            await Task.WhenAll( all ).ConfigureAwait( false );
+                            await h.ClearAsync( _daemonMonitor, waitForDeviceDestroyed: StoppedBehavior == OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed )
+                                   .ConfigureAwait( false );
                         }
                     }
                     catch( Exception ex )
