@@ -304,32 +304,36 @@ namespace CK.DeviceModel.Tests
             Debug.Assert( d != null );
             d.IsRunning.Should().BeTrue();
 
-            // The device now fails to start. Reset the counter.
+            TestHelper.Monitor.Info( "The device now fails to start. Force stop it (ignoreAlwaysRunning: true) and reset the counter." );
             Machine.TotalRunning = 0;
             d.FailToStart = true;
             await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true );
             d.IsRunning.Should().BeFalse();
+            TestHelper.Monitor.Info( $"The device should now be restarted by the daemon in {policy.RetryTimeouts.Select( t => t.ToString() ).Concatenate()} ms." );
 
             // Waiting for all the timeouts.
             foreach( var delay in policy.RetryTimeouts )
             {
+                TestHelper.Monitor.Info( $"Waiting for {delay} ms" );
                 await Task.Delay( delay );
                 d.IsRunning.Should().BeFalse();
             }
             // Waiting for 2 more attempts.
             for( int i = 0; i < 2; ++i )
             {
+                TestHelper.Monitor.Info( $"To be sure that we have honored the 'alwaysRetry' parameter. Waiting for last (repeated) timeout of the policy ({policy.RetryTimeouts[^1]} ms)." );
                 await Task.Delay( policy.RetryTimeouts[^1] );
                 d.IsRunning.Should().BeFalse();
             }
-            // To be sure that we have honored the "alwaysRetry" parameter.
+            TestHelper.Monitor.Info( $"Daemon has called Start {Machine.TotalRunning} times. This should be greater than {policy.RetryTimeouts.Count}." );
             Machine.TotalRunning.Should().BeGreaterThan( policy.RetryTimeouts.Count );
 
-            // Let the device be started again.
+            TestHelper.Monitor.Info( $"Let the device be started again and wait for the last timeout ({policy.RetryTimeouts[^1]} ms). The device must be started." );
             d.FailToStart = false;
             await Task.Delay( policy.RetryTimeouts[^1] );
             d.IsRunning.Should().BeTrue();
 
+            TestHelper.Monitor.Info( $"Destroy the device and stop the daemon." );
             await d.DestroyAsync( TestHelper.Monitor );
             d.IsRunning.Should().BeFalse();
             d.IsDestroyed.Should().BeTrue();
