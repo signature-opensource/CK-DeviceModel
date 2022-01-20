@@ -504,7 +504,7 @@ namespace CK.DeviceModel
                 {
                     if( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTime ) )
                     {
-                        var delta = (uint)(nextDelayedTime - now);
+                        var delta = nextDelayedTime - now;
                         // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
                         // We use the same 1 ms margin as above.
                         if( delta > 1 )
@@ -512,7 +512,7 @@ namespace CK.DeviceModel
                             Debug.Assert( _delayedQueue.Count > 0 );
                             _commandMonitor.Debug( $"Next delayed command is {delayed} in {delta} ms." );
                             _failedChangeTimerTime = 0;
-                            if( !_timer.Change( delta, 0 ) )
+                            if( !_timer.Change( (uint)delta, 0 ) )
                             {
                                 _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
                                 _failedChangeTimerTime = nextDelayedTime;
