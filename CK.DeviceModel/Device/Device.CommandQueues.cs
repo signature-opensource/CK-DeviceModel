@@ -412,30 +412,38 @@ namespace CK.DeviceModel
         bool EnqueueDelayed( BaseDeviceCommand cmd )
         {
             Debug.Assert( cmd._sendTime.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
-            var ticks = cmd._sendTime.Ticks;
-            var deltaTicks = ticks - DateTime.UtcNow.Ticks;
-            if( deltaTicks > 0 )
+            long time = cmd._sendTime.Ticks / TimeSpan.TicksPerMillisecond;
+            if( time > 0 )
             {
-                if( _delayedQueue == null )
+                long lDelta = time - DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+                if( lDelta >= uint.MaxValue )
                 {
-                    _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
-                    _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
-                    _commandMonitor.Info( "Created DelayedQueue and Timer." );
+                    _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is ignored." );
+                    return false;
                 }
-                _delayedQueue.Enqueue( cmd, ticks );
-                if( _delayedQueue.Peek() == cmd )
+                var delta = (uint)lDelta;
+                if( delta > 0 )
                 {
-                    Debug.Assert( _timer != null );
-                    uint delta = (uint)(deltaTicks / TimeSpan.TicksPerMillisecond);
-                    _commandMonitor.Debug( $"First delayed command in {delta} ms." );
-                    if( !_timer.Change( delta, 0 ) )
+                    if( _delayedQueue == null )
                     {
-                        _commandMonitor.Debug( $"Failed to Change timer." );
-                        _failedChangeTimerNextTick = ticks;
-                        _commandQueue.Writer.TryWrite( _commandAwaker );
+                        _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
+                        _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
+                        _commandMonitor.Info( "Created DelayedQueue and Timer." );
                     }
+                    _delayedQueue.Enqueue( cmd, time );
+                    if( _delayedQueue.Peek() == cmd )
+                    {
+                        Debug.Assert( _timer != null );
+                        _commandMonitor.Debug( $"First delayed command in {delta} ms." );
+                        if( !_timer.Change( delta, 0 ) )
+                        {
+                            _commandMonitor.Debug( $"Failed to Change timer." );
+                            _failedChangeTimerTime = time;
+                            _commandQueue.Writer.TryWrite( _commandAwaker );
+                        }
+                    }
+                    return true;
                 }
-                return true;
             }
             return false;
         }
@@ -446,29 +454,38 @@ namespace CK.DeviceModel
             if( _delayedQueue != null )
             {
                 Debug.Assert( _timer != null );
-                var nowTicks = DateTime.UtcNow.Ticks;
+                var now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
                 // First tries to Change the timer if a previous attempt failed.
-                if( _failedChangeTimerNextTick != 0 )
+                if( _failedChangeTimerTime != 0 )
                 {
-                    _commandMonitor.Debug( $"Retrying to Change timer." );
-                    var deltaTicks = _failedChangeTimerNextTick - nowTicks;
-                    if( deltaTicks > TimeSpan.TicksPerMillisecond )
+                    using( _commandMonitor.OpenWarn( $"Retrying to Change timer." ) )
                     {
-                        uint delta = (uint)(_failedChangeTimerNextTick / TimeSpan.TicksPerMillisecond);
-                        if( !_timer.Change( delta, 0 ) )
+                        var delta = _failedChangeTimerTime - now;
+                        if( delta > 0 )
                         {
-                            _commandMonitor.Debug( $"Failed to Change timer (again)." );
-                            _commandQueue.Writer.TryWrite( _commandAwaker );
+                            if( !_timer.Change( (uint)delta, 0 ) )
+                            {
+                                _commandMonitor.Error( $"Failed to Change timer (again) to {delta} ms. Sending CommandAwaker to loop." );
+                                _commandQueue.Writer.TryWrite( _commandAwaker );
+                            }
+                            else
+                            {
+                                _commandMonitor.Info( $"Timer Change succeeded: Set to {delta} ms." );
+                                _failedChangeTimerTime = 0;
+                            }
                         }
-                        else _failedChangeTimerNextTick = 0;
+                        else
+                        {
+                            _commandMonitor.Error( $"Required timer expired. Give up." );
+                            _failedChangeTimerTime = 0;
+                        }
                     }
-                    else _failedChangeTimerNextTick = 0;
                 }
                 // Next, dequeue the next ready-to-run delayed commands, skipping the canceled ones,
                 // with a 1 ms margin: we consider that a 1 ms delay is negligible.
                 bool hasDequeued = false;
-                while( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTicks )
-                       && nextDelayedTicks <= nowTicks + TimeSpan.TicksPerMillisecond )
+                while( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTime )
+                       && nextDelayedTime <= now + 1 )
                 {
                     hasDequeued = true;
                     _delayedQueue.Dequeue();
@@ -485,21 +502,20 @@ namespace CK.DeviceModel
                 }
                 if( hasDequeued )
                 {
-                    if( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTicks ) )
+                    if( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTime ) )
                     {
-                        var deltaTicks = nextDelayedTicks - nowTicks;
+                        var delta = (uint)(nextDelayedTime - now);
                         // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
                         // We use the same 1 ms margin as above.
-                        if( deltaTicks > TimeSpan.TicksPerMillisecond )
+                        if( delta > 1 )
                         {
                             Debug.Assert( _delayedQueue.Count > 0 );
-                            uint d = (uint)(deltaTicks / TimeSpan.TicksPerMillisecond);
-                            _commandMonitor.Debug( $"Next delayed command is {delayed} in {d} ms." );
-                            _failedChangeTimerNextTick = 0;
-                            if( !_timer.Change( d, 0 ) )
+                            _commandMonitor.Debug( $"Next delayed command is {delayed} in {delta} ms." );
+                            _failedChangeTimerTime = 0;
+                            if( !_timer.Change( delta, 0 ) )
                             {
-                                _commandMonitor.Debug( $"Failed to Change timer." );
-                                _failedChangeTimerNextTick = nextDelayedTicks;
+                                _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
+                                _failedChangeTimerTime = nextDelayedTime;
                                 _commandQueue.Writer.TryWrite( _commandAwaker );
                             }
                         }

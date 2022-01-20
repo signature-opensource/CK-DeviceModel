@@ -24,7 +24,7 @@ namespace CK.DeviceModel
         readonly CancellationTokenSource _destroyed;
         volatile TConfiguration _externalConfiguration;
         TConfiguration _currentConfiguration;
-        long _failedChangeTimerNextTick;
+        long _failedChangeTimerTime;
 
         // For safety, ConfigurationStatus is copied: we don't trust the ExternalConfiguration.
         // This is internal so that the DeviceHostDaemon can use
