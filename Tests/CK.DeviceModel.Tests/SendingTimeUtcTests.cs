@@ -248,7 +248,7 @@ namespace CK.DeviceModel.Tests
             }
             TestHelper.Monitor.Info( $"Final ReminderCount = {rc}, ReminderFiredCount = {fc}." );
             rc.Should().Be( nb * 3, "ReminderCount is fine." );
-            fc.Should().BeGreaterThan( 0, "At least One reminder fired." );
+            fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
         }
     }
 }
