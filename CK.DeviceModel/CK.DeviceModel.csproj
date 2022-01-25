@@ -5,10 +5,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r05" />
-    <PackageReference Include="CK.StObj.Model" Version="19.0.0-r06" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r06-01" />
+    <PackageReference Include="CK.StObj.Model" Version="19.0.0-r07-01" />
     <PackageReference Include="Nullable" Version="1.3.0" />
-    <PackageReference Include="CK.PerfectEvent" Version="15.0.0-r05" />
+    <PackageReference Include="CK.PerfectEvent" Version="15.0.0-r06-01" />
     <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
   </ItemGroup>
