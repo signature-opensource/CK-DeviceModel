@@ -37,15 +37,15 @@ Key features that Commands support are:
 
 - Command execution is serialized thanks to [channels](https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels/) 
 and an internally managed asynchronous command loop with its own ActivityMonitor.
-- Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](../Command/DeviceCommandT.cs)) or not (see [DeviceCommand](../Command/DeviceCommand.cs)).
+- Commands can generate a result (see [DeviceCommand&lt;TResult&gt;](CK.DeviceModel/Command/DeviceCommandT.cs)) or not (see [DeviceCommand](../Command/DeviceCommand.cs)).
 - Commands that are handled while the device is stopped can be considered as errors, be canceled, be executed anyway or deferred until the device
- starts again (see the [DeviceCommandStoppedBehavior enumeration](../Command/DeviceCommandStoppedBehavior.cs)).
+ starts again (see the [DeviceCommandStoppedBehavior enumeration](CK.DeviceModel/Command/DeviceCommandStoppedBehavior.cs)).
 - Commands can be sent immediately (highest priority) or delayed, waiting for their `SendingTimeUtc`.
 - Commands can have one timeout (in milliseconds that is computed and starts right before the command is handled) but can also be bound to 
 any number of CancellationTokens.
 - Commands completion MUST be signaled explicitly.
-- Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](../Command/Basic/BaseConfigureDeviceCommand.cs)
-is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](../Host/DeviceApplyConfigurationResult.cs) enumeration values.
+- Commands may transform errors or cancellations into command results. The [BaseReconfigureDeviceCommand](CK.DeviceModel/Command/Basic/BaseConfigureDeviceCommand.cs)
+is an example where errors or cancellation are mapped to [DeviceApplyConfigurationResult](CK.DeviceModel/Host/DeviceApplyConfigurationResult.cs) enumeration values.
 - Completed commands (even the ones that are completed outside of the command loop and regardless of their state - error, canceled or success) 
 can be safely "continued" thanks to the Device's `OnCommandCompletedAsync` method.
 
@@ -56,7 +56,7 @@ More details on Command can be found [here](CK.DeviceModel/Command#commands).
 There are 2 kind of devices:
 - the basic ones are passive: they handle commands and emit only events related to their lifetime (status,
 configuration and controller key changes)
-- the [active devices](ActiveDevice) extends basic ones and are able to emit specific events either in response to commands
+- the [active devices](CK.DeviceModel/ActiveDevice) extends basic ones and are able to emit specific events either in response to commands
 or because the actual/physical device they interface is itself active.
 
 ## A simple passive device
@@ -140,46 +140,46 @@ public sealed class FlashBulbConfiguration : DeviceConfiguration
 ```csharp
 public sealed class FlashBulb : Device<FlashBulbConfiguration>
 {
-int _color;
-bool _colorFromConfig;
+  int _color;
+  bool _colorFromConfig;
 
-public FlashBulb( IActivityMonitor monitor, CreateInfo info )
-    : base( monitor, info )
-{
-    _color = info.Configuration.FlashColor;
-    _colorFromConfig = true;
-}
+  public FlashBulb( IActivityMonitor monitor, CreateInfo info )
+      : base( monitor, info )
+  {
+      _color = info.Configuration.FlashColor;
+      _colorFromConfig = true;
+  }
 
-protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor,
-                                                                      FlashBulbConfiguration config )
-{
-    bool colorChanged = config.FlashColor != CurrentConfiguration.FlashColor;
-    bool configHasChanged = colorChanged || config.FlashRate != CurrentConfiguration.FlashRate;
+  protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor,
+                                                                        FlashBulbConfiguration config )
+  {
+      bool colorChanged = config.FlashColor != CurrentConfiguration.FlashColor;
+      bool configHasChanged = colorChanged || config.FlashRate != CurrentConfiguration.FlashRate;
 
-    if( colorChanged && _colorFromConfig )
-    {
-        _color = config.FlashColor;
-    }
+      if( colorChanged && _colorFromConfig )
+      {
+          _color = config.FlashColor;
+      }
 
-    return Task.FromResult( configHasChanged
-                                ? DeviceReconfiguredResult.UpdateSucceeded
-                                : DeviceReconfiguredResult.None );
-}
+      return Task.FromResult( configHasChanged
+                                  ? DeviceReconfiguredResult.UpdateSucceeded
+                                  : DeviceReconfiguredResult.None );
+  }
 
-protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
-{
-    return Task.FromResult( true );
-}
+  protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
+  {
+      return Task.FromResult( true );
+  }
 
-protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
-{
-    return Task.CompletedTask;
-}
+  protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
+  {
+      return Task.CompletedTask;
+  }
 
-protected override Task DoDestroyAsync( IActivityMonitor monitor )
-{
-    return Task.CompletedTask;
-}
+  protected override Task DoDestroyAsync( IActivityMonitor monitor )
+  {
+      return Task.CompletedTask;
+  }
 }
 
 ```
@@ -247,7 +247,7 @@ protected override async Task DoHandleCommandAsync( IActivityMonitor monitor,
 >  There is much more to say about Commands: [see here](CK.DeviceModel/Command#commands).
 
 - Finally, a simple helper that triggers a flash directly on the device: such specific device API must 
-always be simple helpers that eventually send a command (an await its completion).
+always be simple helpers that eventually send a command (and await its completion).
 
 ```csharp
 public async Task<bool> FlashAsync( IActivityMonitor monitor )
