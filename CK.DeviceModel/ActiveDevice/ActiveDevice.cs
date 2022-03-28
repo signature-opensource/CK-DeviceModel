@@ -131,7 +131,7 @@ namespace CK.DeviceModel
                     // We always log except if this is a canceled exception and we have been destroyed.
                     if( ex is not OperationCanceledException || !IsDestroyed )
                     {
-                        _eventMonitor.Error( $"While processing event '{ev}'", ex );
+                        _eventMonitor.Error( $"While processing event '{ev}'.", ex );
                     }
                 }
             }
