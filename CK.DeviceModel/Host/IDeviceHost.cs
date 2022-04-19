@@ -16,7 +16,7 @@ namespace CK.DeviceModel
     {
         /// <summary>
         /// Log tag set on the command and any event loop monitors.
-        /// This tag is configured to <see cref="LogFilter.Monitor"/> in <see cref="ActivityMonitor.Tags.DefaultFilters"/>.
+        /// This tag is configured to <see cref="LogFilter.Monitor"/> only in <see cref="ActivityMonitor.Tags.DefaultFilters"/>.
         /// </summary>
         public static CKTrait DeviceModel = ActivityMonitor.Tags.Register( "Device-Model" );
 

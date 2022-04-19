@@ -257,7 +257,7 @@ namespace CK.DeviceModel
 
             public string Path => InnerSection.Path;
 
-            public string Value
+            public string? Value
             {
                 get => InnerSection.Value;
                 set => throw new NotSupportedException();
