@@ -216,8 +216,9 @@ namespace CK.DeviceModel.Tests
             SendCommands( d, true, all );
             SendCommands( d, null, all );
 
-            TestHelper.Monitor.Info( $"All the commands have been sent. Waiting for {waitTime} ms." );
-            await Task.Delay( waitTime );
+            // Adds 200 ms since this test regularly fails on the CI runners.
+            TestHelper.Monitor.Info( $"All the commands have been sent. Waiting for {waitTime} + 200 ms." );
+            await Task.Delay( waitTime + 200 );
             TestHelper.Monitor.Info( $"Done waiting." );
 
             int rc = d.ReminderCount;
