@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1">
   <Comment CommentText="These classes cannot be specialized (outside of the CK.DeviceModel). ">
-    <Position X="6.159" Y="5.073" Height="0.75" Width="1.7" />
+    <Position X="6.159" Y="5.823" Height="0.75" Width="1.7" />
   </Comment>
   <Comment CommentText="Theses are the base class to specialize.">
     <Position X="6.07" Y="8.259" Height="0.75" Width="1.7" />
@@ -17,36 +17,80 @@
     </TypeIdentifier>
   </Class>
   <Class Name="CK.DeviceModel.DeviceCommandNoResult">
-    <Position X="0.75" Y="5" Width="2" />
+    <Position X="0.75" Y="5.75" Width="2" />
     <Members>
+      <Field Name="_commandToString" Hidden="true" />
       <Method Name="DeviceCommandNoResult" Hidden="true" />
+      <Property Name="ICompletable.Completion" Hidden="true" />
+      <Method Name="ICompletable.OnCanceled" Hidden="true" />
+      <Method Name="ICompletable.OnCompleted" Hidden="true" />
+      <Method Name="ICompletable.OnError" Hidden="true" />
+      <Property Name="InternalCompletion" Hidden="true" />
       <Method Name="ToString" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>AAAAAIAAAACAAAAEAAAAAAACBAAAEAQAAAAAAAAAgAA=</HashCode>
+      <HashCode>AAAAAIAAABCAAAQEAAAAAAACBAAQEAQAAAAAAAAAgAA=</HashCode>
       <FileName>Command\DeviceCommandNoResult.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="1.142" />
   </Class>
   <Class Name="CK.DeviceModel.BaseDeviceCommand">
-    <Position X="1.75" Y="0.5" Width="2.25" />
+    <Position X="1.25" Y="0.5" Width="3" />
     <Members>
+      <Field Name="_cancelFromTimeoutHandle" Hidden="true" />
+      <Field Name="_cancelFromTokenHandle" Hidden="true" />
+      <Field Name="_cancels" Hidden="true" />
+      <Field Name="_cancelsResult" Hidden="true" />
+      <Field Name="_controllerKey" Hidden="true" />
+      <Field Name="_device" Hidden="true" />
+      <Field Name="_deviceName" Hidden="true" />
+      <Field Name="_firstCancellationReason" Hidden="true" />
+      <Field Name="_isLocked" Hidden="true" />
+      <Field Name="_mustCheckControllerKey" Hidden="true" />
+      <Field Name="_sendTime" Hidden="true" />
+      <Field Name="_shouldCallCommandComplete" Hidden="true" />
       <Method Name="BaseDeviceCommand" Hidden="true" />
+      <Method Name="CancelFromCancellationTokens" Hidden="true" />
+      <Method Name="CancelFromTimeout" Hidden="true" />
+      <Method Name="CancelFromTimeoutRelay" Hidden="true" />
+      <Method Name="CancelFromTokenRelay" Hidden="true" />
+      <Field Name="CommandCompletionCanceledReason" Hidden="true" />
+      <Field Name="CommandTimeoutReason" Hidden="true" />
+      <Method Name="DoAddCancellationSource" Hidden="true" />
+      <Property Name="InternalCompletion" Hidden="true" />
+      <Method Name="OnCommandSend" Hidden="true" />
+      <Method Name="OnInternalCommandCompleted" Hidden="true" />
+      <Field Name="SendCommandTokenReason" Hidden="true" />
+      <Method Name="SetCommandTimeout" Hidden="true" />
+      <Method Name="ThrowOnLocked" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>EAAQCAAACAAEAAEAAAAAAQAAABgQAAABAAAIEAAAAQA=</HashCode>
+      <HashCode>HEARmAAASAQEAAmAAoFABSAQEBgQgAARQAEYEAACAQA=</HashCode>
       <FileName>Command\BaseDeviceCommand.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="CK.DeviceModel.DeviceCommandWithResult&lt;TResult&gt;">
-    <Position X="3.25" Y="5" Width="2.5" />
+    <Position X="3.25" Y="5.75" Width="2.5" />
     <Members>
+      <Field Name="_commandToString" Hidden="true" />
       <Method Name="DeviceCommandWithResult" Hidden="true" />
+      <Property Name="ICompletable&lt;TResult&gt;.Completion" Hidden="true" />
+      <Method Name="ICompletable&lt;TResult&gt;.OnCanceled" Hidden="true" />
+      <Method Name="ICompletable&lt;TResult&gt;.OnCompleted" Hidden="true" />
+      <Method Name="ICompletable&lt;TResult&gt;.OnError" Hidden="true" />
       <Property Name="InternalCompletion" Hidden="true" />
       <Method Name="ToString" Hidden="true" />
     </Members>
+    <InheritanceLine Type="CK.DeviceModel.BaseDeviceCommand" FixedFromPoint="true">
+      <Path>
+        <Point X="2.75" Y="4.747" />
+        <Point X="2.75" Y="5.375" />
+        <Point X="4.5" Y="5.375" />
+        <Point X="4.5" Y="5.75" />
+      </Path>
+    </InheritanceLine>
     <TypeIdentifier>
-      <HashCode>AAAAAAAAAACAAAREAIAAAAACAAAQEAAAAAAAAAAAgAA=</HashCode>
+      <HashCode>AAAAAAAAABCAAAREAIAAAAACAAAQEAAAAAAAAAAAgAA=</HashCode>
       <FileName>Command\DeviceCommandWithResult.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="1.408" />
