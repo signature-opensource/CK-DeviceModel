@@ -158,7 +158,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase(30, 200, 20)]
         [TestCase(50, 150, 20)]
-        [Timeout( 16000 )]
+        [Timeout( 60000 )]
         public async Task SendingTimeUtc_stress_test_Async( int nb, int sendingDeltaMS, int execTimeMS )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{sendingDeltaMS},{execTimeMS})" );
