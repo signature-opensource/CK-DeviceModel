@@ -156,7 +156,7 @@ namespace CK.DeviceModel.Tests
         {
         }
 
-        [TestCase(50, 200, 20)]
+        [TestCase(30, 200, 20)]
         [TestCase(50, 150, 20)]
         [Timeout( 16000 )]
         public async Task SendingTimeUtc_stress_test_Async( int nb, int sendingDeltaMS, int execTimeMS )
@@ -247,7 +247,14 @@ namespace CK.DeviceModel.Tests
                     fc = (await c.Completion).Item2;
                 }
             }
-            TestHelper.Monitor.Info( $"Final ReminderCount = {rc}, ReminderFiredCount = {fc}." );
+            if( rc != nb * 3 || fc != nb * 3 )
+            {
+                TestHelper.Monitor.Error( $"Failed: Final ReminderCount = {rc}, ReminderFiredCount = {fc} (should be both {nb * 3})." );
+            }
+            else
+            {
+                TestHelper.Monitor.Info( $"Success: Final ReminderCount = {rc}, ReminderFiredCount = {fc}." );
+            }
             rc.Should().Be( nb * 3, "ReminderCount is fine." );
             fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
         }
