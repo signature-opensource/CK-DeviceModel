@@ -207,9 +207,9 @@ namespace CK.DeviceModel.Tests
             // The last command (n° nb) will start in nb * sendingDeltaMS and wait for execTimeMS before adding the reminder.
             int lastAddedReminderTime = (nb * sendingDeltaMS) + execTimeMS;
             int lastReminderTime = lastAddedReminderTime + 50;
-            // This is very theoretical. But we should not wait 20% this time more for the last reminder to be executed.
+            // This is very theoretical. But we should not wait 100% this time more for the last reminder to be executed.
             // This depends on the machine and on the deltaMS: for small deltaMS this doesn't work!
-            int waitTime = (lastReminderTime * 120) / 100;
+            int waitTime = (lastReminderTime * 200) / 100;
 
             var all = new List<DCommand>();
             SendCommands( d, false, all );

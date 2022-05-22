@@ -17,7 +17,7 @@ public class FlashBulbHost : DeviceHost<FlashBulb, DeviceHostConfiguration<Flash
 }
 ```
 
-The host configuration exposes the `IList<TConfiguration> Items` with all the device's configuration that must be applied. By default,
+The host configuration exposes the `List<TConfiguration> Items` with all the device's configuration that must be applied. By default,
 a host configuration is **"partial"**: it will ignore all existing devices that don't appear in its `Items`.
 This behavior can be changed thanks to the `IsPartialConfiguration` property:
 
