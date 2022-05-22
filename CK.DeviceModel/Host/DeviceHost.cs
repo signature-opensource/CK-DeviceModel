@@ -173,16 +173,15 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets a device by its name.
+        /// <para>
+        /// This is efficient since it lookups an independent read only dictionary instance. No lock needed.
+        /// </para>
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device or null if not found.</returns>
         public T? Find( string deviceName ) => _devices.GetValueOrDefault( deviceName );
 
-        /// <summary>
-        /// Gets a device by its name.
-        /// </summary>
-        /// <param name="deviceName">The device name to find.</param>
-        /// <returns>The device or null if not found.</returns>
+        /// <inheritdoc cref="Find(string)"/>
         public T? this[ string deviceName ] => _devices.GetValueOrDefault( deviceName );
 
         IDevice? IDeviceHost.Find( string deviceName ) => Find( deviceName );
@@ -273,7 +272,7 @@ namespace CK.DeviceModel
         /// <returns>the result of the device configuration.</returns>
         public async Task<DeviceApplyConfigurationResult> EnsureDeviceAsync( IActivityMonitor monitor, TConfiguration configuration )
         {
-            if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
+            Throw.CheckNotNullArgument( configuration );
 
             THostConfiguration hostConfig = _hostConfigFactory();
             hostConfig.Items.Add( configuration );

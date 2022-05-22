@@ -18,7 +18,7 @@ namespace CK.DeviceModel
         /// Log tag set on the command and any event loop monitors.
         /// This tag is configured to <see cref="LogFilter.Monitor"/> only in <see cref="ActivityMonitor.Tags.DefaultFilters"/>.
         /// </summary>
-        public static CKTrait DeviceModel = ActivityMonitor.Tags.Register( "Device-Model" );
+        public static readonly CKTrait DeviceModel = ActivityMonitor.Tags.Register( "Device-Model" );
 
         /// <summary>
         /// Gets the host name that SHOULD identify this host instance unambiguously in a running context.
@@ -65,6 +65,9 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets a device by its name.
+        /// <para>
+        /// This is efficient since it lookups an independent read only dictionary instance. No lock needed.
+        /// </para>
         /// </summary>
         /// <param name="deviceName">The device name to find.</param>
         /// <returns>The device or null if not found.</returns>

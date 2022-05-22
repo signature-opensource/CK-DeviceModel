@@ -10,6 +10,13 @@ namespace CK.DeviceModel
 {
     /// <summary>
     /// Defines non-generic device properties and methods.
+    /// <para>
+    /// Only the immutable <see cref="Name"/>, <see cref="FullName"/> and the dynamic <see cref="ImmediateCommandLimitOffset"/>
+    /// should be accessed through this interface.
+    /// The other exposed properties should be accessed on <see cref="DeviceLifetimeEvent"/> properties:
+    /// the event capture the relevant information at the time of the event whereas those device's properties
+    /// can change at any moment.
+    /// </para>
     /// </summary>
     public interface IDevice
     {
@@ -26,50 +33,34 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets whether this device has been started.
+        /// <para>
         /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
         /// based on this "instant" status should be avoided.
+        /// </para>
         /// </summary>
         bool IsRunning { get; }
 
         /// <summary>
         /// Gets whether this device has been destroyed.
+        /// <para>
         /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
         /// based on this "instant" status should be avoided (except if it is true: it never transitions
         /// from true to false).
+        /// </para>
         /// </summary>
         bool IsDestroyed { get; }
 
         /// <summary>
         /// Gets the <see cref="DeviceStatus"/> that captures the last change that occurred.
+        /// <para>
         /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
         /// based on this "instant" status should be avoided.
+        /// </para>
         /// </summary>
         public DeviceStatus Status { get; }
 
         /// <summary>
-        /// Raised whenever a change occurred:
-        /// <list type="table">
-        /// <item>
-        ///     <term>ControllerKey</term>
-        ///     <description>
-        ///     A <see cref="DeviceControllerKeyChangedEvent"/> is raised, either because of a reconfiguration or because of a call
-        ///     to <see cref="SetControllerKeyAsync(IActivityMonitor, string?)"/> or a <see cref="SetControllerKeyDeviceCommand{THost}"/>
-        ///     command has been handled.
-        ///     </description>
-        /// </item>
-        /// <item>
-        ///     <term>Status</term>
-        ///     <description>
-        ///     A <see cref="DeviceStatusChangedEvent"/> is raised, whenever a reconfiguration, a start or a stop happens.
-        ///     </description>
-        /// </item>
-        /// <item>
-        ///     <term>Configuration</term>
-        ///     <description>
-        ///     A <see cref="DeviceConfigurationChangedEvent{TConfiguration}"/> is raised after a successful reconfiguration.
-        ///     </description>
-        /// </item>
-        /// </list>
+        /// Raised whenever a change occurred in the device status, controller key and/or configuration.
         /// </summary>
         PerfectEvent<DeviceLifetimeEvent> LifetimeEvent { get; }
 
@@ -78,6 +69,10 @@ namespace CK.DeviceModel
         /// This is NOT the actual configuration object reference that the device has received and
         /// is using: configuration objects are cloned in order to isolate the running device of any change
         /// in this publicly exposed configuration.
+        /// <para>
+        /// Since a device lives in multi-threaded/concurrent contexts, any sensible decision
+        /// based on this property should be avoided.
+        /// </para>
         /// <para>
         /// Even if changing this object is harmless, it should obviously not be changed.
         /// </para>
@@ -92,14 +87,14 @@ namespace CK.DeviceModel
         int ImmediateCommandLimitOffset { get; set; }
 
         /// <summary>
-        /// Attempts to start this device.
+        /// Attempts to start this device. This sends a <see cref="BaseStartDeviceCommand"/> and await its completion.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false if this device cannot start.</returns>
         Task<bool> StartAsync( IActivityMonitor monitor );
 
         /// <summary>
-        /// Attempts to stop this device if it is running.
+        /// Attempts to stop this device if it is running. This sends a <see cref="BaseStopDeviceCommand"/> and await its completion.
         /// The only reason a device cannot be stopped (and this method to return false) is because its <see cref="DeviceConfiguration.Status"/>
         /// is <see cref="DeviceConfigurationStatus.AlwaysRunning"/> and <paramref name="ignoreAlwaysRunning"/> is false.
         /// </summary>
@@ -109,7 +104,7 @@ namespace CK.DeviceModel
         Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false );
 
         /// <summary>
-        /// Reconfigures the device.
+        /// Reconfigures the device. This sends a <see cref="BaseConfigureDeviceCommand"/> and await its completion.
         /// Configuration's type must match the actual configuration type otherwise an <see cref="InvalidCastException"/> is thrown.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -148,12 +143,12 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.
         /// When null, the <see cref="BaseDeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>
-        /// checks that the command's controller key is the same as this one otherwise the command is not handled.
+        /// checks that the command's controller key is the same as this one otherwise the command is rejected.
         /// </summary>
         string? ControllerKey { get; }
 
         /// <summary>
-        /// Sets a new <see cref="ControllerKey"/>, whatever its current value is.
+        /// Sets a new <see cref="ControllerKey"/>, whatever its current value is (if this is not set by the <see cref="DeviceConfiguration.ControllerKey"/>).
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="key">The controller key.</param>

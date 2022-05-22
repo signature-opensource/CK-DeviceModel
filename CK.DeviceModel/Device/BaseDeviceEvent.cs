@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -5,8 +6,7 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Base class for <see cref="DeviceLifetimeEvent"/> (<see cref="DeviceStatusChangedEvent"/>, <see cref="DeviceControllerKeyChangedEvent"/>
-    /// and <see cref="DeviceConfigurationChangedEvent"/>) and all <see cref="ActiveDeviceEvent{TDevice}"/>.
+    /// Base class for <see cref="DeviceLifetimeEvent"/> and all <see cref="ActiveDeviceEvent{TDevice}"/>.
     /// </summary>
     public abstract class BaseDeviceEvent
     {
@@ -16,7 +16,8 @@ namespace CK.DeviceModel
         /// <param name="device">The device that raised this event.</param>
         protected BaseDeviceEvent( IDevice device )
         {
-            Device = device ?? throw new ArgumentNullException( nameof( device ) );
+            Throw.CheckNotNullArgument( device );
+            Device = device;
         }
 
         /// <summary>

@@ -378,7 +378,7 @@ namespace CK.DeviceModel.Configuration.Tests
 
                 c1.IsRunning.Should().BeFalse();
                 counter.DevicesChangedCount.Should().Be( 0 );
-                counter.DeviceConfigurationChangedCount.Should().Be( 2 );
+                counter.DeviceConfigurationChangedCount.Should().Be( 1 );
 
                 config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C1:Status", "AlwaysRunning" );
                 config.Provider.Set( "CK-DeviceModel:CameraHost:Items:C2:Status", "Disabled" );

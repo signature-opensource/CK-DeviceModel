@@ -30,8 +30,11 @@ namespace CK.DeviceModel
         // This is internal so that the DeviceHostDaemon can use
         internal DeviceConfigurationStatus _configStatus;
         string? _controllerKey;
-        bool _controllerKeyFromConfiguration;
         volatile bool _isRunning;
+        bool _controllerKeyFromConfiguration;
+        // This is not null during reconfiguration and retains Status changed events
+        // to be raised by intermediate steps like starting a AlwaysRunning or stopping a Disabled device.
+        bool? _reconfiguringStatusChanged;
 
         // DeviceHostDaemon access to the actual safe status.
         DeviceConfigurationStatus IInternalDevice.ConfigStatus => _configStatus;
@@ -60,14 +63,14 @@ namespace CK.DeviceModel
             /// </summary>
             public readonly TConfiguration Configuration;
 
-            internal readonly IInternalDeviceHost Host;
-            internal readonly TConfiguration ExternalConfig;
+            internal readonly IInternalDeviceHost _host;
+            internal readonly TConfiguration _externalConfig;
 
             internal CreateInfo( TConfiguration c, TConfiguration externalConfig, IInternalDeviceHost h )
             {
                 Configuration = c;
-                Host = h;
-                ExternalConfig = externalConfig;
+                _host = h;
+                _externalConfig = externalConfig;
             }
         }
 
@@ -92,14 +95,14 @@ namespace CK.DeviceModel
             TConfiguration config = info.Configuration;
             Debug.Assert( config != null && config.CheckValid( monitor ), "config != null && config.CheckValid( monitor )" );
 
-            _host = info.Host;
+            _host = info._host;
             Name = config.Name;
-            FullName = info.Host.DeviceHostName + '/' + Name;
+            FullName = info._host.DeviceHostName + '/' + Name;
             SystemDeviceFolderPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
             SystemDeviceFolderPath = SystemDeviceFolderPath.Combine( "CK/DeviceModel/" + FullName );
 
             _currentConfiguration = config;
-            _externalConfiguration = info.ExternalConfig;
+            _externalConfiguration = info._externalConfig;
             _configStatus = config.Status;
             _controllerKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
             _controllerKeyFromConfiguration = _controllerKey != null;
@@ -211,7 +214,11 @@ namespace CK.DeviceModel
             if( _status != status )
             {
                 _status = status;
-                return SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceStatusChangedEvent( this, status ) );
+                if( _reconfiguringStatusChanged == null )
+                {
+                    return SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceLifetimeEvent<TConfiguration>( this ) { StatusChanged = true } );
+                }
+                _reconfiguringStatusChanged = true;
             }
             return Task.CompletedTask;
         }
@@ -232,7 +239,7 @@ namespace CK.DeviceModel
         /// <returns>The configuration result.</returns>
         public async Task<DeviceApplyConfigurationResult> ReconfigureAsync( IActivityMonitor monitor, TConfiguration configuration, CancellationToken token = default )
         {
-            if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
+            Throw.CheckNotNullArgument( configuration );
             if( !configuration.CheckValid( monitor ) )
             {
                 return DeviceApplyConfigurationResult.InvalidConfiguration;
@@ -240,7 +247,7 @@ namespace CK.DeviceModel
             return await InternalReconfigureAsync( monitor, configuration, configuration.DeepClone(), token ).ConfigureAwait( false );
         }
 
-        internal async Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
+        internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
                                                                                       TConfiguration config,
                                                                                       TConfiguration clonedconfig,
                                                                                       CancellationToken token )
@@ -248,9 +255,9 @@ namespace CK.DeviceModel
             var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, config, clonedconfig );
             if( cmd == null || !UnsafeSendCommand( monitor, cmd, token ) )
             {
-                return DeviceApplyConfigurationResult.DeviceDestroyed;
+                return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
             }
-            return await cmd.Completion.Task.ConfigureAwait( false );
+            return cmd.Completion.Task;
         }
 
         async Task HandleReconfigureAsync( BaseConfigureDeviceCommand<TConfiguration> cmd )
@@ -267,6 +274,8 @@ namespace CK.DeviceModel
             // a device MAY depend on some of its configuration when in stopped state...
             // It's easier to consider that ControllerKey and Status are always applied and, in the rare case of a failing DoReconfigureAsync,
             // we update the current configurations with these updated fields.
+
+            _reconfiguringStatusChanged = false;
 
             // Always applying BaseImmediateCommandLimit is easier to understand (as its documentation describes it).
             // We use the same pattern as for ControllerKey and Status.
@@ -405,14 +414,17 @@ namespace CK.DeviceModel
                     await SetDeviceStatusAsync( new DeviceStatus( reconfigResult, _isRunning, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
                 }
             }
-            if( controllerKeyChanged )
+            if( controllerKeyChanged || configActuallyChanged || _reconfiguringStatusChanged == true )
             {
-                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, _controllerKey ) );
+                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceLifetimeEvent<TConfiguration>( this )
+                {
+                    ControllerKeyChanged = controllerKeyChanged,
+                    ConfigurationChanged = configActuallyChanged,
+                    StatusChanged = _reconfiguringStatusChanged == true
+                } );
             }
-            if( configActuallyChanged )
-            {
-                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceConfigurationChangedEvent( this, _externalConfiguration ) );
-            }
+            _reconfiguringStatusChanged = null;
+
             // Sets the completion last.
             // We use TrySet to handle any cancellation but this should be weird: the cancellation occurred in the middle
             // of the reconfiguration :(.
@@ -431,7 +443,7 @@ namespace CK.DeviceModel
         /// <para>
         /// It is perfectly valid for this method to return <see cref="DeviceReconfiguredResult.None"/> if nothing happened instead of
         /// <see cref="DeviceReconfiguredResult.UpdateSucceeded"/>. When None is returned, we may avoid a useless raise of the
-        /// <see cref="DeviceConfigurationChangedEvent"/>.
+        /// <see cref="LifetimeEvent"/>.
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -446,14 +458,14 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, string? current, string? key ) => SetControllerKeyAsync( monitor, true, current, key );
 
-        async Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
+        Task<bool> SetControllerKeyAsync( IActivityMonitor monitor, bool checkCurrent, string? current, string? key )
         {
             var cmd = _host?.CreateSetControllerKeyDeviceCommand( Name, current, key );
             if( cmd == null || !SendCommand( monitor, cmd, false, checkCurrent, default ) )
             {
-                return false;
+                return Task.FromResult( false );
             }
-            return await cmd.Completion.Task.ConfigureAwait( false );
+            return cmd.Completion.Task;
         }
 
         async Task HandleSetControllerKeyAsync( BaseSetControllerKeyDeviceCommand cmd )
@@ -470,7 +482,7 @@ namespace CK.DeviceModel
                 }
                 _commandMonitor.Trace( $"Device {FullName}: controller key changed from '{_controllerKey}' to '{key}'." );
                 _controllerKey = key;
-                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceControllerKeyChangedEvent( this, key ) ).ConfigureAwait( false );
+                await SafeRaiseLifetimeEventAsync( _commandMonitor, new DeviceLifetimeEvent<TConfiguration>( this ) { ControllerKeyChanged = true } ).ConfigureAwait( false );
             }
             if( !cmd.Completion.TrySetResult( true ) )
             {

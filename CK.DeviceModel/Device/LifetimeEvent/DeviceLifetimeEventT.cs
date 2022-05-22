@@ -7,16 +7,16 @@ namespace CK.DeviceModel
     /// <summary>
     /// Event raised whenever a device's configuration changed.
     /// </summary>
-    public sealed class DeviceConfigurationChangedEvent<TConfiguration> : DeviceConfigurationChangedEvent
+    public sealed class DeviceLifetimeEvent<TConfiguration> : DeviceLifetimeEvent
         where TConfiguration : DeviceConfiguration
     {
-        internal DeviceConfigurationChangedEvent( IDevice device, TConfiguration c )
-            : base( device, c )
+        internal DeviceLifetimeEvent( IDevice device )
+            : base( device )
         {
         }
 
         /// <summary>
-        /// Gets the new configuration.
+        /// Gets the device configuration.
         /// </summary>
         public new TConfiguration Configuration => (TConfiguration)base.Configuration;
     }

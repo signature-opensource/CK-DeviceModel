@@ -741,8 +741,7 @@ namespace CK.DeviceModel
                                         case DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel:
                                             if( allowDefer && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                                             {
-                                                _commandMonitor.CloseGroup( "Pushing command to the deferred command queue." );
-                                                _deferredCommands.Enqueue( command );
+                                                PushDeferredCommand( command );
                                             }
                                             else
                                             {
@@ -753,8 +752,7 @@ namespace CK.DeviceModel
                                         case DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetUnavailableDeviceException:
                                             if( allowDefer && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                                             {
-                                                _commandMonitor.CloseGroup( "Pushing command to the deferred command queue." );
-                                                _deferredCommands.Enqueue( command );
+                                                PushDeferredCommand( command );
                                             }
                                             else
                                             {
@@ -808,6 +806,13 @@ namespace CK.DeviceModel
                         break;
                     }
             }
+        }
+
+        void PushDeferredCommand( BaseDeviceCommand command )
+        {
+            // TODO: (internal protected virtual) command.OnDeferring( FIFOBuffer<BaseDeviceCommand> queue ) => queue.Push( this );
+            _commandMonitor.CloseGroup( "Pushing command to the deferred command queue." );
+            _deferredCommands.Enqueue( command );
         }
 
         bool CheckControllerKey( BaseDeviceCommand command )

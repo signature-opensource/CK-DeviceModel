@@ -157,10 +157,10 @@ namespace CK.DeviceModel.Tests
             result.Results![0].Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
 
             devicesCalled.Should().Be( 1, "No new or destroyed devices." );
-            lifetimeEvents.Should().HaveCount( 2 );
-            lifetimeEvents[0].Should().BeOfType<DeviceStatusChangedEvent>();
+            lifetimeEvents.Should().HaveCount( 1, "Reconfiguration emits only one final event." );
+            lifetimeEvents[0].StatusChanged.Should().BeTrue();
             {
-                var status = ((DeviceStatusChangedEvent)lifetimeEvents[0]).Status;
+                var status = lifetimeEvents[0].DeviceStatus;
                 status.HasStarted.Should().BeFalse();
                 status.HasBeenReconfigured.Should().BeTrue();
                 status.HasStopped.Should().BeFalse();
@@ -169,9 +169,9 @@ namespace CK.DeviceModel.Tests
                 status.StoppedReason.Should().Be( DeviceStoppedReason.None );
                 status.ToString().Should().Be( "Stopped (UpdateSucceeded)" );
             }
-            lifetimeEvents[1].Should().BeOfType<DeviceConfigurationChangedEvent>();
+            lifetimeEvents[0].ConfigurationChanged.Should().BeTrue();
             {
-                var c = ((DeviceConfigurationChangedEvent)lifetimeEvents[1]).Configuration;
+                var c = lifetimeEvents[0].Configuration;
                 c.Should().NotBeSameAs( config ).And.BeEquivalentTo( config );
             }
             lifetimeEvents.Clear();
@@ -191,18 +191,21 @@ namespace CK.DeviceModel.Tests
             result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             result.Results[0].Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
             lifetimeEvents.Should().HaveCount( 1 );
-            lifetimeEvents[0].Should().BeOfType<DeviceConfigurationChangedEvent>();
+            lifetimeEvents[0].ConfigurationChanged.Should().BeTrue();
             cameraC.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable, "The Status has been updated." );
             devicesCalled.Should().Be( 1 );
 
             lifetimeEvents.Clear();
-            // Starting the camera triggers a DeviceStatusChangedEvent event.
+            // Starting the camera triggers a StatusChanged event.
             (await cameraC.StartAsync( TestHelper.Monitor )).Should().BeTrue();
             lifetimeEvents.Should().HaveCount( 1 );
-            lifetimeEvents[0].Should().BeOfType<DeviceStatusChangedEvent>();
+            lifetimeEvents[0].StatusChanged.Should().BeTrue();
+            lifetimeEvents[0].ConfigurationChanged.Should().BeFalse();
+            lifetimeEvents[0].ControllerKeyChanged.Should().BeFalse();
+
             lifetimeEvents.Should().HaveCount( 1 );
             {
-                var status = ((DeviceStatusChangedEvent)lifetimeEvents[0]).Status;
+                var status = lifetimeEvents[0].DeviceStatus;
                 status.HasStarted.Should().BeTrue();
                 status.HasBeenReconfigured.Should().BeFalse();
                 status.HasStopped.Should().BeFalse();
@@ -219,9 +222,9 @@ namespace CK.DeviceModel.Tests
             devicesCalled.Should().Be( 2, "Device removed!" );
             host.Find( "C" ).Should().BeNull();
             lifetimeEvents.Should().HaveCount( 1 );
-            lifetimeEvents[0].Should().BeOfType<DeviceStatusChangedEvent>();
+            lifetimeEvents[0].StatusChanged.Should().BeTrue();
             {
-                var status = ((DeviceStatusChangedEvent)lifetimeEvents[0]).Status;
+                var status = lifetimeEvents[0].DeviceStatus;
                 status.HasStarted.Should().BeFalse();
                 status.HasBeenReconfigured.Should().BeFalse();
                 status.HasStopped.Should().BeTrue();
@@ -508,17 +511,17 @@ namespace CK.DeviceModel.Tests
 
             device.LifetimeEvent.Sync += ( monitor, e ) =>
             {
-                if( e is DeviceStatusChangedEvent ev )
+                if( e.StatusChanged )
                 {
                     // The device's status is up to date.
-                    Debug.Assert( ev.Device.Status == ev.Status );
+                    Debug.Assert( e.Device.Status == e.DeviceStatus );
                     TestHelper.Monitor.Info( $"Status change." );
-                    if( ev.Status.IsDestroyed )
+                    if( e.DeviceStatus.IsDestroyed )
                     {
                         destroyReceived.Should().BeFalse();
                         destroyReceived = true;
                     }
-                    else if( ev.Status.HasStopped )
+                    else if( e.DeviceStatus.HasStopped )
                     {
                         // HasStopped is true when IsDestroyed is sent.
                         stopReceived.Should().BeFalse();

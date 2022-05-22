@@ -124,7 +124,7 @@ namespace CK.DeviceModel.Tests
             Debug.Assert( d != null );
 
             bool statusChanged = false;
-            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e is DeviceStatusChangedEvent;
+            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e.StatusChanged;
             d.LifetimeEvent.Sync += OnLifetimeChange;
 
             var commands = Enumerable.Range( 0, 3 ).Select( i => new DCommand() { DeviceName = "First", Trace = $"n°{i}" } ).ToArray();
@@ -173,7 +173,7 @@ namespace CK.DeviceModel.Tests
             initialStatus.Should().Be( "Stopped (None)" );
 
             bool statusChanged = false;
-            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e is DeviceStatusChangedEvent;
+            void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e.StatusChanged;
             d.LifetimeEvent.Sync += OnLifetimeChange;
 
             var commands = Enumerable.Range( 0, 3 ).Select( i => new DCommand() { DeviceName = "First", Trace = $"n°{i}" } ).ToArray();
