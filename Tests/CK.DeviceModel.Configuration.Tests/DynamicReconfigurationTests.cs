@@ -313,7 +313,7 @@ namespace CK.DeviceModel.Configuration.Tests
                 _host = host;
                 _devices = new Dictionary<IDevice, int>();
                 RegisteDeviceLifetimeEvents();
-                host.DevicesChanged.Sync += ( m, h ) =>
+                host.DevicesChanged.Sync += ( m, h, devices ) =>
                 {
                     ++DevicesChangedCount;
                     RegisteDeviceLifetimeEvents();

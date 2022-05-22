@@ -115,7 +115,7 @@ namespace CK.DeviceModel.Tests
             var lifetimeEvents = new System.Collections.Generic.List<DeviceLifetimeEvent>();
 
             var host = new FlashBulbHost();
-            host.DevicesChanged.Sync += (monitor,host) => ++devicesCalled;
+            host.DevicesChanged.Sync += (monitor,host,devices) => ++devicesCalled;
 
             var config = new FlashBulbConfiguration() { Name = "C" };
             var hostConfig = new DeviceHostConfiguration<FlashBulbConfiguration>();

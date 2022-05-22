@@ -32,7 +32,7 @@ namespace CK.DeviceModel
         /// </summary>
         Dictionary<string, T> _devices;
 
-        readonly PerfectEventSender<IDeviceHost> _devicesChanged;
+        readonly PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>> _devicesChanged;
 
         /// <summary>
         /// This lock uses the NoRecursion policy.
@@ -95,7 +95,7 @@ namespace CK.DeviceModel
         DeviceHost( bool privateCall )
         {
             _devices = new Dictionary<string, T>();
-            _devicesChanged = new PerfectEventSender<IDeviceHost>();
+            _devicesChanged = new PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>>();
 
             // Generates a typed delegate to instantiate the THostConfiguration dynamically used
             // to apply a partial configuration.
@@ -198,7 +198,7 @@ namespace CK.DeviceModel
         public IReadOnlyDictionary<string, T> GetDevices() => _devices;
 
         /// <inheritdoc />
-        public PerfectEvent<IDeviceHost> DevicesChanged => _devicesChanged.PerfectEvent;
+        public PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> DevicesChanged => _devicesChanged.PerfectEvent;
 
         /// <summary>
         /// Captures the result of <see cref="ApplyConfigurationAsync"/>.
@@ -445,7 +445,9 @@ namespace CK.DeviceModel
 
         Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
                                                                             ? Task.CompletedTask
-                                                                            : _devicesChanged.SafeRaiseAsync( monitor, this );
+                                                                            : _devicesChanged.SafeRaiseAsync( monitor,
+                                                                                                              this,
+                                                                                                              _devices.AsIReadOnlyDictionary<string, T, IDevice>() );
 
         Task IInternalDeviceHost.RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => RaiseDevicesChangedEventAsync( monitor );
 
