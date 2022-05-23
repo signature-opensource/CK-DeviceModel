@@ -225,35 +225,38 @@ namespace CK.DeviceModel
             UpdateImmediateCommandLimit();
 
             // Regular command.
-            BaseDeviceCommand? cmd;
+            BaseDeviceCommand? cmd = null;
 
             // Immediate command.
             BaseDeviceCommand? immediate;
 
             while( !IsDestroyed )
             {
-                _currentlyExecuting = null;
+                cmd = _currentlyExecuting = null;
                 try
                 {
                     // Before waiting for the next regular command or _commandAwaker, tries to retrieve
                     // a delayed command that must be executed.
                     // Ready-to-run delayed commands are picked one by one and handled as if they were coming from the
                     // regular queue. Immediate commands are always handled first.
-                    //
-                    // The way we do this has one drawback: when the WaitForNextCommandAsync method had initially no delayed command
-                    // ready and has waited for _commandAwaker sent by the timer, we (below) skips any _commandAwaker up to the next
-                    // regular command to process: we'll execute the next pending regular command before any ready delayed one.
-                    // To correct this, here, if the cmd is the _commandAwaker we call again WaitForNextCommandAsync: if the awaker
-                    // was from the timer, then we'll obtain the ready to run delayed command and it will be executed now (before
-                    // any regular ones).
-                    // This de facto enables ready-to-run delayed commands to be handled at a higher priority than regular ones.
-                    cmd = await WaitForNextCommandAsync( expectDelayed: false ).ConfigureAwait( false );
-                    _commandMonitor.Debug( $"Obtained {cmd}." );
-                    if( cmd == _commandAwaker )
+
+                    // Dequeuing a delayed command also returns the fact that a next one is ready to run.
+                    // Once immediate are handled, we avoid the flush of the awakers and the lookup from the regular queue
+                    // (if the current command is the awaker): this de facto enables ready-to-run delayed commands to be handled
+                    // at a higher priority than regular ones.
+                    bool delayedCommandReady = false;
+                    if( _delayedQueue != null ) (cmd, delayedCommandReady) = TryGetDelayedCommand();
+                    if( cmd == null )
                     {
-                        cmd = await WaitForNextCommandAsync( expectDelayed: true ).ConfigureAwait( false );
-                        _commandMonitor.Debug( $"Obtained {cmd}." );
+                        _commandMonitor.Debug( "Waiting for command..." );
+                        cmd = await _commandQueue.Reader.ReadAsync().ConfigureAwait( false );
                     }
+                    _commandMonitor.Debug( $"Obtained {cmd}." );
+                    //if( cmd == _commandAwaker )
+                    //{
+                    //    cmd = await WaitForNextCommandAsync( expectDelayed: true ).ConfigureAwait( false );
+                    //    _commandMonitor.Debug( $"Obtained {cmd}." );
+                    //}
                     #region Immediate commands
                     // Handle all available immediate at once (but no more than ImmediateCommandLimit to avoid regular commands starvation).
                     if( _commandQueueImmediate.Reader.TryRead( out immediate ) )
@@ -316,10 +319,13 @@ namespace CK.DeviceModel
                         break;
                     }
 
+                    // Before flushing any command awaker to get an actual command,
+                    // if a delayed command is ready to run, give it the priority.
+                    if( cmd == _commandAwaker && delayedCommandReady ) continue;
+
                     // Updates the wasStop flag.
                     wasStop = !IsRunning;
 
-                    // Flushes any command awaker before an actual command.
                     while( cmd == _commandAwaker )
                     {
                         if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) break;
@@ -417,7 +423,6 @@ namespace CK.DeviceModel
             _commandMonitor.MonitorEnd();
         }
 
-
         bool EnqueueDelayed( BaseDeviceCommand cmd )
         {
             Debug.Assert( cmd._sendTime.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
@@ -463,109 +468,122 @@ namespace CK.DeviceModel
             return false;
         }
 
-        ValueTask<BaseDeviceCommand> WaitForNextCommandAsync( bool expectDelayed )
+        (BaseDeviceCommand?,bool) TryGetDelayedCommand()
         {
-            BaseDeviceCommand? cmd = null;
-            if( _delayedQueue != null )
-            {
-                Debug.Assert( _timer != null );
-                var now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
-                // First tries to Change the timer if a previous attempt failed.
-                if( _failedChangeTimerTime != -1 )
-                {
-                    using( _commandMonitor.OpenWarn( $"Retrying to Change timer." ) )
-                    {
-                        var delta = _failedChangeTimerTime - now;
-                        if( delta > 0 )
-                        {
-                            if( !_timer.Change( (uint)delta, _timerRepeatTime ) )
-                            {
-                                _commandMonitor.Error( $"Failed to Change timer (again) to {delta} ms. Sending CommandAwaker to loop." );
-                                _commandQueue.Writer.TryWrite( _commandAwaker );
-                            }
-                            else
-                            {
-                                _commandMonitor.Info( $"Timer Change succeeded: Set to {delta} ms." );
-                                _failedChangeTimerTime = -1;
-                            }
-                        }
-                        else
-                        {
-                            if( _failedChangeTimerTime != 0 ) _commandMonitor.Error( "Required timer expired. Give up. Stopping it." );
-                            bool done = _timer.Change( Timeout.Infinite, Timeout.Infinite );
-                            if( !done )
-                            {
-                                _commandMonitor.Error(  "Stopping timer failed." );
-                                _failedChangeTimerTime = 0;
-                            }
-                            else
-                            {
-                                _commandMonitor.Info( "Timer stopped." );
-                                _failedChangeTimerTime = -1;
-                            }
-                        }
-                    }
-                }
-                // Next, dequeue the next ready-to-run delayed commands, skipping the canceled ones,
-                // with a 1 ms margin: we consider that a 1 ms delay is negligible.
-                bool hasDequeued = false;
+            Debug.Assert( _delayedQueue != null );
+            Debug.Assert( _timer != null );
 
-                BaseDeviceCommand? delayed;
-                long nextDelayedTime;
-                while( _delayedQueue.TryPeek( out delayed, out nextDelayedTime )
-                       && nextDelayedTime <= now + 1 )
+            BaseDeviceCommand? cmd = null;
+            var now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+
+            // First tries to Change the timer if a previous attempt failed.
+            if( _failedChangeTimerTime != -1 ) RetryTimerConfiguration( now );
+
+            // Next, dequeue the next ready-to-run delayed commands, skipping the canceled ones,
+            // with a 1 ms margin: we consider that a 1 ms delay is negligible.
+            bool hasDequeued = false;
+
+            BaseDeviceCommand? delayed;
+            long nextDelayedTime;
+            while( _delayedQueue.TryPeek( out delayed, out nextDelayedTime )
+                   && nextDelayedTime <= now + 1 )
+            {
+                hasDequeued = true;
+                _delayedQueue.Dequeue();
+                if( delayed.CancellationToken.IsCancellationRequested )
                 {
-                    hasDequeued = true;
-                    _delayedQueue.Dequeue();
-                    if( delayed.CancellationToken.IsCancellationRequested )
-                    {
-                        _commandMonitor.Debug( $"Skipped canceled Delayed Command {delayed}." );
-                        continue;
-                    }
-                    _commandMonitor.Debug( $"Delayed Command dequeued: {delayed} {delayed._sendTime:O}." );
-                    // The command is no more delayed.
-                    delayed._sendTime = Util.UtcMinValue;
-                    cmd = delayed;
-                    break;
+                    _commandMonitor.Debug( $"Skipped canceled Delayed Command {delayed}." );
+                    continue;
                 }
-                if( hasDequeued )
+                _commandMonitor.Debug( $"Delayed Command dequeued: {delayed} {delayed._sendTime:O}." );
+                // The command is no more delayed.
+                delayed._sendTime = Util.UtcMinValue;
+                cmd = delayed;
+                break;
+            }
+            bool nextIsReady = false;
+            if( hasDequeued )
+            {
+                if( _delayedQueue.TryPeek( out delayed, out nextDelayedTime ) )
                 {
-                    if( _delayedQueue.TryPeek( out delayed, out nextDelayedTime ) )
+                    var delta = nextDelayedTime - now;
+                    // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
+                    // We use the same 1 ms margin as above.
+                    if( delta > 1 )
                     {
-                        var delta = nextDelayedTime - now;
-                        // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
-                        // We use the same 1 ms margin as above.
-                        if( delta > 1 )
+                        Debug.Assert( _delayedQueue.Count > 0 );
+                        _commandMonitor.Debug( $"Next delayed command is {delayed} in {delta} ms." );
+                        _failedChangeTimerTime = -1;
+                        if( !_timer.Change( (uint)delta, _timerRepeatTime ) )
                         {
-                            Debug.Assert( _delayedQueue.Count > 0 );
-                            _commandMonitor.Debug( $"Next delayed command is {delayed} in {delta} ms." );
-                            _failedChangeTimerTime = -1;
-                            if( !_timer.Change( (uint)delta, _timerRepeatTime ) )
-                            {
-                                _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
-                                _failedChangeTimerTime = nextDelayedTime;
-                                _commandQueue.Writer.TryWrite( _commandAwaker );
-                            }
-                        }
-                        else _commandMonitor.Debug( "Next delayed command is ready to be dequeued." );
-                    }
-                    else
-                    {
-                        _commandMonitor.Debug( "No more delayed command. Stopping timer." );
-                        if( !_timer.Change( Timeout.Infinite, Timeout.Infinite ) )
-                        {
-                            _commandMonitor.Error( $"Failed to Stop timer. Sending CommandAwaker to loop." );
-                            _failedChangeTimerTime = 0;
+                            _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
+                            _failedChangeTimerTime = nextDelayedTime;
                             _commandQueue.Writer.TryWrite( _commandAwaker );
                         }
                     }
+                    else
+                    {
+                        _commandMonitor.Debug( "Next delayed command is ready to be dequeued. Stopping timer." );
+                        StopTimer();
+                        nextIsReady = true;
+                    }
                 }
-                else _commandMonitor.Debug( "No ready-to-run delayed command." );
+                else
+                {
+                    _commandMonitor.Debug( "No more delayed command. Stopping timer." );
+                    StopTimer();
+                }
             }
-            if( cmd != null || expectDelayed ) return new ValueTask<BaseDeviceCommand>( cmd ?? _commandAwaker );
+            else _commandMonitor.Debug( "No ready-to-run delayed command." );
+            return (cmd,nextIsReady);
+        }
 
-            _commandMonitor.Debug( "Waiting for command..." );
-            return _commandQueue.Reader.ReadAsync();
+        void StopTimer()
+        {
+            Debug.Assert( _timer != null );
+            _failedChangeTimerTime = -1;
+            if( !_timer.Change( Timeout.Infinite, Timeout.Infinite ) )
+            {
+                _commandMonitor.Error( "Failed to Stop timer. Sending CommandAwaker to loop." );
+                _failedChangeTimerTime = 0;
+                _commandQueue.Writer.TryWrite( _commandAwaker );
+            }
+        }
+
+        private void RetryTimerConfiguration( long now )
+        {
+            using( _commandMonitor.OpenWarn( $"Retrying to Change timer." ) )
+            {
+                var delta = _failedChangeTimerTime - now;
+                if( delta > 0 )
+                {
+                    if( !_timer.Change( (uint)delta, _timerRepeatTime ) )
+                    {
+                        _commandMonitor.Error( $"Failed to Change timer (again) to {delta} ms. Sending CommandAwaker to loop." );
+                        _commandQueue.Writer.TryWrite( _commandAwaker );
+                    }
+                    else
+                    {
+                        _commandMonitor.Info( $"Timer Change succeeded: Set to {delta} ms." );
+                        _failedChangeTimerTime = -1;
+                    }
+                }
+                else
+                {
+                    if( _failedChangeTimerTime != 0 ) _commandMonitor.Error( "Required timer expired. Give up. Stopping it." );
+                    bool done = _timer.Change( Timeout.Infinite, Timeout.Infinite );
+                    if( !done )
+                    {
+                        _commandMonitor.Error( "Stopping timer failed." );
+                        _failedChangeTimerTime = 0;
+                    }
+                    else
+                    {
+                        _commandMonitor.Info( "Timer stopped." );
+                        _failedChangeTimerTime = -1;
+                    }
+                }
+            }
         }
 
         /// <summary>
