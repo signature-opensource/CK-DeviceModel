@@ -255,8 +255,12 @@ namespace CK.DeviceModel.Tests
             {
                 TestHelper.Monitor.Info( $"Success: Final ReminderCount = {rc}, ReminderFiredCount = {fc}." );
             }
+
+            await h.ClearAsync( TestHelper.Monitor, true );
+
             rc.Should().Be( nb * 3, "ReminderCount is fine." );
             fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
+
         }
     }
 }
