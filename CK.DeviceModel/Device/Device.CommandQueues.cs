@@ -50,10 +50,9 @@ namespace CK.DeviceModel
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            public override string ToString() => this == _commandAwaker ? nameof( CommandAwaker ) : "CommandAwakerTimer";
+            public override string ToString() => nameof( CommandAwaker );
         }
         static readonly CommandAwaker _commandAwaker = new();
-        static readonly CommandAwaker _commandTimerAwaker = new();
 
         #region CommandCanceler
 
@@ -485,7 +484,10 @@ namespace CK.DeviceModel
                 // Next, dequeue the next ready-to-run delayed commands, skipping the canceled ones,
                 // with a 1 ms margin: we consider that a 1 ms delay is negligible.
                 bool hasDequeued = false;
-                while( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTime )
+
+                BaseDeviceCommand? delayed;
+                long nextDelayedTime;
+                while( _delayedQueue.TryPeek( out delayed, out nextDelayedTime )
                        && nextDelayedTime <= now + 1 )
                 {
                     hasDequeued = true;
@@ -503,7 +505,7 @@ namespace CK.DeviceModel
                 }
                 if( hasDequeued )
                 {
-                    if( _delayedQueue.TryPeek( out var delayed, out var nextDelayedTime ) )
+                    if( _delayedQueue.TryPeek( out delayed, out nextDelayedTime ) )
                     {
                         var delta = nextDelayedTime - now;
                         // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
@@ -524,7 +526,7 @@ namespace CK.DeviceModel
                     }
                     else _commandMonitor.Debug( "No more delayed command." );
                 }
-                else _commandMonitor.Debug( "No ready-to-run delayed command." );
+                else _commandMonitor.Debug( $"No ready-to-run delayed command. {(delayed == null ? $"No more." : $"Next in {nextDelayedTime - now} ms.")}" );
             }
             if( cmd != null || expectDelayed ) return new ValueTask<BaseDeviceCommand>( cmd ?? _commandAwaker );
 

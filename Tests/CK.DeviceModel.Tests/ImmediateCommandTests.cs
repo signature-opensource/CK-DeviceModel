@@ -266,6 +266,8 @@ namespace CK.DeviceModel.Tests
             }
             TestHelper.Monitor.Info( "Got all command completions." );
             CheckCommandTraces( d.Traces, 7, nb );
+
+            await d.DestroyAsync( TestHelper.Monitor, true );
         }
 
     }
