@@ -216,37 +216,14 @@ namespace CK.DeviceModel.Tests
             SendCommands( d, true, all );
             SendCommands( d, null, all );
 
-            // Adds 200 ms since this test regularly fails on the CI runners.
-            TestHelper.Monitor.Info( $"All the commands have been sent. Waiting for {waitTime} + 200 ms." );
-            await Task.Delay( waitTime + 200 );
-            TestHelper.Monitor.Info( $"Done waiting." );
+            // Waits for all the command completions.
+            foreach( var c in all ) await c.Completion;
+            // Each command triggers a 50 ms reminder.
+            // A 20 ms margin should be enough for the reminders to complete.
+            await Task.Delay( 50 + 20 );
 
             int rc = d.ReminderCount;
-            if( rc == 0 )
-            {
-                TestHelper.Monitor.Warn( "Read 0 ReminderCount! Using Volatile.Read." );
-                rc = Volatile.Read( ref d.ReminderCount );
-                if( rc == 0 )
-                {
-                    TestHelper.Monitor.Warn( "Using Volatile.Read: still 0. Using a GetReminderCountCommand." );
-                    var c = new GetReminderCountCommand();
-                    d.UnsafeSendCommand( TestHelper.Monitor, c );
-                    rc = (await c.Completion).Item1;
-                }
-            }
             int fc = d.ReminderFiredCount;
-            if( fc == 0 )
-            {
-                TestHelper.Monitor.Warn( "Read 0 ReminderFiredCount! Using Volatile.Read." );
-                fc = Volatile.Read( ref d.ReminderFiredCount );
-                if( fc == 0 )
-                {
-                    TestHelper.Monitor.Warn( "Using Volatile.Read: still 0. Using a GetReminderCountCommand." );
-                    var c = new GetReminderCountCommand();
-                    d.UnsafeSendCommand( TestHelper.Monitor, c );
-                    fc = (await c.Completion).Item2;
-                }
-            }
             if( rc != nb * 3 || fc != nb * 3 )
             {
                 TestHelper.Monitor.Error( $"Failed: Final ReminderCount = {rc}, ReminderFiredCount = {fc} (should be both {nb * 3})." );
