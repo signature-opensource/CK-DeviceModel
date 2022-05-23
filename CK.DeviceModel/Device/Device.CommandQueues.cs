@@ -413,15 +413,17 @@ namespace CK.DeviceModel
         {
             Debug.Assert( cmd._sendTime.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
             long time = cmd._sendTime.Ticks / TimeSpan.TicksPerMillisecond;
+            long now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
             if( time > 0 )
             {
-                long lDelta = time - DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+                long lDelta = time - now;
                 if( lDelta >= uint.MaxValue )
                 {
                     _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is ignored." );
                     return false;
                 }
                 var delta = (uint)lDelta;
+                // If the command must be send in less than 2ms, handle it now.
                 if( delta > 1 )
                 {
                     if( _delayedQueue == null )
@@ -439,7 +441,7 @@ namespace CK.DeviceModel
                     {
                         Debug.Assert( _timer != null );
                         _commandMonitor.Debug( $"First delayed command in {delta} ms." );
-                        if( !_timer.Change( delta, 0 ) )
+                        if( !_timer.Change( delta, 5 ) )
                         {
                             _commandMonitor.Debug( $"Failed to Change timer." );
                             _failedChangeTimerTime = time;
@@ -519,7 +521,7 @@ namespace CK.DeviceModel
                             Debug.Assert( _delayedQueue.Count > 0 );
                             _commandMonitor.Debug( $"Next delayed command is {delayed} in {delta} ms." );
                             _failedChangeTimerTime = 0;
-                            if( !_timer.Change( (uint)delta, 0 ) )
+                            if( !_timer.Change( (uint)delta, 5 ) )
                             {
                                 _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
                                 _failedChangeTimerTime = nextDelayedTime;
