@@ -46,13 +46,14 @@ namespace CK.DeviceModel
         /// </summary>
         sealed class CommandAwaker : BaseDeviceCommand
         {
-            public CommandAwaker() : base( (string.Empty,null) ) { }
+            public CommandAwaker() : base( (string.Empty, null) ) { }
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            public override string ToString() => nameof(CommandAwaker);
+            public override string ToString() => this == _commandAwaker ? nameof( CommandAwaker ) : "CommandAwakerTimer";
         }
         static readonly CommandAwaker _commandAwaker = new();
+        static readonly CommandAwaker _commandTimerAwaker = new();
 
         #region CommandCanceler
 
@@ -422,7 +423,7 @@ namespace CK.DeviceModel
                     return false;
                 }
                 var delta = (uint)lDelta;
-                if( delta > 0 )
+                if( delta > 1 )
                 {
                     if( _delayedQueue == null )
                     {
