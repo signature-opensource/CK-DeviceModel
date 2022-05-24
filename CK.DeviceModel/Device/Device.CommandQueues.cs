@@ -252,11 +252,7 @@ namespace CK.DeviceModel
                         cmd = await _commandQueue.Reader.ReadAsync().ConfigureAwait( false );
                     }
                     _commandMonitor.Debug( $"Obtained {cmd}." );
-                    //if( cmd == _commandAwaker )
-                    //{
-                    //    cmd = await WaitForNextCommandAsync( expectDelayed: true ).ConfigureAwait( false );
-                    //    _commandMonitor.Debug( $"Obtained {cmd}." );
-                    //}
+
                     #region Immediate commands
                     // Handle all available immediate at once (but no more than ImmediateCommandLimit to avoid regular commands starvation).
                     if( _commandQueueImmediate.Reader.TryRead( out immediate ) )
@@ -443,11 +439,7 @@ namespace CK.DeviceModel
                     if( _delayedQueue == null )
                     {
                         _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
-                        _timer = new Timer( _ =>
-                        {
-                            ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Debug, "Timer fired." );
-                            _commandQueue.Writer.TryWrite( _commandAwaker );
-                        } );
+                        _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
                         _commandMonitor.Info( "Created DelayedQueue and Timer." );
                     }
                     _delayedQueue.Enqueue( cmd, time );

@@ -247,9 +247,9 @@ namespace CK.DeviceModel
         }
 
         internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
-                                                                                      TConfiguration config,
-                                                                                      TConfiguration clonedconfig,
-                                                                                      CancellationToken token )
+                                                                                TConfiguration config,
+                                                                                TConfiguration clonedconfig,
+                                                                                CancellationToken token )
         {
             var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, config, clonedconfig );
             if( cmd == null || !UnsafeSendCommand( monitor, cmd, token ) )

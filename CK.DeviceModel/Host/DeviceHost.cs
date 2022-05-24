@@ -291,7 +291,6 @@ namespace CK.DeviceModel
             return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, null );
         }
 
-
         /// <summary>
         /// Applies a host configuration: multiple devices can be configured at once and if <see cref="DeviceHostConfiguration{TConfiguration}.IsPartialConfiguration"/> is false,
         /// devices for which no configuration appear are stopped and destroyed.

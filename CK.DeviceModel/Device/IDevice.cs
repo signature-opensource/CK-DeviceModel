@@ -148,7 +148,8 @@ namespace CK.DeviceModel
         string? ControllerKey { get; }
 
         /// <summary>
-        /// Sets a new <see cref="ControllerKey"/>, whatever its current value is (if this is not set by the <see cref="DeviceConfiguration.ControllerKey"/>).
+        /// Sets a new <see cref="ControllerKey"/>, whatever its current value is (as long as it has not been fixed by
+        /// configuration (the <see cref="DeviceConfiguration.ControllerKey"/>)).
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="key">The controller key.</param>

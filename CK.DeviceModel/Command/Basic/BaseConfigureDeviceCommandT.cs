@@ -16,7 +16,7 @@ namespace CK.DeviceModel
             : base( configuration ?? Activator.CreateInstance<TConfiguration>(), locked )
         {
             Debug.Assert( IsLocked == (locked != null) );
-            Debug.Assert( IsLocked == (configuration != null) );
+            Debug.Assert( !IsLocked || (configuration != null), "IsLocked => configuration provided." );
             if( IsLocked ) ClonedConfig = clonedConfiguration ?? Configuration.DeepClone();
         }
 
