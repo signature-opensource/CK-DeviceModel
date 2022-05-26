@@ -55,10 +55,10 @@ namespace CK.DeviceModel
         /// </remarks>
         public PerfectEvent<BaseDeviceEvent> AllEvent => _allEvent.PerfectEvent;
 
-        private protected override sealed Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
+        private protected override sealed Task OnSafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent<TConfiguration> e )
         {
             DoPost( e );
-            return base.SafeRaiseLifetimeEventAsync( monitor, e );
+            return Task.CompletedTask;
         }
 
         void IActiveDevice.DebugPostEvent( BaseActiveDeviceEvent e ) => DoPost( (TEvent)e );
@@ -104,7 +104,11 @@ namespace CK.DeviceModel
             {
                 try
                 {
-                    ev = await r.ReadAsync( DestroyedToken ).ConfigureAwait( false );
+                    // The lifetime event is raised after the volatile IsDestroyed is set to true:
+                    // we don't need a cancellation token.
+                    // This allows the SingleConsumerUnboundedChannel<T>.UnboundedChannelReader
+                    // to use a pooled IValueTaskSource instead of creating a new one. 
+                    ev = await r.ReadAsync().ConfigureAwait( false );
                     switch( ev )
                     {
                         case null: continue;

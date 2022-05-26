@@ -46,11 +46,9 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public PerfectEvent<BaseDeviceEvent> AllEvent => _allEvent.PerfectEvent;
 
-        private protected override Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
+        private protected override sealed Task OnSafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent<TConfiguration> e )
         {
-            return base.SafeRaiseLifetimeEventAsync( monitor, e )
-                       .ContinueWith( _ => _allEvent.SafeRaiseAsync( monitor, e ), TaskScheduler.Default )
-                       .Unwrap();
+            return _allEvent.SafeRaiseAsync( monitor, e );
         }
 
         /// <summary>

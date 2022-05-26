@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -33,6 +34,7 @@ namespace CK.DeviceModel
         Dictionary<string, T> _devices;
 
         readonly PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>> _devicesChanged;
+        readonly PerfectEventSender<IDeviceHost, DeviceLifetimeEvent> _allDevicesLifetimeEvent;
 
         /// <summary>
         /// This lock uses the NoRecursion policy.
@@ -96,6 +98,7 @@ namespace CK.DeviceModel
         {
             _devices = new Dictionary<string, T>();
             _devicesChanged = new PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>>();
+            _allDevicesLifetimeEvent = new PerfectEventSender<IDeviceHost, DeviceLifetimeEvent>();
 
             // Generates a typed delegate to instantiate the THostConfiguration dynamically used
             // to apply a partial configuration.
@@ -159,18 +162,6 @@ namespace CK.DeviceModel
             }
         }
 
-        Task IInternalDeviceHost.OnDeviceDestroyedAsync( IActivityMonitor monitor, IDevice device ) => OnDeviceDestroyedAsync( monitor, (T)device );
-
-        /// <summary>
-        /// Called when a device has been removed (its configuration disappeared or <see cref="IDevice.DestroyAsync(IActivityMonitor, bool)"/> has been called).
-        /// There is no way to prevent the device to be destroyed when its configuration disappeared and this is by design.
-        /// This method does nothing at this level.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="device">The device that has been removed.</param>
-        /// <returns>The awaitable.</returns>
-        protected virtual Task OnDeviceDestroyedAsync( IActivityMonitor monitor, T device ) => Task.CompletedTask;
-
         /// <summary>
         /// Gets a device by its name.
         /// <para>
@@ -182,12 +173,12 @@ namespace CK.DeviceModel
         public T? Find( string deviceName ) => _devices.GetValueOrDefault( deviceName );
 
         /// <inheritdoc cref="Find(string)"/>
-        public T? this[ string deviceName ] => _devices.GetValueOrDefault( deviceName );
+        public T? this[string deviceName] => _devices.GetValueOrDefault( deviceName );
 
         IDevice? IDeviceHost.Find( string deviceName ) => Find( deviceName );
 
-        
-        IReadOnlyDictionary<string, IDevice> IDeviceHost.GetDevices() => _devices.AsIReadOnlyDictionary<string,T,IDevice>();
+
+        IReadOnlyDictionary<string, IDevice> IDeviceHost.GetDevices() => _devices.AsIReadOnlyDictionary<string, T, IDevice>();
 
         /// <summary>
         /// Gets a snapshot of the current devices indexed by name.
@@ -199,6 +190,9 @@ namespace CK.DeviceModel
 
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> DevicesChanged => _devicesChanged.PerfectEvent;
+
+        /// <inheritdoc />
+        public PerfectEvent<IDeviceHost, DeviceLifetimeEvent> AllDevicesLifetimeEvent => _allDevicesLifetimeEvent.PerfectEvent;
 
         /// <summary>
         /// Captures the result of <see cref="ApplyConfigurationAsync"/>.
@@ -301,15 +295,20 @@ namespace CK.DeviceModel
         /// <returns>The composite result of the potentially multiple configurations.</returns>
         public virtual async Task<ConfigurationResult> ApplyConfigurationAsync( IActivityMonitor monitor, THostConfiguration configuration, bool allowEmptyConfiguration = false )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            if( configuration == null ) throw new ArgumentNullException( nameof( configuration ) );
+            Throw.CheckNotNullArgument( monitor );
+            Throw.CheckNotNullArgument( configuration );
 
             using var autoTag = monitor.TemporarilySetAutoTags( IDeviceHost.DeviceModel );
 
             var safeConfig = configuration.DeepClone();
             if( !safeConfig.CheckValidity( monitor, allowEmptyConfiguration ) ) return new ConfigurationResult( configuration );
 
-            DeviceApplyConfigurationResult[] results = new DeviceApplyConfigurationResult[safeConfig.Items.Count];
+            var results = new DeviceApplyConfigurationResult[safeConfig.Items.Count];
+            // When the call to the constructor is enough, there will be no DeviceLifetimeEvent emitted.
+            // To be able to signal this device creation as a DeviceLifetimeEvent,
+            // we capture these beasts and emit a "fake" device event
+            // with Status/Configuration/ControllerKeyChanged all set to true for them.
+            List<IInternalDevice>? createdDevices = null;
 
             bool success = true;
             using( monitor.OpenInfo( $"Reconfiguring '{DeviceHostName}'. Applying {safeConfig.Items.Count} device configurations ({(safeConfig.IsPartialConfiguration ? "partial" : "full")} configuration)." ) )
@@ -343,6 +342,8 @@ namespace CK.DeviceModel
                                     }
                                     else
                                     {
+                                        if( createdDevices == null ) createdDevices = new List<IInternalDevice>();
+                                        createdDevices.Add( d );
                                         if( c.Status == DeviceConfigurationStatus.RunnableStarted || c.Status == DeviceConfigurationStatus.AlwaysRunning )
                                         {
                                             if( toStart == null ) toStart = new List<(int, T)>();
@@ -438,8 +439,22 @@ namespace CK.DeviceModel
                     {
                         await RaiseDevicesChangedEventAsync( monitor ).ConfigureAwait( false );
                     }
+                    if( createdDevices != null )
+                    {
+                        foreach( var d in createdDevices )
+                        {
+                            await d.EnsureInitialLifetimeEventAsync( monitor );
+                        }
+                    }
                 }
             }
+        }
+
+        Task RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent<TConfiguration> e )
+        {
+            return DaemonStoppedToken.IsCancellationRequested
+                    ? Task.CompletedTask
+                    : _allDevicesLifetimeEvent.SafeRaiseAsync( monitor, this, e );
         }
 
         Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
@@ -449,6 +464,11 @@ namespace CK.DeviceModel
                                                                                                               _devices.AsIReadOnlyDictionary<string, T, IDevice>() );
 
         Task IInternalDeviceHost.RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => RaiseDevicesChangedEventAsync( monitor );
+
+        Task IInternalDeviceHost.RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
+        {
+            return RaiseAllDevicesLifetimeEventAsync( monitor, (DeviceLifetimeEvent<TConfiguration>)e );
+        }
 
         /// <inheritdoc />
         public async Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed )

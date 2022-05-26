@@ -31,15 +31,11 @@ namespace CK.DeviceModel
         /// </summary>
         bool OnDeviceDoDestroy( IActivityMonitor monitor, IDevice device );
 
-        /// <summary>
-        /// Called asynchronously after OnDeviceDestroyed and once
-        /// the device's status has been updated.
-        /// </summary>
-        Task OnDeviceDestroyedAsync( IActivityMonitor monitor, IDevice device );
-
         void DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor, bool fromStart );
 
         Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor );
+
+        Task RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e );
 
         void SetDaemon( DeviceHostDaemon daemon );
 

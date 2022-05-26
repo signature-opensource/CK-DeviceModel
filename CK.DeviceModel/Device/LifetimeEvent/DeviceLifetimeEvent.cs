@@ -9,12 +9,16 @@ namespace CK.DeviceModel
     /// </summary>
     public abstract class DeviceLifetimeEvent : BaseDeviceEvent
     {
-        private protected DeviceLifetimeEvent( IDevice device )
+        private protected DeviceLifetimeEvent( IDevice device, int sequenceNumber, bool status, bool configuration, bool controllerKey )
             : base( device )
         {
             DeviceStatus = device.Status;
             Configuration = device.ExternalConfiguration;
             ControllerKey = device.ControllerKey;
+            SequenceNumber = sequenceNumber;
+            StatusChanged = status;
+            ConfigurationChanged = configuration;
+            ControllerKeyChanged = controllerKey;
         }
 
         /// <summary>
@@ -35,17 +39,23 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets whether the <see cref="DeviceStatus"/> has changed.
         /// </summary>
-        public bool StatusChanged { get; internal set; }
+        public bool StatusChanged { get; }
 
         /// <summary>
         /// Gets whether the <see cref="Configuration"/> has changed.
         /// </summary>
-        public bool ConfigurationChanged { get; internal set; }
+        public bool ConfigurationChanged { get; }
 
         /// <summary>
         /// Gets whether the <see cref="ControllerKey"/> has changed.
         /// </summary>
-        public bool ControllerKeyChanged { get; internal set; }
+        public bool ControllerKeyChanged { get; }
+
+        /// <summary>
+        /// Gets an ever increasing sequence number for lifetime events starting at 0 after
+        /// device instantiation.
+        /// </summary>
+        public int SequenceNumber { get; }
 
         /// <summary>
         /// Overridden to return a string with the <see cref="IDevice.FullName"/> and <see cref="DeviceStatus"/>.

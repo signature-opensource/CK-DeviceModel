@@ -207,7 +207,7 @@ namespace CK.DeviceModel
         {
             Throw.CheckNotNullArgument( monitor );
             Throw.CheckNotNullArgument( command );
-            if( !command.HostType.IsAssignableFrom( _host!.GetType() ) ) Throw.ArgumentException( nameof( command ), $"{command}: Invalid HostType '{command.HostType.Name}'." );
+            if( !command.HostType.IsAssignableFrom( _host.GetType() ) ) Throw.ArgumentException( nameof( command ), $"{command}: Invalid HostType '{command.HostType.Name}'." );
             if( !command.CheckValidity( monitor ) ) Throw.ArgumentException( nameof( command ), $"{command}: CheckValidity failed. See logs." );
             if( checkDeviceName )
             {
@@ -273,7 +273,6 @@ namespace CK.DeviceModel
                         {
                             using( _commandMonitor.OpenFatal( $"Unhandled error in OnReminderAsync. Stopping the device '{FullName}'.", ex ) )
                             {
-                                Debug.Assert( _host != null );
                                 await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall );
                             }
                         }
@@ -372,7 +371,6 @@ namespace CK.DeviceModel
                             if( IsRunning )
                             {
                                 _commandMonitor.Warn( $"Sending a stop command to Device '{FullName}'." );
-                                Debug.Assert( _host != null );
                                 // Fires and forget the StopCommand: the fact that the device stops
                                 // does not belong to the faulty command plan.
                                 SendRoutedCommandImmediate( _host.CreateStopCommand( Name, ignoreAlwaysRunning: true ) );
@@ -542,8 +540,9 @@ namespace CK.DeviceModel
             }
         }
 
-        private void RetryTimerConfiguration( long now )
+        void RetryTimerConfiguration( long now )
         {
+            Debug.Assert( _timer != null );
             using( _commandMonitor.OpenWarn( $"Retrying to Change timer." ) )
             {
                 var delta = _failedChangeTimerTime - now;
@@ -618,7 +617,6 @@ namespace CK.DeviceModel
                     {
                         using( _commandMonitor.OpenFatal( $"Unhandled error in OnCommandCompletedAsync for '{immediate}'. Stopping the device '{FullName}'.", ex ) )
                         {
-                            Debug.Assert( _host != null );
                             await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall );
                         }
                     }

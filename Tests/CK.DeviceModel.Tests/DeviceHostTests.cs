@@ -18,7 +18,7 @@ namespace CK.DeviceModel.Tests
         [Timeout( 200 )]
         public async Task playing_with_configurations_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations_Async ) );
+            using var _ = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations_Async ) );
 
             FlashBulb.TotalCount = 0;
             FlashBulb.TotalRunning = 0;

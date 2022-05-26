@@ -1,6 +1,8 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
@@ -9,5 +11,7 @@ namespace CK.DeviceModel
         DeviceConfigurationStatus ConfigStatus { get; }
 
         void OnCommandCompleted( BaseDeviceCommand cmd );
+
+        Task EnsureInitialLifetimeEventAsync( IActivityMonitor monitor );
     }
 }

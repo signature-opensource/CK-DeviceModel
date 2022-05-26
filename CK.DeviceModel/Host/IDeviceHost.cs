@@ -74,9 +74,14 @@ namespace CK.DeviceModel
         IDevice? Find( string deviceName );
 
         /// <summary>
-        /// Gets a <see cref="PerfectEvent{IDeviceHost}"/> that is raised whenever one or more devices appeared or disappeared.
+        /// Event that is raised whenever one or more devices appeared or disappeared.
         /// </summary>
         PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> DevicesChanged { get; }
+
+        /// <summary>
+        /// Centralized <see cref="DeviceLifetimeEvent"/> for all the devices.  
+        /// </summary>
+        PerfectEvent<IDeviceHost, DeviceLifetimeEvent> AllDevicesLifetimeEvent { get; }
 
         /// <summary>
         /// Gets a snapshot of the current devices indexed by name.

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace CK.DeviceModel
@@ -10,9 +11,10 @@ namespace CK.DeviceModel
     public sealed class DeviceLifetimeEvent<TConfiguration> : DeviceLifetimeEvent
         where TConfiguration : DeviceConfiguration
     {
-        internal DeviceLifetimeEvent( IDevice device )
-            : base( device )
+        internal DeviceLifetimeEvent( IDevice device, int sequenceNumber, bool status, bool configuration, bool controllerKey )
+            : base( device, sequenceNumber, status, configuration, controllerKey )
         {
+            Debug.Assert( status || configuration || controllerKey );
         }
 
         /// <summary>
