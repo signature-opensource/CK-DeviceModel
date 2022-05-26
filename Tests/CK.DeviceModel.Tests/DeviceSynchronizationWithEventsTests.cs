@@ -172,7 +172,7 @@ namespace CK.DeviceModel.Tests
                         var d = _host.Find( RndName() );
                         if( d != null )
                         {
-                            if( action == 4 ) await d.DestroyAsync( monitor, waitForDeviceDestroyed: false );
+                            if( action == 4 ) await d.DestroyAsync( monitor, waitForDeviceDestroyed: true );
                             else if( action == 5 ) await d.StartAsync( monitor );
                             else if( action == 6 ) await d.StopAsync( monitor );
                         }
@@ -192,11 +192,15 @@ namespace CK.DeviceModel.Tests
             }
         }
 
-        [TestCase( 3712, 2000 )]
-        [TestCase( 3713, 2000 )]
-        [TestCase( 3714, 2000 )]
-        [TestCase( 0, 3000 )]
-        public async Task device_list_sync_Async( int seed, int runtimeMS )
+        [TestCase( 3712, 2000, "SimpleActive" )]
+        [TestCase( 3713, 2000, "SimpleActive" )]
+        [TestCase( 3714, 2000, "SimpleActive" )]
+        [TestCase( 0, 3000, "SimpleActive" )]
+        [TestCase( 3712, 2000, "Active" )]
+        [TestCase( 3713, 2000, "Active" )]
+        [TestCase( 3714, 2000, "Active" )]
+        [TestCase( 0, 3000, "Active" )]
+        public async Task device_list_sync_Async( int seed, int runtimeMS, string deviceType )
         {
             if( seed == 0 ) seed = Random.Shared.Next();
             using var _ = TestHelper.Monitor.OpenInfo( $"{nameof( device_list_sync_Async )}-{seed}-{runtimeMS}" );
@@ -213,8 +217,7 @@ namespace CK.DeviceModel.Tests
             var random = new Random( seed );
             var monitor = TestHelper.Monitor;
 
-            var host = new ScaleHost();
-            await host.EnsureDeviceAsync( monitor, new CommonScaleConfiguration() { Name = "n°1", Status = DeviceConfigurationStatus.Runnable } );
+            IDeviceHost host = deviceType == "SimpleActive" ? new SimpleScaleHost() : new ScaleHost();
 
             var shaker = new HostShaker( host, 10 );
             bool startShakeBeforeClients = random.Next( 2 ) == 0;

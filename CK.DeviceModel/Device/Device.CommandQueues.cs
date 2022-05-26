@@ -930,7 +930,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
         /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
-        /// eventually be called.
+        /// eventually be called even if the device is stopped.
         /// </summary>
         /// <param name="timeUtc">The time in the future at which <see cref="OnReminderAsync"/> will be called.</param>
         /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
@@ -951,7 +951,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
         /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
-        /// eventually be called.
+        /// eventually be called even if the device is stopped.
         /// </summary>
         /// <param name="delay">Positive time span.</param>
         /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
