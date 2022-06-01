@@ -114,8 +114,15 @@ namespace CK.DeviceModel
                         Debug.Assert( c.IsLocked );
                         if( c != _commandAwaker )
                         {
-                            c.InternalCompletion.SetCanceled();
-                            ++cRemoved;
+                            if( c is WaitForSynchronizationCommand sync )
+                            {
+                                sync.OnCommandHandled( _commandMonitor );
+                            }
+                            else
+                            {
+                                c.InternalCompletion.TrySetCanceled();
+                                ++cRemoved;
+                            }
                         }
                     }
                     // Security: run the loop once done.
@@ -128,9 +135,10 @@ namespace CK.DeviceModel
                     tRemoved = _delayedQueue.Count;
                     foreach( var (t, _) in _delayedQueue.UnorderedItems )
                     {
+                        Debug.Assert( t is not WaitForSynchronizationCommand );
                         if( t is not Reminder )
                         {
-                            t.InternalCompletion.SetCanceled();
+                            t.InternalCompletion.TrySetCanceled();
                         }
                     }
                     _delayedQueue.Clear();
@@ -141,7 +149,14 @@ namespace CK.DeviceModel
                     _commandMonitor.Info( $"Canceled {dRemoved} deferred commands." );
                     while( _deferredCommands.TryDequeue( out var c ) )
                     {
-                        c.InternalCompletion.SetCanceled();
+                        if( c is WaitForSynchronizationCommand sync )
+                        {
+                            sync.OnCommandHandled( _commandMonitor );
+                        }
+                        else
+                        {
+                            c.InternalCompletion.TrySetCanceled();
+                        }
                     }
                 }
                 cmd.Completion.SetResult( (cRemoved, tRemoved, dRemoved) );
@@ -280,17 +295,37 @@ namespace CK.DeviceModel
                     }
                     #endregion
 
-                    #region If device is starting, process Deferred commands (interleaved with immediate)
-                    if( wasStop && IsRunning )
+                    #region Handles low-level WaitForSynchronizationCommand.
+                    if( cmd is WaitForSynchronizationCommand sync )
                     {
-                        // Executing deferred commands is a subordinated loop that alternates deferred and immediate commands: both loops are
-                        // constrained by their respective limits.
-                        if( _deferredCommands.Count > 0 )
+                        if( sync.StoppedBehavior == DeviceCommandStoppedBehavior.RunAnyway || _deferredCommands.Count == 0 )
                         {
-                            Debug.Assert( !IsDestroyed );
-                            using( _commandMonitor.OpenInfo( $"Device started: executing {_deferredCommands.Count} deferred commands." ) )
+                            sync.OnCommandHandled( _commandMonitor );
+                        }
+                        else
+                        {
+                            _commandMonitor.Debug( $"Deferring WaitForSynchronizationCommand since {_deferredCommands.Count} are already deferred." );
+                            _deferredCommands.Enqueue( sync );
+                        }
+                        continue;
+                    }
+                    #endregion
+
+                    #region If device is starting, process Deferred commands (interleaved with immediate)
+                    // Executing deferred commands is a subordinated loop that alternates deferred and immediate commands: both loops are
+                    // constrained by their respective limits.
+                    if( wasStop && IsRunning && _deferredCommands.Count > 0 )
+                    {
+                        Debug.Assert( !IsDestroyed );
+                        using( _commandMonitor.OpenInfo( $"Device started: executing {_deferredCommands.Count} deferred commands." ) )
+                        {
+                            while( IsRunning && _deferredCommands.TryDequeue( out var deferred ) )
                             {
-                                while( IsRunning && _deferredCommands.TryDequeue( out var deferred ) )
+                                if( deferred is WaitForSynchronizationCommand dSync )
+                                {
+                                    dSync.OnCommandHandled( _commandMonitor );
+                                }
+                                else
                                 {
                                     await HandleCommandAsync( deferred, allowDefer: false, isImmediate: false ).ConfigureAwait( false );
                                     if( !IsDestroyed && _commandQueueImmediate.Reader.TryRead( out immediate ) )
@@ -336,6 +371,11 @@ namespace CK.DeviceModel
                         {
                             await HandleImmediateCommandsAsync( immediate ).ConfigureAwait( false );
                         }
+                        continue;
+                    }
+                    if( cmd is WaitForSynchronizationCommand rSync )
+                    {
+                        rSync.OnCommandHandled( _commandMonitor );
                         continue;
                     }
                     Debug.Assert( cmd.IsLocked );
@@ -629,8 +669,8 @@ namespace CK.DeviceModel
             while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate! ) );
             // It would not be a good idea to log here that maxCount reached 0 since it could be a false positive and that
             // we cannot inspect whether another immediate is waiting in the queue.
-            // Even when the "queue tracking" will be implemented (via Interlocked.Inc/Decrement since channels have no way to tell us how many items
-            // they have), logging here would not be really interesting. It's better to find a way to collect and represents the metrics and let
+            // Even when the "queue tracking" will be implemented (via Interlocked.Inc/Decrement rather than channels's count implementations),
+            // logging here would not be really interesting. It's better to find a way to collect and represents the metrics and let
             // the limit here do its job silently: the metrics itself must show the status' of the queues.
         }
 
@@ -706,6 +746,7 @@ namespace CK.DeviceModel
 
         async Task HandleCommandAsync( BaseDeviceCommand command, bool allowDefer, bool isImmediate )
         {
+            Debug.Assert( command is not WaitForSynchronizationCommand );
             // No catch here: let the exception be handled by the main catch in HandleCommandAsyc that relies on _currentlyExecuting.
             _currentlyExecuting = command;
             using var g = _commandMonitor.OpenTrace( $"Handling command '{command}'." )
@@ -816,8 +857,7 @@ namespace CK.DeviceModel
                                         case DeviceCommandStoppedBehavior.AlwaysWaitForNextStart:
                                             if( allowDefer )
                                             {
-                                                _commandMonitor.CloseGroup( $"Pushing command to the deferred command queue." );
-                                                _deferredCommands.Enqueue( command );
+                                                PushDeferredCommand( command );
                                             }
                                             else
                                             {

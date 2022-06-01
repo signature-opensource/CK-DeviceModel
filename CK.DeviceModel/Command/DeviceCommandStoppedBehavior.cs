@@ -63,6 +63,10 @@ namespace CK.DeviceModel
         /// <summary>
         /// Automatically starts the device, executes the command and stops the device without emitting device's status changes.
         /// If the device cannot be started (without exception), the command will be canceled.
+        /// <para>
+        /// This behavior ignores any existing deferred commands. The device is started (if needed) only to execute this command and
+        /// is immediately stopped.
+        /// </para>
         /// </summary>
         SilentAutoStartAndStop
     }

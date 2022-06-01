@@ -48,7 +48,11 @@ namespace CK.DeviceModel
 
         private protected override sealed Task OnSafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent<TConfiguration> e )
         {
-            return _allEvent.SafeRaiseAsync( monitor, e );
+            // Raises this AllEvent and the host AllDevicesEvent.
+            // Order should not matter here.
+            return _allEvent.SafeRaiseAsync( monitor, e )
+                   .ContinueWith( _ => _host.RaiseAllDevicesEventAsync( monitor, e ), TaskScheduler.Default )
+                   .Unwrap();
         }
 
         /// <summary>

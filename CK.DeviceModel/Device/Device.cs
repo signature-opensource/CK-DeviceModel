@@ -17,7 +17,9 @@ namespace CK.DeviceModel
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
     public abstract partial class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration
     {
-        readonly IInternalDeviceHost _host;
+        // SimpleActiveDevice and ActiveDevice need to call RaiseAllDevicesEvent,
+        // they need to access their host.
+        private protected readonly IInternalDeviceHost _host;
         DeviceStatus _status;
         readonly PerfectEventSender<DeviceLifetimeEvent> _lifetimeChanged;
         readonly ActivityMonitor _commandMonitor;
@@ -237,7 +239,67 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The command loop monitor.</param>
         /// <param name="e">The event to raise.</param>
-        private protected virtual Task OnSafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent<TConfiguration> e ) => Task.CompletedTask;
+        private protected virtual Task OnSafeRaiseLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent<TConfiguration> e )
+        {
+            return _host.RaiseAllDevicesEventAsync( monitor, e );
+        }
+
+        #region WaitForSynchronizationAsync
+
+
+        sealed class WaitForSynchronizationCommand : DeviceCommandWithResult<WaitForSynchronizationResult>
+        {
+            readonly IDevice _device;
+
+            public WaitForSynchronizationCommand( IDevice d, DeviceCommandStoppedBehavior b, CancellationToken c )
+            {
+                _device = d;
+                StoppedBehavior = b;
+                ShouldCallDeviceOnCommandCompleted = false;
+                if( c.CanBeCanceled ) DoAddCancellationSource( c, SendCommandTokenReason );
+            }
+
+            public void OnCommandHandled( IActivityMonitor monitor )
+            {
+                // Device and SimpleActiveDevice are not IMonitoredWorker.
+                if( _device is IMonitoredWorker activeDevice )
+                {
+                    // For active devices, we post the completion to the event loop.
+                    activeDevice.Execute( DoComplete );
+                }
+                else
+                {
+                    // For device and SimpleActiveDevice, we complete the command.
+                    DoComplete( monitor );
+                }
+            }
+
+            void DoComplete( IActivityMonitor monitor ) => Completion.TrySetResult( _device.IsDestroyed ? WaitForSynchronizationResult.DeviceDestroyed : WaitForSynchronizationResult.Success );
+
+            protected override void OnCanceled( ref CompletionSource<WaitForSynchronizationResult>.OnCanceled result ) => result.SetResult( WaitForSynchronizationResult.Timeout );
+
+            protected override void OnError( Exception ex, ref CompletionSource<WaitForSynchronizationResult>.OnError result )
+            {
+                Debug.Assert( ex is UnavailableDeviceException );
+                result.SetResult( WaitForSynchronizationResult.DeviceDestroyed );
+            }
+
+            public override Type HostType => throw new NotImplementedException( "Never called." );
+
+            protected internal override DeviceCommandStoppedBehavior StoppedBehavior { get; }
+        }
+
+        /// <inheritdoc />
+        public Task<WaitForSynchronizationResult> WaitForSynchronizationAsync( bool considerDeferredCommands, CancellationToken cancel = default )
+        {
+            if( cancel.IsCancellationRequested ) return Task.FromResult( WaitForSynchronizationResult.Timeout );
+            var c = new WaitForSynchronizationCommand( this, considerDeferredCommands ? DeviceCommandStoppedBehavior.AlwaysWaitForNextStart : DeviceCommandStoppedBehavior.RunAnyway, cancel );
+            // Skips useless OnCommandSend call made by SendRoutedCommand.
+            if( !_commandQueue.Writer.TryWrite( c ) ) return Task.FromResult( WaitForSynchronizationResult.DeviceDestroyed );
+            return c.Completion.Task;
+        }
+
+        #endregion
 
         #region Reconfigure
         Task<DeviceApplyConfigurationResult> IDevice.ReconfigureAsync( IActivityMonitor monitor, DeviceConfiguration configuration, CancellationToken token )

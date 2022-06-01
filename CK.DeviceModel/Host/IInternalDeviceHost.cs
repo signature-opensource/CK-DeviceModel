@@ -37,6 +37,8 @@ namespace CK.DeviceModel
 
         Task RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e );
 
+        Task RaiseAllDevicesEventAsync( IActivityMonitor monitor, BaseDeviceEvent e );
+
         void SetDaemon( DeviceHostDaemon daemon );
 
         ValueTask<long> DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, DateTime now );

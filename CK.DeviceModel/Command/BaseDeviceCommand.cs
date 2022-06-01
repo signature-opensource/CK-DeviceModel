@@ -324,7 +324,8 @@ namespace CK.DeviceModel
             return DoAddCancellationSource( t, reason );
         }
 
-        bool DoAddCancellationSource( CancellationToken t, string reason )
+        // Allow internal commands such as WaitForSynchronizationAsync to call this.
+        private protected bool DoAddCancellationSource( CancellationToken t, string reason )
         {
             if( t.CanBeCanceled && !InternalCompletion.IsCompleted )
             {
@@ -339,7 +340,7 @@ namespace CK.DeviceModel
                     // Instead of using CreateLinkedTokenSource and its linked list
                     // for which we'll have to handle the head with an interlocked setter anyway,
                     // we use a reallocated array of registrations because:
-                    //  - it results in much less allocations (one array of value type instead of the linked nodes).
+                    //  - it results in much less allocations (one array of 2-tuple instead of the linked nodes).
                     //  - concurrency should be exceptional (interlocked operations will almost always occur once).
                     Util.InterlockedAdd( ref _cancels, c );
                 }

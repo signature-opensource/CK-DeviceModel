@@ -17,6 +17,18 @@ namespace CK.DeviceModel.Tests
     [TestFixture]
     public class ActiveDeviceTests
     {
+        [SetUp]
+        public void SetDebugDevice()
+        {
+            ActivityMonitor.Tags.AddFilter( IDeviceHost.DeviceModel, new LogClamper( LogFilter.Debug, false ) );
+        }
+
+        [TearDown]
+        public void ClearDebugDevice()
+        {
+            ActivityMonitor.Tags.RemoveFilter( IDeviceHost.DeviceModel );
+        }
+
         class EventCollector
         {
             public readonly List<object> Events = new List<object>();
@@ -202,7 +214,11 @@ namespace CK.DeviceModel.Tests
                 AlwaysPositiveMeasure = true,
                 PhysicalRate = 10,
                 MeasureStep = 1,
-                Status = DeviceConfigurationStatus.Runnable
+                Status = DeviceConfigurationStatus.Runnable,
+                // We use DebugPostEvent that is sent as an immediate command for SimpleActiveDevice.
+                // This guaranties that all the DebugPostEvent we need to send (100) will be handled
+                // without an intermediate regular command.
+                BaseImmediateCommandLimit = 1000
             };
 
             (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
@@ -276,6 +292,8 @@ namespace CK.DeviceModel.Tests
                     Throw.Exception( "We should only receive SimpleScaleMeasureEvent (some of them being fake DebugPostEvent)." );
                 }
             }
+
+            #region Test1: Running device: receiving all DebugPostEvent and some MeasureEvent.
             await device.StartAsync( TestHelper.Monitor );
             device.IsRunning.Should().BeTrue();
 
@@ -291,17 +309,45 @@ namespace CK.DeviceModel.Tests
             // In practice, 10 ms for the timer is short. We should receive at least half of them here.
             await Task.Delay( 1000 );
 
-            await device.StopAsync( TestHelper.Monitor );
-
-            device.IsRunning.Should().BeFalse();
+            await SendStopAndWaitForSynchronizationAsync( scaleType, device );
 
             TestHelper.Monitor.Info( $"Results '{scaleType}': DebugPostEventCount = {debugPostEventCount}, MeasureEventCount = {measureEventCount}." );
             debugPostEventCount.Should().Be( 100 );
             measureEventCount.Should().BeGreaterThan( 50 );
 
+            #endregion
+
+            #region Test2: Stopped device: no more MeasureEvent. This tests the WaitForSynchronizationAsync.
+            // Sets the command 
+            debugPostEventCount = measureEventCount = 0;
+            for( int i = 0; i < 100; ++i )
+            {
+                BaseActiveDeviceEvent ev = scale != null
+                                            ? new ScaleMeasureEvent( scale, double.MaxValue, "DebugPostEvent" )
+                                            : new SimpleScaleMeasureEvent( simple!, double.MaxValue, "DebugPostEvent" );
+                device.DebugPostEvent( ev );
+            }
+            await SendStopAndWaitForSynchronizationAsync( scaleType, device );
+            debugPostEventCount.Should().Be( 100 );
+            measureEventCount.Should().Be( 0 );
+            #endregion
+
             await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
         }
 
+        private static async Task SendStopAndWaitForSynchronizationAsync( string scaleType, IActiveDevice device )
+        {
+            // Uses SendCommand here instead of calling StopAsync: WaitForSynchronizationAsync will do its job. 
+            BaseStopDeviceCommand stop = scaleType == "SimpleScale"
+                                       ? new StopDeviceCommand<SimpleScaleHost>()
+                                       : new StopDeviceCommand<ScaleHost>();
+            stop.ImmediateSending = false;
+            device.UnsafeSendCommand( TestHelper.Monitor, stop ).Should().BeTrue();
+
+            (await device.WaitForSynchronizationAsync( true )).Should().Be( WaitForSynchronizationResult.Success );
+
+            device.IsRunning.Should().BeFalse();
+        }
     }
 
 }

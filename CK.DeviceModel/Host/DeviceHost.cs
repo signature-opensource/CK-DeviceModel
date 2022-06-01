@@ -35,6 +35,7 @@ namespace CK.DeviceModel
 
         readonly PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>> _devicesChanged;
         readonly PerfectEventSender<IDeviceHost, DeviceLifetimeEvent> _allDevicesLifetimeEvent;
+        readonly PerfectEventSender<IDeviceHost, BaseDeviceEvent> _allDevicesEvent;
 
         /// <summary>
         /// This lock uses the NoRecursion policy.
@@ -99,6 +100,7 @@ namespace CK.DeviceModel
             _devices = new Dictionary<string, T>();
             _devicesChanged = new PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>>();
             _allDevicesLifetimeEvent = new PerfectEventSender<IDeviceHost, DeviceLifetimeEvent>();
+            _allDevicesEvent = new PerfectEventSender<IDeviceHost,BaseDeviceEvent>();
 
             // Generates a typed delegate to instantiate the THostConfiguration dynamically used
             // to apply a partial configuration.
@@ -191,8 +193,34 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> DevicesChanged => _devicesChanged.PerfectEvent;
 
+        Task IInternalDeviceHost.RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => RaiseDevicesChangedEventAsync( monitor );
+
+        Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
+                                                                            ? Task.CompletedTask
+                                                                            : _devicesChanged.SafeRaiseAsync( monitor,
+                                                                                                              this,
+                                                                                                              _devices.AsIReadOnlyDictionary<string, T, IDevice>() );
+
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost, DeviceLifetimeEvent> AllDevicesLifetimeEvent => _allDevicesLifetimeEvent.PerfectEvent;
+
+        /// <inheritdoc />
+        public PerfectEvent<IDeviceHost, BaseDeviceEvent> AllDevicesEvent => _allDevicesEvent.PerfectEvent;
+
+        Task IInternalDeviceHost.RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
+        {
+            return DaemonStoppedToken.IsCancellationRequested
+                    ? Task.CompletedTask
+                    : _allDevicesLifetimeEvent.SafeRaiseAsync( monitor, this, e );
+        }
+
+        Task IInternalDeviceHost.RaiseAllDevicesEventAsync( IActivityMonitor monitor, BaseDeviceEvent e )
+        {
+            return DaemonStoppedToken.IsCancellationRequested
+                    ? Task.CompletedTask
+                    : _allDevicesEvent.SafeRaiseAsync( monitor, this, e );
+        }
+
 
         /// <summary>
         /// Captures the result of <see cref="ApplyConfigurationAsync"/>.
@@ -450,25 +478,7 @@ namespace CK.DeviceModel
             }
         }
 
-        Task RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent<TConfiguration> e )
-        {
-            return DaemonStoppedToken.IsCancellationRequested
-                    ? Task.CompletedTask
-                    : _allDevicesLifetimeEvent.SafeRaiseAsync( monitor, this, e );
-        }
 
-        Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => DaemonStoppedToken.IsCancellationRequested
-                                                                            ? Task.CompletedTask
-                                                                            : _devicesChanged.SafeRaiseAsync( monitor,
-                                                                                                              this,
-                                                                                                              _devices.AsIReadOnlyDictionary<string, T, IDevice>() );
-
-        Task IInternalDeviceHost.RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => RaiseDevicesChangedEventAsync( monitor );
-
-        Task IInternalDeviceHost.RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
-        {
-            return RaiseAllDevicesLifetimeEventAsync( monitor, (DeviceLifetimeEvent<TConfiguration>)e );
-        }
 
         /// <inheritdoc />
         public async Task ClearAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed )

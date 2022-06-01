@@ -83,7 +83,7 @@ namespace CK.DeviceModel.Tests
                 List<string>? toRemove = null;
                 foreach( var info in _devices.Values )
                 {
-                    if( !_devices.ContainsKey( info.DeviceName ) )
+                    if( !devices.ContainsKey( info.DeviceName ) )
                     {
                         if( toRemove == null ) toRemove = new List<string>();
                         toRemove.Add( info.DeviceName );
@@ -204,15 +204,6 @@ namespace CK.DeviceModel.Tests
         {
             if( seed == 0 ) seed = Random.Shared.Next();
             using var _ = TestHelper.Monitor.OpenInfo( $"{nameof( device_list_sync_Async )}-{seed}-{runtimeMS}" );
-
-            //TestHelper.Monitor.AutoTags += ActivityMonitor.Tags.StackTrace;
-            //Action<IActivityMonitor> setStackTrace = m => m.AutoTags += ActivityMonitor.Tags.StackTrace;
-            //ActivityMonitor.AutoConfiguration += setStackTrace;
-            //using var cleanupStackTrace = Util.CreateDisposableAction( () =>
-            //{
-            //    TestHelper.Monitor.AutoTags -= ActivityMonitor.Tags.StackTrace;
-            //    ActivityMonitor.AutoConfiguration -= setStackTrace;
-            //} );
 
             var random = new Random( seed );
             var monitor = TestHelper.Monitor;

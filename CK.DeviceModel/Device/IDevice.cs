@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
+
     /// <summary>
     /// Defines non-generic device properties and methods.
     /// <para>
@@ -123,24 +124,6 @@ namespace CK.DeviceModel
         Task DestroyAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed = true );
 
         /// <summary>
-        /// Cancels all the commands that are waiting to be handled, either because they have been queued
-        /// and not handled yet or because they are waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/>
-        /// or the device to be running.
-        /// </summary>
-        /// <param name="cancelQueuedCommands">Cancels the current command queue.</param>
-        /// <param name="cancelDelayedCommands">
-        /// Cancels delayed commands waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/> and any
-        /// registered <see cref="Device{TConfiguration}.AddReminder(DateTime, object?, bool)"/>.
-        /// </param>
-        /// <param name="cancelDeferredCommands">
-        /// Cancels deferred commands waiting for the device to be running.
-        /// </param>
-        /// <returns>The number of queued, delayed and deferred commands that have been canceled.</returns>
-        Task<(int,int,int)> CancelAllPendingCommandsAsync( bool cancelQueuedCommands,
-                                                           bool cancelDelayedCommands,
-                                                           bool cancelDeferredCommands );
-
-        /// <summary>
         /// Gets the current controller key. It can be null but not the empty string.
         /// When null, the <see cref="BaseDeviceCommand.ControllerKey"/> can be anything, but when this is not null, <see cref="IDeviceHost.SendCommand(IActivityMonitor, BaseDeviceCommand, bool, CancellationToken)"/>
         /// checks that the command's controller key is the same as this one otherwise the command is rejected.
@@ -218,6 +201,52 @@ namespace CK.DeviceModel
         /// <param name="token">Optional cancellation token (added to <see cref="BaseDeviceCommand.AddCancellationSource(CancellationToken,string)"/>).</param>
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         bool UnsafeSendCommand( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default );
+
+        /// <summary>
+        /// Ensures that any existing commands have been fully handled: when the returned task is completed,
+        /// you are assured that any previous commands have been fully handled.
+        /// <para>
+        /// For passive device, an internal command is sent and the returned task is its completion.
+        /// </para>
+        /// <para>
+        /// It is more evolved for active device: an internal command that raises an event is sent and the returned task completes
+        /// when the event should have been raised. This guaranties that all events that should have been emitted before calling this
+        /// method have actually been emitted.
+        /// </para>
+        /// <para>
+        /// This doesn't await long running commands (commands that are not completed directly by their handling but in the background).
+        /// </para>
+        /// </summary>
+        /// <param name="considerDeferredCommands">True to consider all previous commands regardless of
+        /// their <see cref="BaseDeviceCommand.StoppedBehavior"/> (any deferred commands waiting for the device to be running will be awaited).
+        /// <para>
+        /// When set to false, current deferred commands are ignored, the device can be stopped and only commands that are <see cref="DeviceCommandStoppedBehavior.RunAnyway"/>,
+        /// <see cref="DeviceCommandStoppedBehavior.SilentAutoStartAndStop"/> or <see cref="DeviceCommandStoppedBehavior.AutoStartAndKeepRunning"/> are considered.
+        /// (In the latter case, there may be some deferred commands that have been handled before the returned task completes.)
+        /// </para>
+        /// </param>
+        /// <param name="cancel">Optional cancellation token.</param>
+        /// <returns>Success or whether the device is destroyed or <paramref name="cancel"/> has been signaled.</returns>
+        Task<WaitForSynchronizationResult> WaitForSynchronizationAsync( bool considerDeferredCommands, CancellationToken cancel = default );
+
+        /// <summary>
+        /// Cancels all the commands that are waiting to be handled, either because they have been queued
+        /// and not handled yet or because they are waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/>
+        /// or the device to be running.
+        /// </summary>
+        /// <param name="cancelQueuedCommands">Cancels the current command queue.</param>
+        /// <param name="cancelDelayedCommands">
+        /// Cancels delayed commands waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/> and any
+        /// registered <see cref="Device{TConfiguration}.AddReminder(DateTime, object?, bool)"/>.
+        /// </param>
+        /// <param name="cancelDeferredCommands">
+        /// Cancels deferred commands waiting for the device to be running.
+        /// </param>
+        /// <returns>The number of queued, delayed and deferred commands that have been canceled.</returns>
+        Task<(int,int,int)> CancelAllPendingCommandsAsync( bool cancelQueuedCommands,
+                                                           bool cancelDelayedCommands,
+                                                           bool cancelDeferredCommands );
+
     }
 
 }

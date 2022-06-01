@@ -6,7 +6,7 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Non generic base for <see cref="StopDeviceCommand{THost}"/> command that
+    /// Non generic abstract base for <see cref="StopDeviceCommand{THost}"/> command that
     /// stops a device.
     /// </summary>
     /// <remarks>

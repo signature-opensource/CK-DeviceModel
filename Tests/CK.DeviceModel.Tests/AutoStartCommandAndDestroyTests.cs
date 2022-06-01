@@ -157,9 +157,10 @@ namespace CK.DeviceModel.Tests
                                               "Destroy" );
         }
 
-        [Test]
+        [TestCase( "ExecuteDeferred" )]
+        [TestCase( "DoNotExecuteDeferred" )]
         [Timeout( 500 )]
-        public async Task auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async()
+        public async Task auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async( string mode )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async ) );
 
@@ -184,29 +185,77 @@ namespace CK.DeviceModel.Tests
             {
                 h.SendCommand( TestHelper.Monitor, c );
             }
+
+            // Sends the auto start command and wait for its completion.
             h.SendCommand( TestHelper.Monitor, starter );
-
             await starter.Completion.Task;
-            // To let the implicit Stop command do its work.
-            await Task.Delay( 50 );
 
-            statusChanged.Should().BeFalse();
+            // To let the implicit Stop command do its work (HandleCommandAutoStartAsync is called after the
+            // DoHandleCommandAsync of the real command), we use the WaitForSynchronizationAsync.
+            // Since the device is Stopped and there are deferred commands we must ignore them otherwise
+            // we'll be waiting for the device to restart.
+            (await d.WaitForSynchronizationAsync( considerDeferredCommands: false )).Should().Be( WaitForSynchronizationResult.Success );
+            statusChanged.Should().BeFalse( "No visible status change despite the fact that the device has start/stop." );
             d.Status.ToString().Should().Be( initialStatus );
 
-            h.SendCommand( TestHelper.Monitor, destroy );
-
-            await destroy.Completion.Task;
-
-            foreach( var c in commands )
+            bool executeDeferred = mode == "ExecuteDeferred";
+            if( executeDeferred )
             {
-                c.Completion.Task.IsCompleted.Should().BeFalse();
-                c.Completion.IsCompleted.Should().BeFalse();
+                // We want to monitor the end of the currently deferred commands.
+                var afterDeferred = d.WaitForSynchronizationAsync( considerDeferredCommands: true );
+                await d.StartAsync( TestHelper.Monitor );
+                (await afterDeferred).Should().Be( WaitForSynchronizationResult.Success );
+                foreach( var c in commands )
+                {
+                    c.Completion.Task.IsCompletedSuccessfully.Should().BeTrue();
+                    c.Completion.HasSucceed.Should().BeTrue();
+                }
+            }
+            else
+            {
+                foreach( var c in commands )
+                {
+                    c.Completion.Task.IsCompleted.Should().BeFalse();
+                    c.Completion.IsCompleted.Should().BeFalse();
+                }
+            }
+            // Destroying the device.
+            h.SendCommand( TestHelper.Monitor, destroy );
+            // Using WaitForSynchronizationAsync here may lead to Success or IsDetroyed.
+            (await d.WaitForSynchronizationAsync( considerDeferredCommands: false )).Should().Match( r => r == WaitForSynchronizationResult.Success
+                                                                                                          || r == WaitForSynchronizationResult.DeviceDestroyed );
+            destroy.Completion.Task.IsCompleted.Should().BeTrue();
+
+            if( executeDeferred )
+            {
+                foreach( var c in commands )
+                {
+                    c.Completion.Task.IsCompletedSuccessfully.Should().BeTrue();
+                    c.Completion.HasSucceed.Should().BeTrue();
+                }
+                d.Traces.Should().BeEquivalentTo( "Start SilentAutoStartAndStopStoppedBehavior",
+                                                  "Command DO IT",
+                                                  "Stop SilentAutoStartAndStopStoppedBehavior",
+                                                  "Start StartCall",
+                                                  "Command n°0",
+                                                  "Command n°1",
+                                                  "Command n°2",
+                                                  "Stop Destroyed",
+                                                  "Destroy" );
+            }
+            else
+            {
+                foreach( var c in commands )
+                {
+                    c.Completion.Task.IsFaulted.Should().BeTrue();
+                    c.Completion.HasFailed.Should().BeTrue();
+                }
+                d.Traces.Should().BeEquivalentTo( "Start SilentAutoStartAndStopStoppedBehavior",
+                                                  "Command DO IT",
+                                                  "Stop SilentAutoStartAndStopStoppedBehavior",
+                                                  "Destroy" );
             }
 
-            d.Traces.Should().BeEquivalentTo( "Start SilentAutoStartAndStopStoppedBehavior",
-                                              "Command DO IT",
-                                              "Stop SilentAutoStartAndStopStoppedBehavior",
-                                              "Destroy" );
         }
 
         [TestCase( "Deferred" )]

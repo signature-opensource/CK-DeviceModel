@@ -79,9 +79,23 @@ namespace CK.DeviceModel
         PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> DevicesChanged { get; }
 
         /// <summary>
-        /// Centralized <see cref="DeviceLifetimeEvent"/> for all the devices.  
+        /// Centralized <see cref="DeviceLifetimeEvent"/> for all the devices.
+        /// <para>
+        /// This event can be raised concurrently by multiple devices.
+        /// </para>
         /// </summary>
         PerfectEvent<IDeviceHost, DeviceLifetimeEvent> AllDevicesLifetimeEvent { get; }
+
+        /// <summary>
+        /// This event concentrates all the events from all the devices.
+        /// When the device is a <see cref="IActiveDevice"/> this enables a client of this host
+        /// to receive all the events emitted by all the devices whether they are <see cref="ActiveDeviceEvent{TDevice}"/>
+        /// or <see cref="DeviceLifetimeEvent"/>.
+        /// <para>
+        /// This event (like <see cref="AllDevicesLifetimeEvent"/>) is raised concurrently by multiple devices.
+        /// </para>
+        /// </summary>
+        PerfectEvent<IDeviceHost, BaseDeviceEvent> AllDevicesEvent { get; }
 
         /// <summary>
         /// Gets a snapshot of the current devices indexed by name.

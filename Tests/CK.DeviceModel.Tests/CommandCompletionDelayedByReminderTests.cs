@@ -146,7 +146,10 @@ namespace CK.DeviceModel.Tests
             }
             // Completion is signaled and then OnCommandCompletedAsync is called.
             // We have to wait.
-            await Task.Delay( nb*2 );
+            // Instead of waiting for a delay, use the new WaitForSynchronizationAsync method.
+            //   await Task.Delay( nb * 2 );
+            (await d.WaitForSynchronizationAsync( true )).Should().Be( WaitForSynchronizationResult.Success );
+
             d.OnCommandCompletionErrorCount.Should().Be( nbError );
             d.OnCommandCompletionCancelCount.Should().Be( nbCancel );
             d.OnCommandCompletionSuccessCount.Should().Be( nbSuccess );

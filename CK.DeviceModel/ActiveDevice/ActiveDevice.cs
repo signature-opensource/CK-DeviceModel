@@ -100,12 +100,12 @@ namespace CK.DeviceModel
         {
             var r = _events.Reader;
             object? ev = null;
-            while( !IsDestroyed )
+            bool receivedDestroyed = false;
+            while( !receivedDestroyed )
             {
                 try
                 {
-                    // The lifetime event is raised after the volatile IsDestroyed is set to true:
-                    // we don't need a cancellation token.
+                    // The lifetime event with a status IsDetroyed end this loop: we don't need a cancellation token.
                     // This allows the SingleConsumerUnboundedChannel<T>.UnboundedChannelReader
                     // to use a pooled IValueTaskSource instead of creating a new one. 
                     ev = await r.ReadAsync().ConfigureAwait( false );
@@ -121,9 +121,12 @@ namespace CK.DeviceModel
                         case TEvent e:
                             await _deviceEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
                             await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
+                            await _host.RaiseAllDevicesEventAsync( _eventMonitor, e );
                             break;
                         case DeviceLifetimeEvent e:
                             await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
+                            await _host.RaiseAllDevicesEventAsync( _eventMonitor, e );
+                            if( e.DeviceStatus.IsDestroyed ) receivedDestroyed = true;
                             break;
                         default:
                             _eventMonitor.Error( $"Unknown event type '{ev.GetType()}'." );
