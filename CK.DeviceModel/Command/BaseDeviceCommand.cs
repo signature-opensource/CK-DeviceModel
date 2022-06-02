@@ -1,9 +1,9 @@
 using CK.Core;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
@@ -33,11 +33,27 @@ namespace CK.DeviceModel
         /// </summary>
         public const string SendCommandTokenReason = "SendCommandToken";
 
+        /// <summary>
+        /// The command is long running because the device is stopped. See <see cref="StoppedBehavior"/>.
+        /// </summary>
+        public const string LongRunningDeferredReason = "Deferred";
+
+        /// <summary>
+        /// The command is long running because it is delayed. See <see cref="SendingTimeUtc"/>.
+        /// </summary>
+        public const string LongRunningDelayedReason = "Delayed";
+
+        /// <summary>
+        /// The command is long running because it has not been completed by its handling.
+        /// </summary>
+        public const string LongRunningWaitForCompletionReason = "WaitForCompletion";
+
         string _deviceName;
         string? _controllerKey;
         // Internal for the command queue.
         internal DateTime _sendTime;
         CancellationTokenRegistration[] _cancels;
+        readonly TaskCompletionSource<string?> _longRunningReason;
         static readonly Action<object?> _cancelFromTokenHandle = o => CancelFromTokenRelay( o! );
         static readonly Action<object?> _cancelFromTimeoutHandle = o => CancelFromTimeoutRelay( o! );
 
@@ -78,6 +94,7 @@ namespace CK.DeviceModel
             {
                 _deviceName = String.Empty;
             }
+            _longRunningReason = new TaskCompletionSource<string?>();
             ShouldCallDeviceOnCommandCompleted = true;
             _sendTime = Util.UtcMinValue;
             _cancels = Array.Empty<CancellationTokenRegistration>();
@@ -268,6 +285,9 @@ namespace CK.DeviceModel
         public virtual void Lock()
         {
             _isLocked = true;
+            // Note: an Immediate command cannot be deferred but nothing
+            // prevents its completion to happen later.
+            // This would be an error here to set a null long running reason.
         }
 
         /// <summary>
@@ -277,6 +297,38 @@ namespace CK.DeviceModel
         {
             if( _isLocked ) Throw.InvalidOperationException( $"Command '{ToString()}' is locked." );
         }
+
+        /// <summary>
+        /// Gets the reason that explains why this command is a long running one.
+        /// <para>
+        /// The reason is null when this command is known to be short running: it has already been handled or
+        /// will be handled soon.
+        /// </para>
+        /// <para>
+        /// Long running occurs when:
+        /// <list type="bullet">
+        ///     <item>
+        ///     The command is delayed (see <see cref="SendingTimeUtc"/>).
+        ///     </item>
+        ///     <item>
+        ///     The command is deferred (the device is stopped and the command needs and can wait for a running device).
+        ///     </item>
+        ///     <item>
+        ///     The command has been handled but not completed at the end of its handling: its completion will happen later.
+        ///     </item>
+        /// </list>
+        /// </para>
+        /// </summary>
+        public Task<string?> LongRunningReason => _longRunningReason.Task;
+
+        /// <summary>
+        /// Gets whether this command is known to be long running or not.
+        /// </summary>
+        [SuppressMessage( "Usage", "VSTHRD002:Avoid problematic synchronous waits", Justification = "Result is called when IsCompleted is true." )]
+        [SuppressMessage( "Usage", "VSTHRD104:Offer async methods", Justification = "Result is called when IsCompleted is true." )]
+        public bool? IsLongRunning => _longRunningReason.Task.IsCompleted ? _longRunningReason.Task.Result != null : null;
+
+        internal void TrySetLongRunningReason( string? r ) => _longRunningReason.TrySetResult( r );
 
         /// <summary>
         /// Gets the cancellation reason if a cancellation occurred.
@@ -360,6 +412,10 @@ namespace CK.DeviceModel
         void CancelFromCancellationTokens( string reason )
         {
             Interlocked.CompareExchange( ref _firstCancellationReason, reason, null );
+            // This will call CancelFromTimeout() but the _firstCancellationReason
+            // will already be set.
+            // CancelFromTimeout() then calls InternalCompletion.TrySetCanceled() and
+            // this triggers a call (if the cancellation succeeded) to OnInternalCommandCompleted().
             _cancelsResult.Cancel();
         }
 
@@ -388,6 +444,7 @@ namespace CK.DeviceModel
             if( InternalCompletion.IsCompleted )
             {
                 // This is already completed but we are accepting the command here...
+                //
                 // We must be sure that OnCommandCompled is called ONCE (if ShouldCallDeviceOnCommandCompleted is true).
                 // To prevent a race condition, the trick here (and in OnInternalCommandCompleted) is to use -1
                 // as an atomic marker that OnCommandCompleted has already been called.
@@ -395,6 +452,10 @@ namespace CK.DeviceModel
                 // so we can safely miss it in OnInternalCommandCompleted.
                 //
                 // Note that an already completed command doesn't check the controller key.
+                //
+                // Note: An already completed command is obviously short running and this 
+                // should have been set by OnInternalCommandCompleted or will be soon.
+                // We don't set the _longRunningReason here.
                 //
                 if( Interlocked.CompareExchange( ref _shouldCallCommandComplete, -1, 1 ) == 1 ) 
                 {
@@ -420,8 +481,13 @@ namespace CK.DeviceModel
             } );
             if( InternalCompletion.HasBeenCanceled )
             {
+                // If the completion itself has been canceled (not from this command layer), then
+                // the _firstCancellationReason may still be null.
                 Interlocked.CompareExchange( ref _firstCancellationReason, CommandCompletionCanceledReason, null );
             }
+            // If the long running reason is not yet set, then it's a short one.
+            _longRunningReason.TrySetResult( null );
+
             // A command can be completed before being sent:
             // we don't call OnCommandCompleted is such case.
             if( _device != null && Interlocked.CompareExchange( ref _shouldCallCommandComplete, -1, 1 ) == 1 )

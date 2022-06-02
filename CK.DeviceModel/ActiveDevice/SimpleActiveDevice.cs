@@ -58,7 +58,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Dummy command that carries the event to send to the event loop.
         /// </summary>
-        class AutoSendEvent : DeviceCommandNoResult
+        sealed class AutoSendEvent : DeviceCommandNoResult
         {
             public readonly TEvent Event;
 
@@ -67,6 +67,11 @@ namespace CK.DeviceModel
                 ImmediateSending = true;
                 ShouldCallDeviceOnCommandCompleted = false;
                 Event = e;
+                // Immediate, RunAnyway and completion is not set.
+                // We can leave it unset, it will be set to "WaitForCompletion" by 
+                // HandleCommandAsync but this is useless (and we don't want this to be tracked
+                // as a long running command).
+                TrySetLongRunningReason( null );
             }
 
             public override Type HostType => throw new NotImplementedException( "Never called." );

@@ -257,9 +257,13 @@ namespace CK.DeviceModel
                 StoppedBehavior = b;
                 ShouldCallDeviceOnCommandCompleted = false;
                 if( c.CanBeCanceled ) DoAddCancellationSource( c, SendCommandTokenReason );
+                // WaitForSynchronization is by design a short running command since
+                // it cannot wait for long running ones.
+                // This is not used anyway (but checked in DEBUG).
+                TrySetLongRunningReason( null );
             }
 
-            public void OnCommandHandled( IActivityMonitor monitor )
+            public void OnSyncCommandHandled( IActivityMonitor monitor )
             {
                 // Device and SimpleActiveDevice are not IMonitoredWorker.
                 if( _device is IMonitoredWorker activeDevice )

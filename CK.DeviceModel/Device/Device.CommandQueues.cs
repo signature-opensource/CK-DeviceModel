@@ -82,10 +82,11 @@ namespace CK.DeviceModel
                 DelayedCommands = cancelDelayedCommands;
                 DeferredCommands = cancelDeferredCommands;
                 ShouldCallDeviceOnCommandCompleted = false;
+                TrySetLongRunningReason( null );
             }
             public override Type HostType => throw new NotImplementedException();
             protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            protected override string ToStringSuffix => $"( Queued:{QueuedCommands}, Delayed:{DelayedCommands}, Deferred:{DelayedCommands} )";
+            protected override string ToStringSuffix => $" (Queued:{QueuedCommands}, Delayed:{DelayedCommands}, Deferred:{DelayedCommands})";
         }
 
         /// <inheritdoc />
@@ -116,7 +117,7 @@ namespace CK.DeviceModel
                         {
                             if( c is WaitForSynchronizationCommand sync )
                             {
-                                sync.OnCommandHandled( _commandMonitor );
+                                sync.OnSyncCommandHandled( _commandMonitor );
                             }
                             else
                             {
@@ -151,7 +152,7 @@ namespace CK.DeviceModel
                     {
                         if( c is WaitForSynchronizationCommand sync )
                         {
-                            sync.OnCommandHandled( _commandMonitor );
+                            sync.OnSyncCommandHandled( _commandMonitor );
                         }
                         else
                         {
@@ -247,6 +248,10 @@ namespace CK.DeviceModel
 
             while( !IsDestroyed )
             {
+                Debug.Assert( cmd == null
+                              || cmd == _commandAwaker    
+                              || cmd.LongRunningReason.IsCompleted, $"Whatever happened to the previous command, its long/short running status is known '{cmd}'." );
+
                 cmd = _currentlyExecuting = null;
                 try
                 {
@@ -288,7 +293,7 @@ namespace CK.DeviceModel
                         {
                             using( _commandMonitor.OpenFatal( $"Unhandled error in OnReminderAsync. Stopping the device '{FullName}'.", ex ) )
                             {
-                                await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall );
+                                await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall ).ConfigureAwait( false );
                             }
                         }
                         continue;
@@ -300,11 +305,12 @@ namespace CK.DeviceModel
                     {
                         if( sync.StoppedBehavior == DeviceCommandStoppedBehavior.RunAnyway || _deferredCommands.Count == 0 )
                         {
-                            sync.OnCommandHandled( _commandMonitor );
+                            sync.OnSyncCommandHandled( _commandMonitor );
                         }
                         else
                         {
                             _commandMonitor.Debug( $"Deferring WaitForSynchronizationCommand since {_deferredCommands.Count} are already deferred." );
+                            sync.TrySetLongRunningReason( BaseDeviceCommand.LongRunningDeferredReason );
                             _deferredCommands.Enqueue( sync );
                         }
                         continue;
@@ -323,7 +329,7 @@ namespace CK.DeviceModel
                             {
                                 if( deferred is WaitForSynchronizationCommand dSync )
                                 {
-                                    dSync.OnCommandHandled( _commandMonitor );
+                                    dSync.OnSyncCommandHandled( _commandMonitor );
                                 }
                                 else
                                 {
@@ -375,7 +381,7 @@ namespace CK.DeviceModel
                     }
                     if( cmd is WaitForSynchronizationCommand rSync )
                     {
-                        rSync.OnCommandHandled( _commandMonitor );
+                        rSync.OnSyncCommandHandled( _commandMonitor );
                         continue;
                     }
                     Debug.Assert( cmd.IsLocked );
@@ -480,6 +486,7 @@ namespace CK.DeviceModel
                         _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
                         _commandMonitor.Info( "Created DelayedQueue and Timer." );
                     }
+                    cmd.TrySetLongRunningReason( BaseDeviceCommand.LongRunningDelayedReason );
                     _delayedQueue.Enqueue( cmd, time );
                     if( _delayedQueue.Peek() == cmd )
                     {
@@ -887,18 +894,26 @@ namespace CK.DeviceModel
                         if( !command.CancellationToken.IsCancellationRequested )
                         {
                             await DoHandleCommandAsync( _commandMonitor, command ).ConfigureAwait( false );
+                            if( !command.LongRunningReason.IsCompleted )
+                            {
+                                // The command has not been completed by its handling and no long running reason
+                                // has been set: use the default "WaitForCompletion" reason.
+                                command.TrySetLongRunningReason( BaseDeviceCommand.LongRunningWaitForCompletionReason );
+                            }
                         }
                         break;
                     }
             }
+
+            void PushDeferredCommand( BaseDeviceCommand command )
+            {
+                _commandMonitor.CloseGroup( "Pushing command to the deferred command queue." );
+                // TODO: (internal protected virtual) command.OnDeferring( FIFOBuffer<BaseDeviceCommand> queue ) => queue.Push( this );
+                command.TrySetLongRunningReason( BaseDeviceCommand.LongRunningDeferredReason );
+                _deferredCommands.Enqueue( command );
+            }
         }
 
-        void PushDeferredCommand( BaseDeviceCommand command )
-        {
-            // TODO: (internal protected virtual) command.OnDeferring( FIFOBuffer<BaseDeviceCommand> queue ) => queue.Push( this );
-            _commandMonitor.CloseGroup( "Pushing command to the deferred command queue." );
-            _deferredCommands.Enqueue( command );
-        }
 
         bool CheckControllerKey( BaseDeviceCommand command )
         {
@@ -943,6 +958,8 @@ namespace CK.DeviceModel
             return command.ImmediateStoppedBehavior;
         }
 
+        // Called by the completion of the command.
+        // This is a sync call: this replays the command as an immediate one.
         void IInternalDevice.OnCommandCompleted( BaseDeviceCommand cmd )
         {
             Debug.Assert( cmd.InternalCompletion.IsCompleted );
@@ -960,6 +977,9 @@ namespace CK.DeviceModel
                 // Time field preserves it.
                 _sendTime = Time = time;
                 State = state;
+                // A reminder is enqueued in the delayed queue: it's by design a long running command.
+                // The fact that it must not be considered as a real long running command must be
+                // done by testing its type.
             }
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
