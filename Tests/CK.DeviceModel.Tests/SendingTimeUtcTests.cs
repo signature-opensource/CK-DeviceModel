@@ -204,13 +204,6 @@ namespace CK.DeviceModel.Tests
             D? d = h["Single"];
             Debug.Assert( d != null );
 
-            // The last command (n° nb) will start in nb * sendingDeltaMS and wait for execTimeMS before adding the reminder.
-            int lastAddedReminderTime = (nb * sendingDeltaMS) + execTimeMS;
-            int lastReminderTime = lastAddedReminderTime + 50;
-            // This is very theoretical. But we should not wait 100% this time more for the last reminder to be executed.
-            // This depends on the machine and on the deltaMS: for small deltaMS this doesn't work!
-            int waitTime = (lastReminderTime * 200) / 100;
-
             var all = new List<DCommand>();
             SendCommands( d, false, all );
             SendCommands( d, true, all );
@@ -219,8 +212,8 @@ namespace CK.DeviceModel.Tests
             // Waits for all the command completions.
             foreach( var c in all ) await c.Completion;
             // Each command triggers a 50 ms reminder.
-            // A 20 ms margin should be enough for the reminders to complete.
-            await Task.Delay( 50 + 20 );
+            // A 30 ms margin should be enough for the reminders to complete.
+            await Task.Delay( 50 + 30 );
 
             int rc = d.ReminderCount;
             int fc = d.ReminderFiredCount;

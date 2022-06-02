@@ -51,7 +51,7 @@ namespace CK.DeviceModel
         /// <summary>
         /// Dummy command that is used to awake the command loop.
         /// This does nothing and is ignored except that, just like any other commands that are
-        /// dequeued, this handles the _commandQueueImmediate execution.
+        /// dequeued, this triggers the _commandQueueImmediate execution.
         /// </summary>
         sealed class CommandAwaker : BaseDeviceCommand
         {
@@ -310,7 +310,7 @@ namespace CK.DeviceModel
                         else
                         {
                             _commandMonitor.Debug( $"Deferring WaitForSynchronizationCommand since {_deferredCommands.Count} are already deferred." );
-                            sync.TrySetLongRunningReason( BaseDeviceCommand.LongRunningDeferredReason );
+                            await TrySetLongRunningCommandAsync( sync, BaseDeviceCommand.LongRunningDeferredReason ).ConfigureAwait( false );
                             _deferredCommands.Enqueue( sync );
                         }
                         continue;
@@ -389,6 +389,7 @@ namespace CK.DeviceModel
                     if( EnqueueDelayed( cmd ) )
                     {
                         _commandMonitor.Trace( $"Delaying '{cmd}', SendingTimeUtc: {cmd.SendingTimeUtc:O}." );
+                        await TrySetLongRunningCommandAsync( cmd, BaseDeviceCommand.LongRunningDelayedReason ).ConfigureAwait( false );
                         continue;
                     }
                     await HandleCommandAsync( cmd, allowDefer: true, isImmediate: false ).ConfigureAwait( false );
@@ -486,7 +487,6 @@ namespace CK.DeviceModel
                         _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
                         _commandMonitor.Info( "Created DelayedQueue and Timer." );
                     }
-                    cmd.TrySetLongRunningReason( BaseDeviceCommand.LongRunningDelayedReason );
                     _delayedQueue.Enqueue( cmd, time );
                     if( _delayedQueue.Peek() == cmd )
                     {
@@ -834,7 +834,7 @@ namespace CK.DeviceModel
                                         case DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel:
                                             if( allowDefer && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                                             {
-                                                PushDeferredCommand( command );
+                                                await PushDeferredCommandAsync( command ).ConfigureAwait( false );
                                             }
                                             else
                                             {
@@ -845,7 +845,7 @@ namespace CK.DeviceModel
                                         case DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrSetUnavailableDeviceException:
                                             if( allowDefer && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
                                             {
-                                                PushDeferredCommand( command );
+                                                await PushDeferredCommandAsync( command ).ConfigureAwait( false );
                                             }
                                             else
                                             {
@@ -864,7 +864,7 @@ namespace CK.DeviceModel
                                         case DeviceCommandStoppedBehavior.AlwaysWaitForNextStart:
                                             if( allowDefer )
                                             {
-                                                PushDeferredCommand( command );
+                                                await PushDeferredCommandAsync( command ).ConfigureAwait( false );
                                             }
                                             else
                                             {
@@ -894,25 +894,47 @@ namespace CK.DeviceModel
                         if( !command.CancellationToken.IsCancellationRequested )
                         {
                             await DoHandleCommandAsync( _commandMonitor, command ).ConfigureAwait( false );
-                            if( !command.LongRunningReason.IsCompleted )
+                            if( !command.InternalCompletion.IsCompleted )
                             {
-                                // The command has not been completed by its handling and no long running reason
-                                // has been set: use the default "WaitForCompletion" reason.
-                                command.TrySetLongRunningReason( BaseDeviceCommand.LongRunningWaitForCompletionReason );
+                                // The command has not been completed by its handling (command's completion sets a null long running reason).
+                                // Ensures that the default "WaitForCompletion" reason is set AND ensures that if
+                                // a non null reason has been set by the public BaseDeviceCommand.TrySetLongRunningReason()
+                                // then OnLongRunningCommandAppearedAsync is called.
+                                await TrySetLongRunningCommandAsync( command, BaseDeviceCommand.LongRunningWaitForCompletionReason );
                             }
                         }
                         break;
                     }
             }
 
-            void PushDeferredCommand( BaseDeviceCommand command )
+            ValueTask PushDeferredCommandAsync( BaseDeviceCommand command )
             {
                 _commandMonitor.CloseGroup( "Pushing command to the deferred command queue." );
                 // TODO: (internal protected virtual) command.OnDeferring( FIFOBuffer<BaseDeviceCommand> queue ) => queue.Push( this );
-                command.TrySetLongRunningReason( BaseDeviceCommand.LongRunningDeferredReason );
                 _deferredCommands.Enqueue( command );
+                return TrySetLongRunningCommandAsync( command, BaseDeviceCommand.LongRunningDeferredReason );
             }
+
         }
+
+        ValueTask TrySetLongRunningCommandAsync( BaseDeviceCommand command, string reason )
+        {
+            return command.DeviceSetLongRunningReason( reason )
+                    ? OnLongRunningCommandAppearedAsync( _commandMonitor, command )
+                    : default;
+        }
+
+        /// <summary>
+        /// Called whenever a command is known to be long running.
+        /// See <see cref="BaseDeviceCommand.LongRunningReason"/>.
+        /// <para>
+        /// This method does nothing at this level.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="command">The long running command.</param>
+        /// <returns>The awaitable.</returns>
+        protected virtual ValueTask OnLongRunningCommandAppearedAsync( IActivityMonitor monitor, BaseDeviceCommand command ) => default;
 
 
         bool CheckControllerKey( BaseDeviceCommand command )
@@ -977,9 +999,9 @@ namespace CK.DeviceModel
                 // Time field preserves it.
                 _sendTime = Time = time;
                 State = state;
-                // A reminder is enqueued in the delayed queue: it's by design a long running command.
-                // The fact that it must not be considered as a real long running command must be
-                // done by testing its type.
+                // A reminder is enqueued in the delayed queue (as soon as it is instantiated) but
+                // this internal command must not be considered as a real long running command.
+                TrySetLongRunningReason( null );
             }
             public override Type HostType => throw new NotImplementedException();
             internal override ICompletionSource InternalCompletion => throw new NotImplementedException();

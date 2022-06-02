@@ -123,6 +123,7 @@ command handling **MUST** ensure that the `DeviceCommandNoResult.Completion`
 or `DeviceCommandWithResult<TResult>.Completion` is eventually resolved 
 by calling `SetResult`, `SetCanceled` or `SetException` on the Completion otherwise the caller 
 may indefinitely wait for the command completion.
+When `DoHandleCommandAsync` doesn't complete the command, the command is "Long Running" (more on this below).
 
 `DoHandleCommandAsync` has no CancellationToken parameter: the command exposes a unique token that unifies the
 multiple ways to cancel a command: `DoHandleCommandAsync` have just to use this unique token when calling
@@ -269,4 +270,95 @@ command's property that is:
 - False for the 5 standard commands.
 - True by default for any other commands. It can be changed at any time (before the completion occurs of course).
 
+## Long Running commands
+
+> Before waiting for a command completion, one may want to know whether the time to wait can be way tooooo loooong!
+
+As said before, the completion of a command **IS NOT** the completion of the `DoHandleCommandAsync` method.
+A command can perfectly be completed before (typically through cancellation) or after its handling (the command is waiting
+for an external event for instance): when the handler does not complete the command it is considered as Long Running.
+
+Regardless of its handling, a delayed (via its `SendingTimeUtc`) or deferred (waiting for the device to be restarted) command
+will for sure take some time to be completed: delayed or deferred commands are also considered as Long Running.
+
+And just like cancellations (see above), there may be a lot of reason for a command to be Long Running (it has to wait for
+an incoming mail for instance): a reason string can be explicitly set on a Command (as long as it has not been already set).
+
+### Long Running API
+The Device commands expose a rather simple public API to support this:
+
+```csharp
+public Task<string?> LongRunningReason { get; }
+
+/// <summary>
+/// Gets whether this command is known to be long running or not.
+/// This is null until this is known.
+/// </summary>
+public bool? IsLongRunning { get; }
+
+/// <summary>
+/// Atomically tries to set the <see cref="LongRunningReason"/>.
+/// </summary>
+/// <param name="reason">The reason to set.</param>
+/// <returns>True on success, false if a reason was previously set.</returns>
+public bool TrySetLongRunningReason( string? reason );
+```
+
+The `LongRunningReason` is null when the command is known to be short running: it has already been handled or
+should be handled soon.
+
+The reason can be any string if `TrySetLongRunningReason` is used. Internally the 3 constants "Deferred", "Delayed"
+and "WaitForCompletion" are used.
+
+On the device implementation side, the protected `OnLongRunningCommandAppearedAsync` can be overridden to implement
+controls or tracking of the commands that happened to be Long Running:
+
+```csharp
+/// <summary>
+/// Called whenever a command is known to be long running.
+/// See <see cref="BaseDeviceCommand.LongRunningReason"/>.
+/// <para>
+/// This method does nothing at this level.
+/// </para>
+/// </summary>
+/// <param name="monitor">The monitor to use.</param>
+/// <param name="command">The long running command.</param>
+/// <returns>The awaitable.</returns>
+protected virtual ValueTask OnLongRunningCommandAppearedAsync( IActivityMonitor monitor, BaseDeviceCommand command ) => default;
+```
+
+### Why should I care?
+
+You may simply ignore this capability and use the "Always Waiting for Completion" approach. Providing that the
+cancellations and/or command timeout is properly used, this is fine.
+
+However some scenario require more control. A Web API for instance can not wait indefinitely for the Completion
+to happen: the initial request must be answered (the sooner, the better) typically with a command identifier
+and a continuation mechanism must be stated (thanks to a polling or back channel).
+
+One way to handle this (that is always possible) is to wait for the completion during a given delay (by using
+https://github.com/Invenietis/CK-Core/blob/develop/CK.Core/Extension/TaskExtensions.cs#L29) but it would then
+be more efficient to use the "Long Running" capability:
+
+- Send the command.
+- Await the `LongRunningReason`
+  - If the reason is null, await the Completion and returns the result.
+  - Otherwise:
+    -  Choose a unique identifier for the command (you may use a [FastUniqueIdGenerator](https://github.com/Invenietis/CK-Core/blob/develop/CK.Core/FastUniqueIdGenerator.cs). 
+    -  Enlist the Long Running Command (and an expiration time) in a (concurrent) dictionary indexed by its identifier.
+    -  Expose this dictionary to polling methods and/or initiate a continuation on the Command's completion to trigger a call
+       back to the initiator if it's possible.
+
+This doesn't suppress the need to correctly manage the command timeout. And to fully secure the process, awaiting the `LongRunningReason`
+can be done with a timeout.
+
+### Why a Device doesn't track Long Running commands?
+
+The `OnLongRunningCommandAppearedAsync` can be used to track the Long Running commands. This can be done easily by adding them
+to an HashSet of commands (and deciding how and when they should be removed). But for what benefits? With which features?
+
+Properly handling such commands heavily depends on the caller's expectations and not all the devices need a dashboard
+of long running commands.
+
+The recommended answer to this is to implement this externally and then, may be, to consider its inclusion.
 

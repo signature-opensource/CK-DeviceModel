@@ -72,7 +72,7 @@ namespace CK.DeviceModel
         string? _firstCancellationReason;
         int _shouldCallCommandComplete;
         bool _isLocked;
-
+        bool _externalLongRunning;
         // Running data...
         // ...initialized by OnCommandSend.
         internal bool _mustCheckControllerKey;
@@ -302,7 +302,7 @@ namespace CK.DeviceModel
         /// Gets the reason that explains why this command is a long running one.
         /// <para>
         /// The reason is null when this command is known to be short running: it has already been handled or
-        /// will be handled soon.
+        /// should be handled soon.
         /// </para>
         /// <para>
         /// Long running occurs when:
@@ -311,24 +311,67 @@ namespace CK.DeviceModel
         ///     The command is delayed (see <see cref="SendingTimeUtc"/>).
         ///     </item>
         ///     <item>
-        ///     The command is deferred (the device is stopped and the command needs and can wait for a running device).
+        ///     The command is deferred (the device is stopped and the command needs and can wait for a running device - see <see cref="StoppedBehavior"/>).
         ///     </item>
         ///     <item>
         ///     The command has been handled but not completed at the end of its handling: its completion will happen later.
         ///     </item>
         /// </list>
         /// </para>
+        /// <para>
+        /// The reason can be any string if <see cref="TrySetLongRunningReason(string?)"/> is used.
+        /// Internally the 3 constants <see cref="LongRunningDeferredReason"/>, <see cref="LongRunningDelayedReason"/>
+        /// and <see cref="LongRunningWaitForCompletionReason"/> are used.
+        /// </para>
         /// </summary>
         public Task<string?> LongRunningReason => _longRunningReason.Task;
 
         /// <summary>
         /// Gets whether this command is known to be long running or not.
+        /// This is null until this is known.
         /// </summary>
         [SuppressMessage( "Usage", "VSTHRD002:Avoid problematic synchronous waits", Justification = "Result is called when IsCompleted is true." )]
         [SuppressMessage( "Usage", "VSTHRD104:Offer async methods", Justification = "Result is called when IsCompleted is true." )]
         public bool? IsLongRunning => _longRunningReason.Task.IsCompleted ? _longRunningReason.Task.Result != null : null;
 
-        internal void TrySetLongRunningReason( string? r ) => _longRunningReason.TrySetResult( r );
+        /// <summary>
+        /// Atomically tries to set the <see cref="LongRunningReason"/>.
+        /// </summary>
+        /// <param name="reason">The reason to set. Must not be the empty string.</param>
+        /// <returns>True on success, false if a reason was previously set.</returns>
+        public bool TrySetLongRunningReason( string? reason )
+        {
+            Throw.CheckArgument( reason == null || reason.Length > 0 );
+            if( _longRunningReason.TrySetResult( reason ) )
+            {
+                // Since this can be called concurrently by any piece of code,
+                // we cannot call Device.OnLongRunningCommandAppearedAsync here.
+                // Instead, we memorize that a long running reason has been provided and
+                // we wait for the CommandRunLoopAsync to call its TrySetLongRunningCommandAsync
+                // (that calls our DeviceSetLongRunningReason below) either because the command is
+                // deferred or delayed or HandleCommandAsync did not complete the command.
+                //
+                // The side effect is that an externally set long running reason is not
+                // immediately tracked. Moreover, if the command has been completed by
+                // HandleCommandAsync, the device OnLongRunningCommandAppearedAsync will
+                // never see the command.
+                //
+                // This is not necessarily bad: the command has been marked as long running
+                // but it appears that it is not. Unfortunately we don't hide this false positive
+                // to the external world (since the LongRunningReason is completed with a non null
+                // reason).
+                //  
+                _externalLongRunning = reason != null;
+                return true;
+            }
+            return false;
+        }
+
+        internal bool DeviceSetLongRunningReason( string reason )
+        {
+            Debug.Assert( reason == LongRunningDeferredReason || reason == LongRunningDelayedReason || reason == LongRunningWaitForCompletionReason );
+            return _externalLongRunning || _longRunningReason.TrySetResult( reason );
+        }
 
         /// <summary>
         /// Gets the cancellation reason if a cancellation occurred.

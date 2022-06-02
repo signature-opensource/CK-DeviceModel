@@ -39,6 +39,7 @@ protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime remin
 protected virtual ValueTask<bool> OnUnhandledExceptionAsync( IActivityMonitor monitor, BaseDeviceCommand command, Exception ex );
 protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 protected virtual Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual ValueTask OnLongRunningCommandAppearedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 ```
 
 Details about Command handling can be found [here](../Command).
@@ -153,7 +154,7 @@ public sealed class FlashBulbConfiguration : DeviceConfiguration
 ````
 
 Whenever a device's configuration changes,
-a [DeviceConfigurationChangedEvent&lt;TConfiguration&gt;](LifetimeEvent/DeviceConfigurationChangedEvent.cs)
+a [DeviceLifetimeEvent&lt;TConfiguration&gt;](LifetimeEvent/DeviceLifetimeEventT.cs)
 lifetime event is raised (this is a typed event: its base class is non-generic and expose the base `DeviceConfiguration`).
 
 It is up to the device to accept or reject a new configuration:
