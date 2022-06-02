@@ -334,18 +334,18 @@ cancellations and/or command timeout is properly used, this is fine.
 
 However some scenario require more control. A Web API for instance can not wait indefinitely for the Completion
 to happen: the initial request must be answered (the sooner, the better) typically with a command identifier
-and a continuation mechanism must be stated (thanks to a polling or back channel).
+and a continuation mechanism must be exposed (thanks to polling or back channel).
 
 One way to handle this (that is always possible) is to wait for the completion during a given delay (by using
-https://github.com/Invenietis/CK-Core/blob/develop/CK.Core/Extension/TaskExtensions.cs#L29) but it would then
+[WaitAsync](https://github.com/Invenietis/CK-Core/blob/develop/CK.Core/Extension/TaskExtensions.cs#L29)) but it would then
 be more efficient to use the "Long Running" capability:
 
 - Send the command.
 - Await the `LongRunningReason`
   - If the reason is null, await the Completion and returns the result.
   - Otherwise:
-    -  Choose a unique identifier for the command (you may use a [FastUniqueIdGenerator](https://github.com/Invenietis/CK-Core/blob/develop/CK.Core/FastUniqueIdGenerator.cs). 
-    -  Enlist the Long Running Command (and an expiration time) in a (concurrent) dictionary indexed by its identifier.
+    -  Choose a unique identifier for the command (you may use a [FastUniqueIdGenerator](https://github.com/Invenietis/CK-Core/blob/develop/CK.Core/FastUniqueIdGenerator.cs)). 
+    -  Enlist the Long Running Command (and an expiration time to avoid leaks!) in a (concurrent) dictionary indexed by its identifier.
     -  Expose this dictionary to polling methods and/or initiate a continuation on the Command's completion to trigger a call
        back to the initiator if it's possible.
 
@@ -354,7 +354,7 @@ can be done with a timeout.
 
 ### Why a Device doesn't track Long Running commands?
 
-The `OnLongRunningCommandAppearedAsync` can be used to track the Long Running commands. This can be done easily by adding them
+The `OnLongRunningCommandAppearedAsync` can be used to track the Long Running commands by adding them
 to an HashSet of commands (and deciding how and when they should be removed). But for what benefits? With which features?
 
 Properly handling such commands heavily depends on the caller's expectations and not all the devices need a dashboard
