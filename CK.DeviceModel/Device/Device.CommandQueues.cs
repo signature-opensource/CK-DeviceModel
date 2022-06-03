@@ -192,7 +192,14 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Sends the given command directly in the waiting queue.
-        /// This is to be used for low level internal commands, typically initiated by timers.
+        /// This is to be used for:
+        /// <list type="bullet">
+        ///     <item>Low level internal commands, typically initiated by timers.</item>
+        ///     <item>
+        ///     Commands queued by handler (typically because they have to wait for a condition, like a connection availability).
+        ///     When the conditions are met, such command can be re-injected in the waiting queue.
+        ///     </item>
+        /// </list>
         /// </summary>
         /// <param name="command">The command to send without any checks.</param>
         /// <param name="checkControllerKey">Optionally checks the ControllerKey.</param>
@@ -207,7 +214,14 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Sends the given command directly for immediate execution.
-        /// This is to be used for low level internal commands, typically initiated by timers.
+        /// This is to be used for:
+        /// <list type="bullet">
+        ///     <item>Low level internal commands, typically initiated by timers.</item>
+        ///     <item>
+        ///     Commands queued by handler (typically because they have to wait for a condition, like a connection availability).
+        ///     When the conditions are met, such command can be re-injected in the waiting queue.
+        ///     </item>
+        /// </list>
         /// </summary>
         /// <param name="command">The command to send without any checks.</param>
         /// <param name="checkControllerKey">Optionally checks the ControllerKey.</param>

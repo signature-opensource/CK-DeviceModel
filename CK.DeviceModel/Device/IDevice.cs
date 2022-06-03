@@ -203,8 +203,8 @@ namespace CK.DeviceModel
         bool UnsafeSendCommand( IActivityMonitor monitor, BaseDeviceCommand command, CancellationToken token = default );
 
         /// <summary>
-        /// Ensures that any existing commands have been fully handled: when the returned task is completed,
-        /// you are assured that any previous commands have been fully handled.
+        /// Ensures that any existing commands have been handled: when the returned task is completed,
+        /// you are assured that any previous commands have been handled at least once.
         /// <para>
         /// For passive device, an internal command is sent and the returned task is its completion.
         /// </para>
