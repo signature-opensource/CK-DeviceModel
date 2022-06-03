@@ -488,6 +488,8 @@ namespace CK.DeviceModel
             InternalCompletion.TrySetCanceled();
         }
 
+        // Called if when Device.GetCommandTimeoutAsync return a non 0 or negative timeout.
+        // Can be called by internal commands as well.
         internal void SetCommandTimeout( int ms )
         {
             _cancelsResult.CancelAfter( ms );
@@ -499,11 +501,16 @@ namespace CK.DeviceModel
         /// </summary>
         internal abstract ICompletionSource InternalCompletion { get; }
 
-        internal void OnCommandSend( IInternalDevice device, bool checkControllerKey, CancellationToken token )
+        internal bool OnCommandSend( IInternalDevice device, bool checkControllerKey, CancellationToken token )
         {
-            Debug.Assert( _device == null );
-            Lock();
-            _device = device;
+            // This can be called more than once: SendRoutedCommand can be used to push back an already
+            // handled (but delayed for multiple reasons) command.
+            if( _device == null )
+            {
+                Lock();
+                _device = device;
+
+            }
             if( InternalCompletion.IsCompleted )
             {
                 // This is already completed but we are accepting the command here...
@@ -524,12 +531,11 @@ namespace CK.DeviceModel
                 {
                     _device.OnCommandCompleted( this );
                 }
+                return false;
             }
-            else
-            {
-                _mustCheckControllerKey = checkControllerKey;
-                if( token.CanBeCanceled ) DoAddCancellationSource( token, SendCommandTokenReason );
-            }
+            _mustCheckControllerKey = checkControllerKey;
+            if( token.CanBeCanceled ) DoAddCancellationSource( token, SendCommandTokenReason );
+            return true;
         }
 
         // This is called by the ICompletable.OnCompleted implementations of DeviceCommandNoResult

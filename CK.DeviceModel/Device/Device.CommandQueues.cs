@@ -200,7 +200,8 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         internal protected bool SendRoutedCommand( BaseDeviceCommand command, bool checkControllerKey = false, CancellationToken token = default )
         {
-            command.OnCommandSend( this, checkControllerKey, token );
+            // If the command is already completed, OnCommandSend returns false.
+            if( !command.OnCommandSend( this, checkControllerKey, token ) ) return true;
             return _commandQueue.Writer.TryWrite( command );
         }
 
@@ -214,7 +215,8 @@ namespace CK.DeviceModel
         /// <returns>True on success, false if this device doesn't accept commands anymore since it is destroyed.</returns>
         internal protected bool SendRoutedCommandImmediate( BaseDeviceCommand command, bool checkControllerKey = false, CancellationToken token = default )
         {
-            command.OnCommandSend( this, checkControllerKey, token );
+            // If the command is already completed, OnCommandSend returns false.
+            if( !command.OnCommandSend( this, checkControllerKey, token ) ) return true;
             return _commandQueueImmediate.Writer.TryWrite( command )
                    && _commandQueue.Writer.TryWrite( _commandAwaker );
         }
@@ -714,10 +716,10 @@ namespace CK.DeviceModel
             {
                 try
                 {
-                    int t = await GetCommandTimeoutAsync( _commandMonitor, command ).ConfigureAwait( false );
-                    if( t > 0 ) command.SetCommandTimeout( t );
                     if( !command.CancellationToken.IsCancellationRequested )
                     {
+                        int t = await GetCommandTimeoutAsync( _commandMonitor, command ).ConfigureAwait( false );
+                        if( t > 0 ) command.SetCommandTimeout( t );
                         await DoHandleCommandAsync( _commandMonitor, command ).ConfigureAwait( false );
                     }
                 }
