@@ -225,9 +225,10 @@ namespace CK.DeviceModel
         /// (In the latter case, there may be some deferred commands that have been handled before the returned task completes.)
         /// </para>
         /// </param>
+        /// <param name="timeout">Optional timeout in milliseconds.</param>
         /// <param name="cancel">Optional cancellation token.</param>
         /// <returns>Success or whether the device is destroyed or <paramref name="cancel"/> has been signaled.</returns>
-        Task<WaitForSynchronizationResult> WaitForSynchronizationAsync( bool considerDeferredCommands, CancellationToken cancel = default );
+        Task<WaitForSynchronizationResult> WaitForSynchronizationAsync( bool considerDeferredCommands, int timeout = 0, CancellationToken cancel = default );
 
         /// <summary>
         /// Cancels all the commands that are waiting to be handled, either because they have been queued

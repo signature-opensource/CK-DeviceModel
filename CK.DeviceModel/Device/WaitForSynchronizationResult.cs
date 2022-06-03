@@ -1,9 +1,9 @@
-﻿using System.Threading;
+using System.Threading;
 
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Possible <see cref="IDevice.WaitForSynchronizationAsync(bool,CancellationToken)"/> result.
+    /// Possible <see cref="IDevice.WaitForSynchronizationAsync"/> result.
     /// </summary>
     public enum WaitForSynchronizationResult
     {
@@ -14,6 +14,11 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// The cancellation token has been signaled.
+        /// </summary>
+        Canceled,
+
+        /// <summary>
+        /// The timeout provided expired.
         /// </summary>
         Timeout,
 

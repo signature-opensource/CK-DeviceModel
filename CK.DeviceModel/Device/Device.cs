@@ -280,7 +280,12 @@ namespace CK.DeviceModel
 
             void DoComplete( IActivityMonitor monitor ) => Completion.TrySetResult( _device.IsDestroyed ? WaitForSynchronizationResult.DeviceDestroyed : WaitForSynchronizationResult.Success );
 
-            protected override void OnCanceled( ref CompletionSource<WaitForSynchronizationResult>.OnCanceled result ) => result.SetResult( WaitForSynchronizationResult.Timeout );
+            protected override void OnCanceled( ref CompletionSource<WaitForSynchronizationResult>.OnCanceled result )
+            {
+                var r = GetFirstCancellationReason();
+                Debug.Assert( r == CommandTimeoutReason || r == SendCommandTokenReason );
+                result.SetResult( r == CommandTimeoutReason ? WaitForSynchronizationResult.Timeout : WaitForSynchronizationResult.Canceled );
+            }
 
             protected override void OnError( Exception ex, ref CompletionSource<WaitForSynchronizationResult>.OnError result )
             {
@@ -294,10 +299,12 @@ namespace CK.DeviceModel
         }
 
         /// <inheritdoc />
-        public Task<WaitForSynchronizationResult> WaitForSynchronizationAsync( bool considerDeferredCommands, CancellationToken cancel = default )
+        public Task<WaitForSynchronizationResult> WaitForSynchronizationAsync( bool considerDeferredCommands, int timeout = 0, CancellationToken cancel = default )
         {
-            if( cancel.IsCancellationRequested ) return Task.FromResult( WaitForSynchronizationResult.Timeout );
+            Throw.CheckOutOfRangeArgument( timeout >= 0 );
+            if( cancel.IsCancellationRequested ) return Task.FromResult( WaitForSynchronizationResult.Canceled );
             var c = new WaitForSynchronizationCommand( this, considerDeferredCommands ? DeviceCommandStoppedBehavior.AlwaysWaitForNextStart : DeviceCommandStoppedBehavior.RunAnyway, cancel );
+            if( timeout > 0 ) c.SetCommandTimeout( timeout );
             // Skips useless OnCommandSend call made by SendRoutedCommand.
             if( !_commandQueue.Writer.TryWrite( c ) ) return Task.FromResult( WaitForSynchronizationResult.DeviceDestroyed );
             return c.Completion.Task;

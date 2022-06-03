@@ -379,6 +379,26 @@ namespace CK.DeviceModel
         public string? CancellationReason => InternalCompletion.HasBeenCanceled ? _firstCancellationReason : null;
 
         /// <summary>
+        /// Gets the cancellation reason set even if this command is not canceled because of race condition.
+        /// <para>
+        /// This is set and available before the completion is canceled when a cancellation occurs by <see cref="Cancel(string)"/>,
+        /// the timeout set by <see cref="Device{TConfiguration}.GetCommandTimeoutAsync(IActivityMonitor, BaseDeviceCommand)"/>,
+        /// or one of the registered token in <see cref="AddCancellationSource(CancellationToken, string)"/>.
+        /// </para>
+        /// <para>
+        /// The only case where it is null and the completion is about to be canceled is when the cancellation occurs on
+        /// the <see cref="CompletionSource"/> directly. In this case, the default <see cref="CommandCompletionCanceledReason"/> string
+        /// will be set after the command is canceled.
+        /// </para>
+        /// <para>
+        /// This is available to specialized commands so that they can use this information in their optional <see cref="ICompletable.OnCanceled(ref CompletionSource.OnCanceled)"/>
+        /// or <see cref="ICompletable{TResult}.OnCanceled(ref CompletionSource{TResult}.OnCanceled)"/> hook.
+        /// </para>
+        /// </summary>
+        /// <returns>The cancellation reason set.</returns>
+        protected string? GetFirstCancellationReason() => _firstCancellationReason;
+
+        /// <summary>
         /// Cancels this command with an explicit reason.
         /// </summary>
         /// <param name="reason">
