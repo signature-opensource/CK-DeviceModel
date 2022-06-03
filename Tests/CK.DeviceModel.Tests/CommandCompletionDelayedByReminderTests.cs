@@ -50,7 +50,7 @@ namespace CK.DeviceModel.Tests
             public int OnCommandCompletionErrorCount;
             public int OnCommandCompletionCancelCount;
             public int OnCommandCompletionSuccessCount;
-            Random _rnd = new Random();
+            readonly Random _rnd = new Random();
 
             protected override Task DoDestroyAsync( IActivityMonitor monitor )
             {

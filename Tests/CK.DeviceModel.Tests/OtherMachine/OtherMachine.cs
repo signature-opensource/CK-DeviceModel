@@ -1,8 +1,8 @@
-using System.Diagnostics;
+using CK.Core;
 using System.Threading;
 using System.Threading.Tasks;
-using CK.Core;
-using CK.PerfectEvent;
+
+#pragma warning disable CA2211 // Non-constant fields should not be visible
 
 namespace CK.DeviceModel.Tests
 {
