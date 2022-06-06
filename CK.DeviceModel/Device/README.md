@@ -40,9 +40,159 @@ protected virtual ValueTask<bool> OnUnhandledExceptionAsync( IActivityMonitor mo
 protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 protected virtual Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 protected virtual ValueTask OnLongRunningCommandAppearedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
+protected virtual Task OnCommandSignalAsync( IActivityMonitor monitor, object? payload );
 ```
 
 Details about Command handling can be found [here](../Command).
+
+## CommandLoop and Signals
+
+Device model's primary goal is to isolate developers from concurrency issues. This is done by an asynchronous loop
+that dequeues the commands from a [Channel](https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels)
+(actually 2 and also from regular queues but this is an implementation detail).
+Commands are handled sequentially one after the others: a device's state is never accessed concurrently as long as the
+execution comes from one the device's method.
+
+For real devices that interacts with the external world, typically listening to external events or communication channels,
+the origin of the code is not the device itself. Any external code must use the `CommandLoop` to "transfer" its work to the
+safe world of the loop.
+
+```c#
+/// <summary>
+/// Gets the command loop API that implementation can use to execute 
+/// actions, sends logs to the command loop or calls <see cref="ICommandLoop.Signal(object?)"/>.
+/// </summary>
+protected ICommandLoop CommandLoop => _commandLoop;
+```
+
+The `ICommandLoop` extends the `CK.Core.IMonitoredWorker` interface defined in CK.ActivityMonitor package:
+
+```csharp
+    /// <summary>
+    /// Simple abstraction of a worker with its own monitor that
+    /// can execute synchronous or asynchronous actions and offers
+    /// simple log methods (more complex logging can be done via
+    /// the <see cref="Execute(Action{IActivityMonitor})"/> method).
+    /// <para>
+    /// Note that the simple log methods here don't open/close groups and this
+    /// is normal: the worker is free to interleave any workload between consecutive
+    /// calls from this interface: structured groups have little chance to really be
+    /// structured.
+    /// </para>
+    /// </summary>
+    public interface IMonitoredWorker
+    {
+        /// <summary>
+        /// Posts the given synchronous action to be executed by this worker.
+        /// </summary>
+        /// <param name="action">The action to execute.</param>
+        void Execute( Action<IActivityMonitor> action );
+
+        /// <summary>
+        /// Posts the given asynchronous action to be executed by this worker.
+        /// </summary>
+        /// <param name="action">The action to execute.</param>
+        void Execute( Func<IActivityMonitor, Task> action );
+
+        /// <summary>
+        /// Posts an error log message into this worker monitor.
+        /// </summary>
+        /// <param name="msg">The message to log.</param>
+        void LogError( string msg );
+
+        /// <summary>
+        /// Posts an error log message with an exception into this worker monitor.
+        /// </summary>
+        /// <param name="msg">The message to log.</param>
+        /// <param name="ex">The exception to log.</param>
+        void LogError( string msg, Exception ex );
+
+        /// <summary>
+        /// Posts a warning log message into this worker monitor.
+        /// </summary>
+        /// <param name="msg">The message to log.</param>
+        void LogWarn( string msg );
+
+        /// <summary>
+        /// Posts a warning log message with an exception into this worker monitor.
+        /// </summary>
+        /// <param name="msg">The message to log.</param>
+        /// <param name="ex">The exception to log.</param>
+        void LogWarn( string msg, Exception ex );
+
+        /// <summary>
+        /// Posts an informational message log into this worker monitor.
+        /// </summary>
+        /// <param name="msg">The message to log.</param>
+        void LogInfo( string msg );
+
+        /// <summary>
+        /// Posts a trace log message into this worker monitor.
+        /// </summary>
+        /// <param name="msg">The message to log.</param>
+        void LogTrace( string msg );
+
+        /// <summary>
+        /// Posts a debug log message this worker event monitor.
+        /// </summary>
+        /// <param name="msg">The message to log.</param>
+        void LogDebug( string msg );
+    }
+```
+
+Thanks to the `void Execute( Action<IActivityMonitor> action )` and `void Execute( Func<IActivityMonitor, Task> action )`
+methods, any actions (synchronous as well as asynchronous) can be posted to be executed in the context of the command loop:
+any process that interacts with the state of a device should go through this loop.
+
+The `ICommandLoop` adds a notion of "signal" that can be useful to avoid lambda functions and to centralize code:
+becaus lambda functions are written at the call site, they can be really misleading for the reader/maintainer:
+```c#
+/// <summary>
+/// The command loop exposed by <see cref="CommandLoop"/>.
+/// </summary>
+protected interface ICommandLoop : IMonitoredWorker
+{
+    /// <summary>
+    /// Sends an immediate signal into the command loop that will be handled by <see cref="OnCommandSignalAsync(IActivityMonitor, object?)"/>.
+    /// An <see cref="ArgumentException"/> is thrown if the <paramref name="payload"/> is a <see cref="BaseDeviceCommand"/>.
+    /// </summary>
+    /// <param name="payload">The payload to send. Must not be a command.</param>
+    void Signal( object? payload );
+}
+
+```
+Any object (except commands) can be sent as a "signal" (including null!). And this "signal" can be gently handled by a
+dedicated handler (that should of course be overridden):
+
+```c#
+  /// <summary>
+  /// Optional extension point that must handle <see cref="ICommandLoop.Signal(object?)"/> payloads.
+  /// This does nothing at this level.
+  /// <para>
+  /// Any exceptions raised by this method will stop the device.
+  /// </para>
+  /// </summary>
+  /// <param name="monitor">The monitor to use.</param>
+  /// <param name="payload">The signal payload.</param>
+  /// <returns>The awaitable.</returns>
+  protected virtual Task OnCommandSignalAsync( IActivityMonitor monitor, object? payload ) => Task.CompletedTask;
+```
+
+The Signal/OnCommandSignalAsync is a simple helper that is a kind of "internal immediate multi-purpose" command.
+
+*Note:* The `CommandLoop` property is protected. Often, it must be exposed to the whole device's assembly.
+To expose it simply use the `new` masking operator:
+
+```csharp
+  public sealed class MyDevice : Device<MyDeviceConfiguration>
+  {
+    ... 
+    internal new ICommandLoop CommandLoop => base.CommandLoop;
+    ...
+  }  
+```
+
+> ActiveDevice adds a similar (and concurrent) [`EventLoop`](../ActiveDevice/README.md##the-activedeviceieventloop-interface).
 
 ## Reminders
 

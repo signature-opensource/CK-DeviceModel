@@ -14,7 +14,7 @@ namespace CK.DeviceModel
     public abstract partial class Device<TConfiguration>
     {
         readonly Channel<BaseDeviceCommand> _commandQueue;
-        readonly Channel<BaseDeviceCommand> _commandQueueImmediate;
+        readonly Channel<object?> _commandQueueImmediate;
         readonly Queue<BaseDeviceCommand> _deferredCommands;
         PriorityQueue<BaseDeviceCommand, long>? _delayedQueue;
 
@@ -259,8 +259,8 @@ namespace CK.DeviceModel
             // Regular command.
             BaseDeviceCommand? cmd = null;
 
-            // Immediate command.
-            BaseDeviceCommand? immediate;
+            // Immediate object.
+            object? immediateObject;
 
             while( !IsDestroyed )
             {
@@ -291,10 +291,9 @@ namespace CK.DeviceModel
 
                     #region Immediate commands
                     // Handle all available immediate at once (but no more than ImmediateCommandLimit to avoid regular commands starvation).
-                    if( _commandQueueImmediate.Reader.TryRead( out immediate ) )
+                    if( _commandQueueImmediate.Reader.TryRead( out immediateObject ) )
                     {
-                        Debug.Assert( immediate != null );
-                        await HandleImmediateCommandsAsync( immediate ).ConfigureAwait( false );
+                        await HandleImmediateObjectsAsync( immediateObject ).ConfigureAwait( false );
                     }
                     #endregion
 
@@ -350,9 +349,9 @@ namespace CK.DeviceModel
                                 else
                                 {
                                     await HandleCommandAsync( deferred, allowDefer: false, isImmediate: false ).ConfigureAwait( false );
-                                    if( !IsDestroyed && _commandQueueImmediate.Reader.TryRead( out immediate ) )
+                                    if( !IsDestroyed && _commandQueueImmediate.Reader.TryRead( out immediateObject ) )
                                     {
-                                        await HandleImmediateCommandsAsync( immediate ).ConfigureAwait( false );
+                                        await HandleImmediateObjectsAsync( immediateObject ).ConfigureAwait( false );
                                     }
                                 }
                             }
@@ -389,9 +388,9 @@ namespace CK.DeviceModel
                         // No regular command found. Before awaiting the next command,
                         // handle any potential immediate ones since we may have dequeued the last
                         // awaker.
-                        if( _commandQueueImmediate.Reader.TryRead( out immediate ) )
+                        if( _commandQueueImmediate.Reader.TryRead( out immediateObject ) )
                         {
-                            await HandleImmediateCommandsAsync( immediate ).ConfigureAwait( false );
+                            await HandleImmediateObjectsAsync( immediateObject ).ConfigureAwait( false );
                         }
                         continue;
                     }
@@ -450,10 +449,13 @@ namespace CK.DeviceModel
             _commandQueueImmediate.Writer.Complete();
             using( _commandMonitor.OpenInfo( $"Ending device loop, flushing command queues by signaling a UnavailableDeviceException." ) )
             {
-                while( _commandQueueImmediate.Reader.TryRead( out immediate ) )
+                while( _commandQueueImmediate.Reader.TryRead( out immediateObject ) )
                 {
-                    _commandMonitor.Trace( $"Setting UnavailableDeviceException on '{immediate}' (from immediate queue)." );
-                    immediate.InternalCompletion.TrySetException( new UnavailableDeviceException( this, immediate ) );
+                    if( immediateObject is BaseDeviceCommand immediate )
+                    {
+                        _commandMonitor.Trace( $"Setting UnavailableDeviceException on '{immediate}' (from immediate queue)." );
+                        immediate.InternalCompletion.TrySetException( new UnavailableDeviceException( this, immediate ) );
+                    }
                 }
                 while( _deferredCommands.TryDequeue( out cmd ) )
                 {
@@ -656,40 +658,74 @@ namespace CK.DeviceModel
         ///  </item>
         /// </list>
         /// </summary>
-        /// <param name="immediate">The first immediate command.</param>
+        /// <param name="immediateObject">The first immediate command or object or function from the ICommandLoop.</param>
         /// <returns>The awaitable.</returns>
-        async Task HandleImmediateCommandsAsync( BaseDeviceCommand immediate )
+        async Task HandleImmediateObjectsAsync( object? immediateObject )
         {
             if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
             int maxCount = _currentImmediateCommandLimit;
             do
             {
-                if( immediate is CommandCanceler c )
+                if( immediateObject is BaseDeviceCommand immediate )
                 {
-                    HandleCancelAllPendingCommands( c );
+                    if( immediate is CommandCanceler c )
+                    {
+                        HandleCancelAllPendingCommands( c );
+                    }
+                    else if( immediate.InternalCompletion.IsCompleted )
+                    {
+                        // Command completion don't count as immediate commands.
+                        ++maxCount;
+                        try
+                        {
+                            await OnCommandCompletedAsync( _commandMonitor, immediate );
+                        }
+                        catch( Exception ex )
+                        {
+                            using( _commandMonitor.OpenFatal( $"Unhandled error in OnCommandCompletedAsync for '{immediate}'. Stopping the device '{FullName}'.", ex ) )
+                            {
+                                await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall );
+                            }
+                        }
+                    }
+                    else
+                    {
+                        await HandleCommandAsync( immediate, allowDefer: false, isImmediate: true ).ConfigureAwait( false );
+                    }
                 }
-                else if( immediate.InternalCompletion.IsCompleted )
+                else
                 {
-                    // Command completion don't count as immediate commands.
+                    // Just like Command completion, this don't count as immediate commands
+                    // and any error stops the device.
                     ++maxCount;
+                    string action = "synchronous command loop function";
                     try
                     {
-                        await OnCommandCompletedAsync( _commandMonitor, immediate );
+                        switch( immediateObject )
+                        {
+                            case Action<IActivityMonitor> syncA:
+                                syncA( _commandMonitor );
+                                break;
+                            case Func<IActivityMonitor, Task> asyncA:
+                                action = "asynchronous command loop function";
+                                await asyncA( _commandMonitor ).ConfigureAwait( false );
+                                break;
+                            default:
+                                action = "command loop Signal call";
+                                await OnCommandSignalAsync( _commandMonitor, immediateObject );
+                                break;
+                        }
                     }
                     catch( Exception ex )
                     {
-                        using( _commandMonitor.OpenFatal( $"Unhandled error in OnCommandCompletedAsync for '{immediate}'. Stopping the device '{FullName}'.", ex ) )
+                        using( _commandMonitor.OpenFatal( $"Unhandled error while executing immediate {action}. Stopping the device '{FullName}'.", ex ) )
                         {
                             await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall );
                         }
                     }
                 }
-                else
-                {
-                    await HandleCommandAsync( immediate, allowDefer: false, isImmediate: true ).ConfigureAwait( false );
-                }
             }
-            while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediate! ) );
+            while( !IsDestroyed && --maxCount > 0 && _commandQueueImmediate.Reader.TryRead( out immediateObject ) );
             // It would not be a good idea to log here that maxCount reached 0 since it could be a false positive and that
             // we cannot inspect whether another immediate is waiting in the queue.
             // Even when the "queue tracking" will be implemented (via Interlocked.Inc/Decrement rather than channels's count implementations),

@@ -23,16 +23,20 @@ namespace CK.DeviceModel
         DeviceStatus _status;
         readonly PerfectEventSender<DeviceLifetimeEvent> _lifetimeChanged;
         readonly ActivityMonitor _commandMonitor;
+        readonly LoopImpl _commandLoop;
+
         TConfiguration _currentConfiguration;
         volatile TConfiguration _externalConfiguration;
-        volatile bool _destroyed;
 
         // For safety, ConfigurationStatus is copied: we don't trust the ExternalConfiguration.
         // This is internal so that the DeviceHostDaemon can use
         internal DeviceConfigurationStatus _configStatus;
         string? _controllerKey;
         int _eventSeqNumber;
+
+        volatile bool _destroyed;
         volatile bool _isRunning;
+
         bool _controllerKeyFromConfiguration;
         // This is not null during reconfiguration and retains Status changed events
         // to be raised by intermediate steps like starting a AlwaysRunning or stopping a Disabled device.
@@ -102,7 +106,8 @@ namespace CK.DeviceModel
             _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}." );
             _commandMonitor.AutoTags = IDeviceHost.DeviceModel;
             _commandQueue = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
-            _commandQueueImmediate = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
+            _commandQueueImmediate = Channel.CreateUnbounded<object?>( new UnboundedChannelOptions() { SingleReader = true } );
+            _commandLoop = new LoopImpl( _commandQueueImmediate.Writer );
             _deferredCommands = new Queue<BaseDeviceCommand>();
             _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
             _immediateCommandLimitDirty = true;

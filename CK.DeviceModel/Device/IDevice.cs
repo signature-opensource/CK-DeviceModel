@@ -232,8 +232,11 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Cancels all the commands that are waiting to be handled, either because they have been queued
-        /// and not handled yet or because they are waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/>
-        /// or the device to be running.
+        /// and not handled yet or because they are delayed (waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/>)
+        /// or deferred (waiting the device to be running).
+        /// <para>
+        /// This doesn't cancel commands that have been handled but are long running.
+        /// </para>
         /// </summary>
         /// <param name="cancelQueuedCommands">Cancels the current command queue.</param>
         /// <param name="cancelDelayedCommands">

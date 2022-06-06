@@ -63,84 +63,8 @@ to safely communicate with the external world:
     }
 ```
 
-This extends the `CK.Core.IMonitoredWorker` interface defined in CK.ActivityMonitor package:
-
-```csharp
-    /// <summary>
-    /// Simple abstraction of a worker with its own monitor that
-    /// can execute synchronous or asynchronous actions and offers
-    /// simple log methods (more complex logging can be done via
-    /// the <see cref="Execute(Action{IActivityMonitor})"/> method).
-    /// <para>
-    /// Note that the simple log methods here don't open/close groups and this
-    /// is normal: the worker is free to interleave any workload between consecutive
-    /// calls from this interface: structured groups have little chance to really be
-    /// structured.
-    /// </para>
-    /// </summary>
-    public interface IMonitoredWorker
-    {
-        /// <summary>
-        /// Posts the given synchronous action to be executed by this worker.
-        /// </summary>
-        /// <param name="action">The action to execute.</param>
-        void Execute( Action<IActivityMonitor> action );
-
-        /// <summary>
-        /// Posts the given asynchronous action to be executed by this worker.
-        /// </summary>
-        /// <param name="action">The action to execute.</param>
-        void Execute( Func<IActivityMonitor, Task> action );
-
-        /// <summary>
-        /// Posts an error log message into this worker monitor.
-        /// </summary>
-        /// <param name="msg">The message to log.</param>
-        void LogError( string msg );
-
-        /// <summary>
-        /// Posts an error log message with an exception into this worker monitor.
-        /// </summary>
-        /// <param name="msg">The message to log.</param>
-        /// <param name="ex">The exception to log.</param>
-        void LogError( string msg, Exception ex );
-
-        /// <summary>
-        /// Posts a warning log message into this worker monitor.
-        /// </summary>
-        /// <param name="msg">The message to log.</param>
-        void LogWarn( string msg );
-
-        /// <summary>
-        /// Posts a warning log message with an exception into this worker monitor.
-        /// </summary>
-        /// <param name="msg">The message to log.</param>
-        /// <param name="ex">The exception to log.</param>
-        void LogWarn( string msg, Exception ex );
-
-        /// <summary>
-        /// Posts an informational message log into this worker monitor.
-        /// </summary>
-        /// <param name="msg">The message to log.</param>
-        void LogInfo( string msg );
-
-        /// <summary>
-        /// Posts a trace log message into this worker monitor.
-        /// </summary>
-        /// <param name="msg">The message to log.</param>
-        void LogTrace( string msg );
-
-        /// <summary>
-        /// Posts a debug log message this worker event monitor.
-        /// </summary>
-        /// <param name="msg">The message to log.</param>
-        void LogDebug( string msg );
-    }
-```
-
-Thanks to the `void Execute( Action<IActivityMonitor> action )` and `void Execute( Func<IActivityMonitor, Task> action )`
-methods, any actions (synchronous as well as asynchronous) can be posted to be executed in the context of the event loop:
-any visible side-effect of a running device should go through this loop.
+Just like the [CommandLoop](../Device/Device.ICommandLoop.cs), this extends the `CK.Core.IMonitoredWorker` interface
+defined in CK.ActivityMonitor package: see Device's [CommandLoop and Signals](../Device/README.md#CommandLoop-and-Signals).
 
 *Note:* The `EventLoop` property is protected. Often, it must be exposed to its whole assembly. To expose it simply use
 the `new` masking operator:
@@ -154,3 +78,5 @@ the `new` masking operator:
   }  
 ```
 
+> An ActiveDevice has 2 protected loops at its disposal: the `Device.CommandLoop` and the `ActiveDevice.EventLoop`. Care must 
+> be taken to which one a job is sent: they execute concurrently!

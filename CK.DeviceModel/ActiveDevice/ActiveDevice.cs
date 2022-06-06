@@ -71,8 +71,12 @@ namespace CK.DeviceModel
         public void DebugPostEvent( TEvent e ) => DoPost( e );
 
         /// <summary>
-        /// Gets the event loop API that implementation can use to execute 
-        /// actions and logs to the event loop.
+        /// Gets the event loop API that implementation can use to safely execute 
+        /// actions, send logs to the event loop or call <see cref="IEventLoop.RaiseEvent(TEvent)"/>.
+        /// <para>
+        /// Always check that the executed action doesn't use any of the <see cref="Device{TConfiguration}.CommandLoop"/>
+        /// resources since these 2 loops execute concurrently.
+        /// </para>
         /// </summary>
         protected IEventLoop EventLoop => this;
 
