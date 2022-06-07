@@ -179,8 +179,9 @@ dedicated handler (that should of course be overridden):
 ```
 
 The Signal/OnCommandSignalAsync is a simple helper that is a kind of "internal immediate multi-purpose" command. The paylaod
-is totally internal: a simple set of strings like `"Disconnected"`, `Connected` can do the job, as well as internal static
-singletons `internal static readonly object SignalConnected = new object();`.
+is totally internal: a simple set of strings like `"Disconnected"` or `"Connected"` can do the job, as well as internal static
+singletons `internal static readonly object SignalConnected = new object();` (the latter is slightly more efficient since pure
+reference equality can be used).
 
 *Note:* The `CommandLoop` property is protected. Often, it must be exposed to the whole device's assembly.
 To expose it simply use the `new` masking operator:
@@ -194,7 +195,7 @@ To expose it simply use the `new` masking operator:
   }  
 ```
 
-> ActiveDevice adds a similar (and concurrent) [`EventLoop`](../ActiveDevice/README.md##the-activedeviceieventloop-interface).
+> An ActiveDevice adds a similar (and concurrent) [`EventLoop`](../ActiveDevice/README.md#the-activedeviceieventloop-interface).
 
 ## Reminders
 
