@@ -119,7 +119,7 @@ namespace CK.DeviceModel.Tests
                 }
                 if( command is GetReminderCountCommand get )
                 {
-                    get.Completion.SetResult( (ReminderCount,ReminderFiredCount) );
+                    get.Completion.SetResult( (ReminderCount, ReminderFiredCount) );
                     monitor.Trace( $"ReminderCount is '({ReminderCount},{ReminderFiredCount})'." );
                     return;
                 }
@@ -152,85 +152,91 @@ namespace CK.DeviceModel.Tests
             protected override string? ToStringSuffix => Trace;
         }
 
-        public class GetReminderCountCommand : DeviceCommand<DHost,(int,int)>
+        public class GetReminderCountCommand : DeviceCommand<DHost, (int, int)>
         {
         }
 
-        [TestCase(30, 200, 20)]
-        [TestCase(50, 150, 20)]
+        [TestCase( 30, 200, 20 )]
+        [TestCase( 50, 150, 20 )]
         [Timeout( 90000 )]
         public async Task SendingTimeUtc_stress_test_Async( int nb, int sendingDeltaMS, int execTimeMS )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{sendingDeltaMS},{execTimeMS})" );
-
-            var rnd = new Random();
-            var dSpan = TimeSpan.FromMilliseconds( sendingDeltaMS );
-
-            void SendCommands( D device, bool? inc, List<DCommand> c )
+            try
             {
-                var mode = inc switch { true => "increased", false => "decreased", _ => "random" };
-                using var g = TestHelper.Monitor.OpenInfo( $"Sending {nb} command with {mode} start time." );
-                var start = DateTime.UtcNow.Add( dSpan );
-                var commands = Enumerable.Range( 0, nb )
-                               .Select( i => new DCommand() { Trace = $"{mode}-n°{i}", SendingTimeUtc = start.Add( dSpan * i ) } )
-                               .ToArray();
-                if( !inc.HasValue )
+                var rnd = new Random();
+                var dSpan = TimeSpan.FromMilliseconds( sendingDeltaMS );
+
+                void SendCommands( D device, bool? inc, List<DCommand> c )
                 {
-                    int i = nb;
-                    while( i > 1 )
+                    var mode = inc switch { true => "increased", false => "decreased", _ => "random" };
+                    using var g = TestHelper.Monitor.OpenInfo( $"Sending {nb} command with {mode} start time." );
+                    var start = DateTime.UtcNow.Add( dSpan );
+                    var commands = Enumerable.Range( 0, nb )
+                                   .Select( i => new DCommand() { Trace = $"{mode}-n°{i}", SendingTimeUtc = start.Add( dSpan * i ) } )
+                                   .ToArray();
+                    if( !inc.HasValue )
                     {
-                        int k = rnd.Next( i-- );
-                        var temp = commands[i];
-                        commands[i] = commands[k];
-                        commands[k] = temp;
+                        int i = nb;
+                        while( i > 1 )
+                        {
+                            int k = rnd.Next( i-- );
+                            var temp = commands[i];
+                            commands[i] = commands[k];
+                            commands[k] = temp;
+                        }
                     }
+                    else if( !inc.Value )
+                    {
+                        Array.Reverse( commands );
+                    }
+                    c.AddRangeArray( commands );
+                    foreach( var cmd in commands ) device.UnsafeSendCommand( TestHelper.Monitor, cmd );
                 }
-                else if( !inc.Value )
+
+                var h = new DHost();
+                var config = new DConfiguration()
                 {
-                    Array.Reverse( commands );
+                    Name = "Single",
+                    Status = DeviceConfigurationStatus.RunnableStarted,
+                    ExecTimeMS = execTimeMS
+                };
+                (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+                D? d = h["Single"];
+                Debug.Assert( d != null );
+
+                var all = new List<DCommand>();
+                SendCommands( d, false, all );
+                SendCommands( d, true, all );
+                SendCommands( d, null, all );
+
+                // Waits for all the command completions.
+                foreach( var c in all ) await c.Completion;
+                // Each command triggers a 50 ms reminder.
+                // A 30 ms margin should be enough for the reminders to complete.
+                await Task.Delay( 50 + 30 );
+
+                int rc = d.ReminderCount;
+                int fc = d.ReminderFiredCount;
+                if( rc != nb * 3 || fc != nb * 3 )
+                {
+                    TestHelper.Monitor.Error( $"Failed: Final ReminderCount = {rc}, ReminderFiredCount = {fc} (should be both {nb * 3})." );
                 }
-                c.AddRangeArray( commands );
-                foreach( var cmd in commands ) device.UnsafeSendCommand( TestHelper.Monitor, cmd );
+                else
+                {
+                    TestHelper.Monitor.Info( $"Success: Final ReminderCount = {rc}, ReminderFiredCount = {fc}." );
+                }
+
+                await h.ClearAsync( TestHelper.Monitor, true );
+
+                rc.Should().Be( nb * 3, "ReminderCount is fine." );
+                fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
             }
-
-            var h = new DHost();
-            var config = new DConfiguration()
+            catch( Exception ex )
             {
-                Name = "Single",
-                Status = DeviceConfigurationStatus.RunnableStarted,
-                ExecTimeMS = execTimeMS
-            };
-            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
-            D? d = h["Single"];
-            Debug.Assert( d != null );
-
-            var all = new List<DCommand>();
-            SendCommands( d, false, all );
-            SendCommands( d, true, all );
-            SendCommands( d, null, all );
-
-            // Waits for all the command completions.
-            foreach( var c in all ) await c.Completion;
-            // Each command triggers a 50 ms reminder.
-            // A 30 ms margin should be enough for the reminders to complete.
-            await Task.Delay( 50 + 30 );
-
-            int rc = d.ReminderCount;
-            int fc = d.ReminderFiredCount;
-            if( rc != nb * 3 || fc != nb * 3 )
-            {
-                TestHelper.Monitor.Error( $"Failed: Final ReminderCount = {rc}, ReminderFiredCount = {fc} (should be both {nb * 3})." );
+                TestHelper.Monitor.Fatal( ex );
+                throw;
             }
-            else
-            {
-                TestHelper.Monitor.Info( $"Success: Final ReminderCount = {rc}, ReminderFiredCount = {fc}." );
-            }
-
-            await h.ClearAsync( TestHelper.Monitor, true );
-
-            rc.Should().Be( nb * 3, "ReminderCount is fine." );
-            fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
-
         }
     }
 }

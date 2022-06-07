@@ -153,150 +153,160 @@ namespace CK.DeviceModel.Tests
         public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_cancellation_reasons_Async )}({nb},{randomSeed})" );
-
-            var rnd = new Random( randomSeed );
-            var h = new DHost();
-            var config = new DConfiguration() { Name = "Single", Status = DeviceConfigurationStatus.RunnableStarted, RandomSeed = rnd.Next() };
-            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
-            D? d = h["Single"];
-            Debug.Assert( d != null );
-
-            var alreadyCanceled = new CancellationTokenSource();
-            alreadyCanceled.Cancel();
-
-            var cancel200Timeout = new CancellationTokenSource( 200 );
-
-            var neverCanceled = new CancellationTokenSource();
-
-            var all = new List<DCommand>();
-
-            for( int i = 0; i < nb; ++i )
+            try
             {
-                CancellationTokenSource? sendCommandTimeout = null;
+                var rnd = new Random( randomSeed );
+                var h = new DHost();
+                var config = new DConfiguration() { Name = "Single", Status = DeviceConfigurationStatus.RunnableStarted, RandomSeed = rnd.Next() };
+                (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+                D? d = h["Single"];
+                Debug.Assert( d != null );
 
-                var c = new DCommand();
-                all.Add( c );
-                // Each command will normally be completed in 500 ms but it starts
-                // randomly (including immediately) and its completion is deferred either
-                // by a reminder or by a stupid delayed Task.
-                var startDelay = rnd.Next( 500 ) - 30;
-                if( startDelay < 0 ) c.ImmediateSending = true;
-                else c.SendingTimeUtc = DateTime.UtcNow.AddMilliseconds( startDelay );
-                c.WaitToComplete = TimeSpan.FromMilliseconds( 500 - Math.Max( 0, startDelay ) );
+                var alreadyCanceled = new CancellationTokenSource();
+                alreadyCanceled.Cancel();
 
-                switch( i % 11 )
+                var cancel200Timeout = new CancellationTokenSource( 200 );
+
+                var neverCanceled = new CancellationTokenSource();
+
+                var all = new List<DCommand>();
+
+                for( int i = 0; i < nb; ++i )
                 {
-                    case 0:
-                        c.ExpectedCancellationReason = nameof( alreadyCanceled );
-                        switch( i % 3 )
-                        {
-                            case 0:
-                                c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
-                                c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                                c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                                break;
-                            case 1:
-                                c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                                c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
-                                c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                                break;
-                            case 2:
-                                c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                                c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
-                                c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                                break;
-                        }
-                        break;
-                    case 1:
-                        c.ExpectedCancellationReason = nameof( cancel200Timeout );
-                        switch( i % 2 )
-                        {
-                            case 0:
-                                c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                                c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                                break;
-                            case 1:
-                                c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                                c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                                break;
-                        }
-                        break;
-                    case 2:
-                        c.ExpectedCancellationReason = nameof( alreadyCanceled );
-                        c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
-                        break;
-                    case 3:
-                        // SendCommandTokenReason or cancel200Timeout.
-                        c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                        if( rnd.Next( 2 ) == 0 )
-                        {
-                            sendCommandTimeout = new CancellationTokenSource( 100 );
-                            c.ExpectedCancellationReason = BaseDeviceCommand.SendCommandTokenReason;
-                        }
-                        else
-                        {
+                    CancellationTokenSource? sendCommandTimeout = null;
+
+                    var c = new DCommand();
+                    all.Add( c );
+                    // Each command will normally be completed in 500 ms but it starts
+                    // randomly (including immediately) and its completion is deferred either
+                    // by a reminder or by a stupid delayed Task.
+                    var startDelay = rnd.Next( 500 ) - 30;
+                    if( startDelay < 0 ) c.ImmediateSending = true;
+                    else c.SendingTimeUtc = DateTime.UtcNow.AddMilliseconds( startDelay );
+                    c.WaitToComplete = TimeSpan.FromMilliseconds( 500 - Math.Max( 0, startDelay ) );
+
+                    switch( i % 11 )
+                    {
+                        case 0:
+                            c.ExpectedCancellationReason = nameof( alreadyCanceled );
+                            switch( i % 3 )
+                            {
+                                case 0:
+                                    c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
+                                    c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                                    c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                                    break;
+                                case 1:
+                                    c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                                    c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
+                                    c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                                    break;
+                                case 2:
+                                    c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                                    c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
+                                    c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                                    break;
+                            }
+                            break;
+                        case 1:
                             c.ExpectedCancellationReason = nameof( cancel200Timeout );
-                        }
-                        break;
-                    case 4:
-                        // Success or SendCommandTokenReason.
-                        c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                        if( rnd.Next( 2 ) == 0 )
-                        {
-                            sendCommandTimeout = new CancellationTokenSource( 300 );
-                            c.ExpectedCancellationReason = BaseDeviceCommand.SendCommandTokenReason;
-                        }
-                        break;
-                    case 5:
-                        // CommandTimeoutReason occurs 50 ms after the DoHandleCommandAsync.
-                        c.ExpectedCancellationReason = BaseDeviceCommand.CommandTimeoutReason;
-                        break;
-                    case 6:
-                        c.ExpectedCancellationReason = BaseDeviceCommand.CommandTimeoutReason;
-                        c.ImmediateSending = true;
-                        c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                        c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                        break;
-                    case 7:
-                        c.ExpectedCancellationReason = BaseDeviceCommand.CommandCompletionCanceledReason;
-                        c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                        c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                        c.Completion.SetCanceled();
-                        break;
-                    case 8:
-                        c.ExpectedCancellationReason = "ExplicitCancel";
-                        c.ExplicitCancelOnComplete = true;
-                        c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                        break;
-                    case 9:
-                        c.ExpectedCancellationReason = BaseDeviceCommand.CommandTimeoutReason;
-                        c.ExplicitCancelOnComplete = true;
-                        c.ImmediateSending = true;
-                        c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                        c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                        break;
-                    case 10:
-                        c.ExpectedCancellationReason = BaseDeviceCommand.CommandCompletionCanceledReason;
-                        c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
-                        c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                        _ = Task.Run( async () =>
-                        {
-                            await Task.Delay( 100 );
+                            switch( i % 2 )
+                            {
+                                case 0:
+                                    c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                                    c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                                    break;
+                                case 1:
+                                    c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                                    c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                                    break;
+                            }
+                            break;
+                        case 2:
+                            c.ExpectedCancellationReason = nameof( alreadyCanceled );
+                            c.AddCancellationSource( alreadyCanceled.Token, nameof( alreadyCanceled ) );
+                            break;
+                        case 3:
+                            // SendCommandTokenReason or cancel200Timeout.
+                            c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                            if( rnd.Next( 2 ) == 0 )
+                            {
+                                sendCommandTimeout = new CancellationTokenSource( 100 );
+                                c.ExpectedCancellationReason = BaseDeviceCommand.SendCommandTokenReason;
+                            }
+                            else
+                            {
+                                c.ExpectedCancellationReason = nameof( cancel200Timeout );
+                            }
+                            break;
+                        case 4:
+                            // Success or SendCommandTokenReason.
+                            c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                            if( rnd.Next( 2 ) == 0 )
+                            {
+                                sendCommandTimeout = new CancellationTokenSource( 300 );
+                                c.ExpectedCancellationReason = BaseDeviceCommand.SendCommandTokenReason;
+                            }
+                            break;
+                        case 5:
+                            // CommandTimeoutReason occurs 50 ms after the DoHandleCommandAsync.
+                            c.ExpectedCancellationReason = BaseDeviceCommand.CommandTimeoutReason;
+                            break;
+                        case 6:
+                            c.ExpectedCancellationReason = BaseDeviceCommand.CommandTimeoutReason;
+                            c.ImmediateSending = true;
+                            c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                            c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                            break;
+                        case 7:
+                            c.ExpectedCancellationReason = BaseDeviceCommand.CommandCompletionCanceledReason;
+                            c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                            c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
                             c.Completion.SetCanceled();
-                        } );
-                        break;
-                    default: Debug.Fail( "Never" ); break;
+                            break;
+                        case 8:
+                            c.ExpectedCancellationReason = "ExplicitCancel";
+                            c.ExplicitCancelOnComplete = true;
+                            c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                            break;
+                        case 9:
+                            c.ExpectedCancellationReason = BaseDeviceCommand.CommandTimeoutReason;
+                            c.ExplicitCancelOnComplete = true;
+                            c.ImmediateSending = true;
+                            c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                            c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                            break;
+                        case 10:
+                            c.ExpectedCancellationReason = BaseDeviceCommand.CommandCompletionCanceledReason;
+                            c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
+                            c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
+                            _ = Task.Run( async () =>
+                            {
+                                await Task.Delay( 100 );
+                                c.Completion.SetCanceled();
+                            } );
+                            break;
+                        default: Debug.Fail( "Never" ); break;
+                    }
+                    c.Trace = $"n°{i}-{c.ExpectedCancellationReason ?? "<Success>"}'";
+                    d.UnsafeSendCommand( TestHelper.Monitor, c, sendCommandTimeout?.Token ?? default );
                 }
-                c.Trace = $"n°{i}-{c.ExpectedCancellationReason ?? "<Success>"}'";
-                d.UnsafeSendCommand( TestHelper.Monitor, c, sendCommandTimeout?.Token ?? default );
+                foreach( var c in all )
+                {
+                    TestHelper.Monitor.Trace( $"Waiting for {c}." );
+                    await c.Completion;
+                    TestHelper.Monitor.Trace( $"Got {c}." );
+                    c.CancellationReason.Should().Be( c.ExpectedCancellationReason );
+                }
+
+                await h.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
             }
-            foreach( var c in all )
+            catch( Exception ex )
             {
-                TestHelper.Monitor.Trace( $"Waiting for {c}." );
-                await c.Completion;
-                TestHelper.Monitor.Trace( $"Got {c}." );
-                c.CancellationReason.Should().Be( c.ExpectedCancellationReason );
+                TestHelper.Monitor.Fatal( ex );
+                throw;
             }
+
 
         }
     }
