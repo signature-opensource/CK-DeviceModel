@@ -2,8 +2,6 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -18,10 +16,9 @@ namespace CK.DeviceModel
         readonly Queue<BaseDeviceCommand> _deferredCommands;
         PriorityQueue<BaseDeviceCommand, long>? _delayedQueue;
 
-        // Timers are not accurate enough. When a due time is set,
-        // the repeat time is set to 5 ms so that if the initial tick is
-        // missed, one of the repeated one will fix it.
-        const uint _timerRepeatTime = 5;
+        // Unsigned integer to disable repeat time.
+        const uint _timerRepeatTime = unchecked((uint)Timeout.Infinite);
+
         // Used to handle timer change failure. 0 means it should be stopped,
         // otherwise this contains the next timer time.
         // This may be useless (never seen it failed) but this is handled (and logged).
