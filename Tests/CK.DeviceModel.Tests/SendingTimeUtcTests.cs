@@ -191,7 +191,10 @@ namespace CK.DeviceModel.Tests
                         Array.Reverse( commands );
                     }
                     c.AddRangeArray( commands );
-                    foreach( var cmd in commands ) device.UnsafeSendCommand( TestHelper.Monitor, cmd );
+                    foreach( var cmd in commands )
+                    {
+                        device.UnsafeSendCommand( TestHelper.Monitor, cmd ).Should().BeTrue();
+                    }
                 }
 
                 var h = new DHost();
@@ -210,8 +213,13 @@ namespace CK.DeviceModel.Tests
                 SendCommands( d, true, all );
                 SendCommands( d, null, all );
 
-                // Waits for all the command completions.
-                foreach( var c in all ) await c.Completion;
+                TestHelper.Monitor.Info( $"Wait for the {all.Count} commands to be completed." );
+
+                await Task.WhenAll( all.Select( c => c.Completion.Task ) );
+                //foreach( var c in all ) await c.Completion;
+
+                TestHelper.Monitor.Info( $"Wait for 50 ms reminder + 30 ms (safety)." );
+
                 // Each command triggers a 50 ms reminder.
                 // A 30 ms margin should be enough for the reminders to complete.
                 await Task.Delay( 50 + 30 );

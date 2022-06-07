@@ -306,8 +306,6 @@ namespace CK.DeviceModel.Tests
                 TestHelper.Monitor.Fatal( ex );
                 throw;
             }
-
-
         }
     }
 }
