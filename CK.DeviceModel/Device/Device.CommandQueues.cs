@@ -502,7 +502,11 @@ namespace CK.DeviceModel
                     if( _delayedQueue == null )
                     {
                         _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
-                        _timer = new Timer( _ => _commandQueue.Writer.TryWrite( _commandAwaker ) );
+                        _timer = new Timer( _ =>
+                        {
+                            ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Debug | LogLevel.IsFiltered, "Timer fired." );
+                            _commandQueue.Writer.TryWrite( _commandAwaker );
+                        } );
                         _commandMonitor.Info( "Created DelayedQueue and Timer." );
                     }
                     _delayedQueue.Enqueue( cmd, time );

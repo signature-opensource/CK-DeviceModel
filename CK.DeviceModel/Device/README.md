@@ -145,7 +145,7 @@ methods, any actions (synchronous as well as asynchronous) can be posted to be e
 any process that interacts with the state of a device should go through this loop.
 
 The `ICommandLoop` adds a notion of "signal" that can be useful to avoid lambda functions and to centralize code:
-becaus lambda functions are written at the call site, they can be really misleading for the reader/maintainer:
+because lambda functions are written at the call site, they can be really misleading for the reader/maintainer:
 ```c#
 /// <summary>
 /// The command loop exposed by <see cref="CommandLoop"/>.
@@ -178,7 +178,9 @@ dedicated handler (that should of course be overridden):
   protected virtual Task OnCommandSignalAsync( IActivityMonitor monitor, object? payload ) => Task.CompletedTask;
 ```
 
-The Signal/OnCommandSignalAsync is a simple helper that is a kind of "internal immediate multi-purpose" command.
+The Signal/OnCommandSignalAsync is a simple helper that is a kind of "internal immediate multi-purpose" command. The paylaod
+is totally internal: a simple set of strings like `"Disconnected"`, `Connected` can do the job, as well as internal static
+singletons `internal static readonly object SignalConnected = new object();`.
 
 *Note:* The `CommandLoop` property is protected. Often, it must be exposed to the whole device's assembly.
 To expose it simply use the `new` masking operator:
