@@ -149,7 +149,6 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( 11, 3713 )]
         [TestCase( 200, 42 )]
-        [TestCase( 10000, 3713 )]
         [Timeout( 1000 )]
         public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed )
         {
