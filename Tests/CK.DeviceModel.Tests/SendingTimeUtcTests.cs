@@ -216,13 +216,12 @@ namespace CK.DeviceModel.Tests
 
                 TestHelper.Monitor.Info( $"Wait for the {all.Count} commands to be completed." );
 
-                await Task.WhenAll( all.Select( c => c.Completion.Task ) );
-                //foreach( var c in all ) await c.Completion;
-
-                TestHelper.Monitor.Info( $"Wait for 50 ms reminder + 30 ms (safety)." );
+                foreach( var c in all ) await c.Completion;
 
                 // Each command triggers a 50 ms reminder.
                 // A 30 ms margin should be enough for the reminders to complete.
+                TestHelper.Monitor.Info( $"Wait for 50 ms reminder + 30 ms (safety)." );
+
                 await Task.Delay( 50 + 30 );
 
                 int rc = d.ReminderCount;
