@@ -440,10 +440,6 @@ namespace CK.DeviceModel
                     }
                 }
             }
-            if( _timer != null )
-            {
-                await _timer.DisposeAsync();
-            }
             _commandQueue.Writer.Complete();
             _commandQueueImmediate.Writer.Complete();
             using( _commandMonitor.OpenInfo( $"Ending device loop, flushing command queues by signaling a UnavailableDeviceException." ) )

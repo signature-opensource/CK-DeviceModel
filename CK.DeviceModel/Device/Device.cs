@@ -809,6 +809,12 @@ namespace CK.DeviceModel
                 await HandleStopAsync( null, autoDestroy ? DeviceStoppedReason.SelfDestroyed : DeviceStoppedReason.Destroyed ).ConfigureAwait( false );
                 Debug.Assert( !_isRunning );
             }
+            // Kill the timer early.
+            if( _timer != null )
+            {
+                await _timer.DisposeAsync();
+                _timer = null;  
+            }
             Exception? error = null;
             try
             {

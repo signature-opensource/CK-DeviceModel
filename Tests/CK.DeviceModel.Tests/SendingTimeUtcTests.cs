@@ -16,39 +16,39 @@ namespace CK.DeviceModel.Tests
     [TestFixture]
     public class SendingTimeUtcTests
     {
-        //[Test]
-        //[Timeout( 200 )]
-        //public void SendingTimeUtc_and_ImmediateSending_are_exclusive()
-        //{
-        //    var d = DateTime.UtcNow;
+        [Test]
+        [Timeout( 200 )]
+        public void SendingTimeUtc_and_ImmediateSending_are_exclusive()
+        {
+            var d = DateTime.UtcNow;
 
-        //    var cmd = new FlashCommand();
-        //    cmd.ImmediateSending.Should().BeFalse();
-        //    cmd.SendingTimeUtc.Should().BeNull();
+            var cmd = new FlashCommand();
+            cmd.ImmediateSending.Should().BeFalse();
+            cmd.SendingTimeUtc.Should().BeNull();
 
-        //    cmd.SendingTimeUtc = d;
-        //    cmd.ImmediateSending.Should().BeFalse();
-        //    cmd.SendingTimeUtc.Should().Be( d );
+            cmd.SendingTimeUtc = d;
+            cmd.ImmediateSending.Should().BeFalse();
+            cmd.SendingTimeUtc.Should().Be( d );
 
-        //    cmd.ImmediateSending = true;
-        //    cmd.ImmediateSending.Should().BeTrue();
-        //    cmd.SendingTimeUtc.Should().BeNull();
+            cmd.ImmediateSending = true;
+            cmd.ImmediateSending.Should().BeTrue();
+            cmd.SendingTimeUtc.Should().BeNull();
 
-        //    cmd.SendingTimeUtc = d;
-        //    cmd.ImmediateSending.Should().BeFalse();
-        //    cmd.SendingTimeUtc.Should().Be( d );
+            cmd.SendingTimeUtc = d;
+            cmd.ImmediateSending.Should().BeFalse();
+            cmd.SendingTimeUtc.Should().Be( d );
 
-        //    cmd.SendingTimeUtc = null;
-        //    cmd.ImmediateSending.Should().BeFalse();
-        //    cmd.SendingTimeUtc.Should().BeNull();
+            cmd.SendingTimeUtc = null;
+            cmd.ImmediateSending.Should().BeFalse();
+            cmd.SendingTimeUtc.Should().BeNull();
 
-        //    cmd.ImmediateSending = true;
-        //    cmd.SendingTimeUtc = CK.Core.Util.UtcMinValue;
-        //    cmd.ImmediateSending.Should().BeFalse();
-        //    cmd.SendingTimeUtc.Should().BeNull();
+            cmd.ImmediateSending = true;
+            cmd.SendingTimeUtc = CK.Core.Util.UtcMinValue;
+            cmd.ImmediateSending.Should().BeFalse();
+            cmd.SendingTimeUtc.Should().BeNull();
 
-        //    FluentActions.Invoking( () => cmd.SendingTimeUtc = DateTime.Now ).Should().Throw<ArgumentException>();
-        //}
+            FluentActions.Invoking( () => cmd.SendingTimeUtc = DateTime.Now ).Should().Throw<ArgumentException>();
+        }
 
         public class DHost : DeviceHost<D, DeviceHostConfiguration<DConfiguration>, DConfiguration>
         {
