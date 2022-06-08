@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CK.DeviceModel.Tests
+namespace CK.DeviceModel
 {
     [SetUpFixture]
     public class MySetUpClass
@@ -20,7 +20,7 @@ namespace CK.DeviceModel.Tests
         [OneTimeTearDown]
         public void RunAfterAnyTests()
         {
-            using var restoreFilter = Util.CreateDisposableAction( () => ActivityMonitor.Tags.RemoveFilter( IDeviceHost.DeviceModel ) );
+            ActivityMonitor.Tags.RemoveFilter( IDeviceHost.DeviceModel );
         }
     }
 }

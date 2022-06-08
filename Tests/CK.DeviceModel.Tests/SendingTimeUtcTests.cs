@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,6 +53,14 @@ namespace CK.DeviceModel.Tests
 
         public class DHost : DeviceHost<D, DeviceHostConfiguration<DConfiguration>, DConfiguration>
         {
+            public DHost()
+            {
+            }
+
+            public DHost( string hostName )
+                : base( hostName )
+            {
+            }
         }
 
         public class DConfiguration : DeviceConfiguration
@@ -156,14 +165,49 @@ namespace CK.DeviceModel.Tests
         {
         }
 
+        public readonly struct Safe
+        {
+            readonly Func<string,Task> _action;
+            readonly string _name;
+            readonly DateTime _start;
+
+            public Safe( Func<string,Task> a, [CallerMemberName] string? name = null )
+            {
+                _action = a;
+                _name = name!;
+                _start = DateTime.UtcNow;
+            }
+
+            public async Task RunAsync( params object[] parameters )
+            {
+                var mName = $"{_name}({parameters.Select( p => p.ToString() ).Concatenate()})";
+                using var g = TestHelper.Monitor.OpenInfo( mName );
+                GC.Collect();
+                try
+                {
+                    await _action( mName );
+                    GC.Collect();
+                }
+                catch( Exception ex )
+                {
+                    GC.Collect();
+                    TestHelper.Monitor.Fatal( ex );
+                    throw;
+                }
+                finally
+                {
+                    TestHelper.Monitor.CloseGroup( $"{mName} ended in {DateTime.UtcNow - _start}." );
+                }
+            }
+
+        }
+
         [TestCase( 30, 200, 20 )]
         [TestCase( 50, 150, 20 )]
         [Timeout( 90000 )]
         public async Task SendingTimeUtc_stress_test_Async( int nb, int sendingDeltaMS, int execTimeMS )
         {
-            GC.Collect();
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( SendingTimeUtc_stress_test_Async )}({nb},{sendingDeltaMS},{execTimeMS})" );
-            try
+            await new Safe( async testName =>
             {
                 var rnd = new Random();
                 var dSpan = TimeSpan.FromMilliseconds( sendingDeltaMS );
@@ -198,7 +242,7 @@ namespace CK.DeviceModel.Tests
                     }
                 }
 
-                var h = new DHost();
+                var h = new DHost( testName );
                 var config = new DConfiguration()
                 {
                     Name = "Single",
@@ -239,13 +283,8 @@ namespace CK.DeviceModel.Tests
 
                 rc.Should().Be( nb * 3, "ReminderCount is fine." );
                 fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
-            }
-            catch( Exception ex )
-            {
-                TestHelper.Monitor.Fatal( ex );
-                throw;
-            }
-            GC.Collect();
+
+            } ).RunAsync( nb, sendingDeltaMS, execTimeMS );
         }
     }
 }

@@ -17,18 +17,6 @@ namespace CK.DeviceModel.Tests
     [TestFixture]
     public class ActiveDeviceTests
     {
-        [SetUp]
-        public void SetDebugDevice()
-        {
-            ActivityMonitor.Tags.AddFilter( IDeviceHost.DeviceModel, new LogClamper( LogFilter.Debug, false ) );
-        }
-
-        [TearDown]
-        public void ClearDebugDevice()
-        {
-            ActivityMonitor.Tags.RemoveFilter( IDeviceHost.DeviceModel );
-        }
-
         class EventCollector
         {
             public readonly List<object> Events = new List<object>();

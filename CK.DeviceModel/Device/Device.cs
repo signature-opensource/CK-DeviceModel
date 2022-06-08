@@ -812,6 +812,7 @@ namespace CK.DeviceModel
             // Kill the timer early.
             if( _timer != null )
             {
+                _commandMonitor.Trace( "Disposing Timer." );
                 await _timer.DisposeAsync();
                 _timer = null;  
             }

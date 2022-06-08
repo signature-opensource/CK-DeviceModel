@@ -18,7 +18,7 @@ namespace CK.DeviceModel
 
         // Unsigned integer for infinite.
         const uint _unsignedTimeoutInfinite = unchecked((uint)Timeout.Infinite);
-        const uint _timerRepeatTime = _unsignedTimeoutInfinite;
+        const uint _tickCountResolution = 15;
 
         Timer? _timer;
         long _nextTimerTime;
@@ -440,6 +440,12 @@ namespace CK.DeviceModel
                     }
                 }
             }
+            if( _timer != null )
+            {
+                _commandMonitor.Warn( "Timer has not been disposed by Destroy. Disposing it now." );
+                await _timer.DisposeAsync();
+                _timer = null;
+            }
             _commandQueue.Writer.Complete();
             _commandQueueImmediate.Writer.Complete();
             using( _commandMonitor.OpenInfo( $"Ending device loop, flushing command queues by signaling a UnavailableDeviceException." ) )
@@ -491,19 +497,15 @@ namespace CK.DeviceModel
                     return false;
                 }
                 var delta = (uint)lDelta;
-                // If the command must be handled in 5 ms or less, handle it now.
-                if( delta > 5 )
+                // If the command must be handled in tickCountResolution ms or less, handle it now.
+                if( delta > _tickCountResolution )
                 {
                     if( _delayedQueue == null )
                     {
+                        Debug.Assert( _timer == null );
+                        _commandMonitor.Info( "Creating DelayedQueue and Timer." );
                         _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
-                        _timer = new Timer( OnTimer );
-                        _timer = new Timer( _ =>
-                        {
-                            ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Debug | LogLevel.IsFiltered, "Timer fired." );
-                            _commandQueue.Writer.TryWrite( _commandAwaker );
-                        } );
-                        _commandMonitor.Info( "Created DelayedQueue and Timer." );
+                        _timer = new Timer( OnTimer, null, _unsignedTimeoutInfinite, _unsignedTimeoutInfinite );
                     }
                     _delayedQueue.Enqueue( cmd, time );
                     if( _delayedQueue.Peek() == cmd )
@@ -519,7 +521,7 @@ namespace CK.DeviceModel
 
         void OnTimer( object? _ )
         {
-            ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Debug | LogLevel.IsFiltered, IDeviceHost.DeviceModel, "Timer fired." );
+            ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Debug | LogLevel.IsFiltered, IDeviceHost.DeviceModel, $"Timer fired for '{FullName}'." );
             //ActivityMonitor.ExternalLog.Debug( IDeviceHost.DeviceModel, $"Timer fired for '{FullName}'." );
             Volatile.Write( ref _timerFired, true );
             _commandQueue.Writer.TryWrite( _commandAwaker );
@@ -554,13 +556,13 @@ namespace CK.DeviceModel
             }
 
             // Next, dequeue the next ready-to-run delayed commands, skipping the canceled ones,
-            // with a 1 ms margin: we consider that a 1 ms delay is negligible.
+            // with a 1 ms margin: we consider that a 5 ms delay is negligible.
             bool hasDequeued = false;
 
             BaseDeviceCommand? delayed;
             long nextDelayedTime;
             while( _delayedQueue.TryPeek( out delayed, out nextDelayedTime )
-                   && nextDelayedTime <= now + 1 )
+                   && nextDelayedTime <= now + _tickCountResolution )
             {
                 hasDequeued = true;
                 _delayedQueue.Dequeue();
@@ -582,8 +584,7 @@ namespace CK.DeviceModel
                 {
                     var delta = nextDelayedTime - now;
                     // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
-                    // We use the same 1 ms margin as above.
-                    if( delta > 1 )
+                    if( delta > _tickCountResolution )
                     {
                         Debug.Assert( _delayedQueue.Count > 0 );
                         _commandMonitor.Debug( $"Next delayed command is {delayed} in {delta} ms." );
@@ -591,15 +592,21 @@ namespace CK.DeviceModel
                     }
                     else
                     {
-                        _commandMonitor.Debug( "Next delayed command is ready to be dequeued. Stopping timer." );
-                        StopTimer();
+                        _commandMonitor.Debug( $"Next delayed command is ready to be dequeued." );
+                        if( _nextTimerTime != 0 )
+                        {
+                            StopTimer();
+                        }
                         nextIsReady = true;
                     }
                 }
                 else
                 {
-                    _commandMonitor.Debug( "No more delayed command. Stopping timer." );
-                    StopTimer();
+                    _commandMonitor.Debug( "No more delayed command." );
+                    if( _nextTimerTime != 0 )
+                    {
+                        StopTimer();
+                    }
                 }
             }
             else _commandMonitor.Debug( "No ready-to-run delayed command." );
@@ -608,9 +615,11 @@ namespace CK.DeviceModel
 
         void StartTimer( long time, long delta )
         {
+            Debug.Assert( delta > _tickCountResolution );
             Debug.Assert( _timer != null );
+            _commandMonitor.Debug( _nextTimerTime == 0 ? $"Timer started to {delta} ms." : $"Timer reconfigured to {delta} ms." );
             _nextTimerTime = time;
-            if( _failedTimerSet = !_timer.Change( (uint)delta, _timerRepeatTime ) )
+            if( _failedTimerSet = !_timer.Change( (uint)delta, _unsignedTimeoutInfinite ) )
             {
                 _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
                 _commandQueue.Writer.TryWrite( _commandAwaker );
@@ -619,8 +628,9 @@ namespace CK.DeviceModel
 
         void StopTimer()
         {
-            Debug.Assert( _timer != null );
+            Debug.Assert( _timer != null && _nextTimerTime != 0 );
             _nextTimerTime = 0;
+            _commandMonitor.Debug( "Timer stopped." );
             if( _failedTimerSet = !_timer.Change( _unsignedTimeoutInfinite, _unsignedTimeoutInfinite ) )
             {
                 _commandMonitor.Error( "Failed to Stop timer. Sending CommandAwaker to loop." );
@@ -634,9 +644,9 @@ namespace CK.DeviceModel
             using( _commandMonitor.OpenWarn( $"Retrying to Change timer." ) )
             {
                 var delta = _nextTimerTime - now;
-                if( delta > 0 )
+                if( delta > _tickCountResolution )
                 {
-                    if( !_timer.Change( (uint)delta, _timerRepeatTime ) )
+                    if( !_timer.Change( (uint)delta, _unsignedTimeoutInfinite ) )
                     {
                         _commandMonitor.Error( $"Failed to Change timer (again) to {delta} ms. Sending CommandAwaker to loop." );
                         _commandQueue.Writer.TryWrite( _commandAwaker );
