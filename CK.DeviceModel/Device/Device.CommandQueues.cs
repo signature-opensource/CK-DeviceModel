@@ -540,13 +540,23 @@ namespace CK.DeviceModel
                 var delta = _nextTimerTime - now;
                 if( delta > 0 )
                 {
-                    // This seems the best thing we can do even if it seems curious.
-                    // The only other possibility would be to reschedule the timer and that would be
-                    // for a very short time.
+                    // Timers can fire before their due date.
+                    // - If the delta is below the _tickCountResolution, we take no risk
+                    // and we "forward the now". This seems curious but it does the job.
+                    // - If the delta greater than the _tickCountResolution, we reschedule the timer.
+                    //
                     // Thanks to this adjustment of current time, we don't lose any timer tick and we don't
-                    // need to use repetitions. 
-                    _commandMonitor.Warn( $"Timer fired {delta} ms before its expected time." );
-                    now = _nextTimerTime;
+                    // need to use repetitions.
+                    if( delta > _tickCountResolution )
+                    {
+                        _commandMonitor.Warn( $"Timer fired {delta} ms before its expected time. Rescheduling it." );
+                        StartTimer( _nextTimerTime, delta );
+                    }
+                    else
+                    {
+                        _commandMonitor.Warn( $"Timer fired {delta} ms before its expected time. Updating 'now' to its expected time." );
+                        now = _nextTimerTime;
+                    }
                 }
             }
             else
