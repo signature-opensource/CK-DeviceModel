@@ -533,20 +533,19 @@ namespace CK.DeviceModel
             Debug.Assert( _timer != null );
 
             BaseDeviceCommand? cmd = null;
-            var now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+            long now; 
             if( Volatile.Read( ref _timerFired ) )
             {
+                now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
                 _timerFired = false;
                 var delta = _nextTimerTime - now;
                 if( delta > 0 )
                 {
-                    // Timers can fire before their due date.
+                    // Timers SHOULD NOT fire before their due date.
                     // - If the delta is below the _tickCountResolution, we take no risk
                     // and we "forward the now". This seems curious but it does the job.
-                    // - If the delta greater than the _tickCountResolution, we reschedule the timer.
-                    //
-                    // Thanks to this adjustment of current time, we don't lose any timer tick and we don't
-                    // need to use repetitions.
+                    // - If the delta is greater than the _tickCountResolution, we reschedule the timer.
+                    // This SHOULD NEVER happen! (But if it does, it's handled.)
                     if( delta > _tickCountResolution )
                     {
                         _commandMonitor.Warn( $"Timer fired {delta} ms before its expected time. Rescheduling it." );
@@ -561,6 +560,7 @@ namespace CK.DeviceModel
             }
             else
             {
+                now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
                 // If a previous attempt failed, tries to Change the timer.
                 if( _failedTimerSet ) RetryTimerConfiguration( now );
             }

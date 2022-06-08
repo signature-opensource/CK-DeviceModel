@@ -149,6 +149,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( 11, 3713 )]
         [TestCase( 200, 42 )]
+        [TestCase( 10000, 3713 )]
         [Timeout( 1000 )]
         public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed )
         {
@@ -296,7 +297,7 @@ namespace CK.DeviceModel.Tests
                     TestHelper.Monitor.Trace( $"Waiting for {c}." );
                     await c.Completion;
                     TestHelper.Monitor.Trace( $"Got {c}." );
-                    c.CancellationReason.Should().Be( c.ExpectedCancellationReason );
+                    c.CancellationReason.Should().Be( c.ExpectedCancellationReason, c.ToString() );
                 }
 
                 await h.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
