@@ -103,7 +103,7 @@ namespace CK.DeviceModel.Tests
                         {
                             await Task.Delay( cmd.WaitToComplete );
                             DoComplete( cmd );
-                            ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Trace, $"Task.Run() completed {command}." );
+                            ActivityMonitor.StaticLogger.Trace( $"Task.Run() completed {command}." );
                         } );
                     }
                     return;

@@ -521,11 +521,9 @@ namespace CK.DeviceModel
 
         void OnTimer( object? _ )
         {
-            ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Debug | LogLevel.IsFiltered, IDeviceHost.DeviceModel, $"Timer fired for '{FullName}'." );
-            //ActivityMonitor.ExternalLog.Debug( IDeviceHost.DeviceModel, $"Timer fired for '{FullName}'." );
-
-            // It is utterly important that, when the loop is woke up by an awaker, the loop  (TryGetDelayedCommand) knowsthat this awaker
-            // comes from the timer.
+            ActivityMonitor.StaticLogger.Debug( IDeviceHost.DeviceModel, $"Timer fired for '{FullName}'." );
+            // It is utterly important that, when the loop is woke up by an awaker, the loop  (TryGetDelayedCommand) knows
+            // that this awaker comes from the timer.
             // Volatile.Read/Write (of a simple bool) may not offer enough guaranty here (see https://www.albahari.com/threading/part4.aspx#_Memory_Barriers_and_Volatility
             // that shows that a Write followed by a Read MAY be swapped).
             // To stay on the safe side, we use Interlocked here.
