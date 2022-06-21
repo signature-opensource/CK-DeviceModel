@@ -657,7 +657,8 @@ namespace CK.DeviceModel
             Throw.CheckNotNullArgument( command );
             if( !command.HostType.IsAssignableFrom( GetType() ) ) return (DeviceHostCommandResult.InvalidHostType, null);
             if( !command.CheckValidity( monitor ) ) return (DeviceHostCommandResult.CommandCheckValidityFailed, null );
-
+            // Should we do something like this here?
+            // command.DependentToken ??= monitor.CreateDependentToken();
             Debug.Assert( command.DeviceName != null, "CheckValidity ensured that." );
             var d = Find( command.DeviceName );
             if( d == null )

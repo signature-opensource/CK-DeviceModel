@@ -22,7 +22,7 @@ namespace CK.DeviceModel
 
         Timer? _timer;
         long _nextTimerTime;
-        bool _timerFired;
+        int _timerFired;
         // This may be useless (never seen it failed) but this is handled (and logged).
         bool _failedTimerSet;
 
@@ -195,7 +195,7 @@ namespace CK.DeviceModel
         /// <list type="bullet">
         ///     <item>Low level internal commands, typically initiated by timers.</item>
         ///     <item>
-        ///     Commands queued by handler (typically because they have to wait for a condition, like a connection availability).
+        ///     Commands queued by their handling (typically because they have to wait for a condition, like a connection availability).
         ///     When the conditions are met, such command can be re-injected in the waiting queue.
         ///     </item>
         /// </list>
@@ -217,7 +217,7 @@ namespace CK.DeviceModel
         /// <list type="bullet">
         ///     <item>Low level internal commands, typically initiated by timers.</item>
         ///     <item>
-        ///     Commands queued by handler (typically because they have to wait for a condition, like a connection availability).
+        ///     Commands queued by their handling (typically because they have to wait for a condition, like a connection availability).
         ///     When the conditions are met, such command can be re-injected in the waiting queue.
         ///     </item>
         /// </list>
@@ -523,7 +523,13 @@ namespace CK.DeviceModel
         {
             ActivityMonitor.ExternalLog.UnfilteredLog( LogLevel.Debug | LogLevel.IsFiltered, IDeviceHost.DeviceModel, $"Timer fired for '{FullName}'." );
             //ActivityMonitor.ExternalLog.Debug( IDeviceHost.DeviceModel, $"Timer fired for '{FullName}'." );
-            Volatile.Write( ref _timerFired, true );
+
+            // It is utterly important that, when the loop is woke up by an awaker, the loop  (TryGetDelayedCommand) knowsthat this awaker
+            // comes from the timer.
+            // Volatile.Read/Write (of a simple bool) may not offer enough guaranty here (see https://www.albahari.com/threading/part4.aspx#_Memory_Barriers_and_Volatility
+            // that shows that a Write followed by a Read MAY be swapped).
+            // To stay on the safe side, we use Interlocked here.
+            Interlocked.Exchange( ref _timerFired, 1 );
             _commandQueue.Writer.TryWrite( _commandAwaker );
         }
 
@@ -534,18 +540,21 @@ namespace CK.DeviceModel
 
             BaseDeviceCommand? cmd = null;
             long now; 
-            if( Volatile.Read( ref _timerFired ) )
+            if( Interlocked.CompareExchange( ref _timerFired, 0, 1 ) == 1 )
             {
                 now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
-                _timerFired = false;
                 var delta = _nextTimerTime - now;
                 if( delta > 0 )
                 {
-                    // Timers SHOULD NOT fire before their due date.
+                    // Timers SHOULD NOT fire before their due date... but they do: Environment.TickCount is used
+                    // to skip a call back (https://source.dot.net/#System.Net.Requests/System/Net/TimerThread.cs,390)
+                    // and this is NOT the same counter as the one used by DateTime.UtcNow! (That we are using.)
+                    // See https://stackoverflow.com/a/8865560/190380
+                    // 
                     // - If the delta is below the _tickCountResolution, we take no risk
                     // and we "forward the now". This seems curious but it does the job.
                     // - If the delta is greater than the _tickCountResolution, we reschedule the timer.
-                    // This SHOULD NEVER happen! (But if it does, it's handled.)
+                    // 
                     if( delta > _tickCountResolution )
                     {
                         _commandMonitor.Warn( $"Timer fired {delta} ms before its expected time. Rescheduling it." );
