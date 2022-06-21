@@ -14,10 +14,4 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
     <ProjectReference Include="..\..\CK.DeviceModel.Configuration\CK.DeviceModel.Configuration.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Update="Microsoft.VisualStudio.Threading.Analyzers" Version="17.1.46">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
 </Project>
