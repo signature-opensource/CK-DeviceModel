@@ -6,25 +6,22 @@ using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests
 {
-    public class Machine : Device<MachineConfiguration>, ITestDevice
+
+    public class Machine : Device<MachineConfiguration>
     {
         public static int TotalCount;
         public static int TotalRunning;
-
-        // A device can keep a reference to the current configuration:
-        // this configuration is an independent clone that is accessible only to the Device.
-        MachineConfiguration _configRef;
 
         public Machine( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
         {
             Interlocked.Increment( ref TotalCount );
-            _configRef = info.Configuration;
         }
 
-        public Task TestAutoDestroyAsync( IActivityMonitor monitor ) => AutoDestroyAsync( monitor );
-
-        public Task TestForceStopAsync( IActivityMonitor monitor ) => AutoStopAsync( monitor, ignoreAlwaysRunning: true );
+        /// <summary>
+        /// Gets or sets whether <see cref="DoStartAsync(IActivityMonitor, DeviceStartedReason)"/> will fail.
+        /// </summary>
+        public bool FailToStart { get; set; }
 
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, MachineConfiguration config )
         {
@@ -34,7 +31,7 @@ namespace CK.DeviceModel.Tests
         protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason )
         {
             Interlocked.Increment( ref TotalRunning );
-            return Task.FromResult( true );
+            return Task.FromResult( !FailToStart );
         }
 
         protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason )
@@ -48,6 +45,7 @@ namespace CK.DeviceModel.Tests
             Interlocked.Decrement( ref TotalCount );
             return Task.CompletedTask;
         }
+
     }
 
 }

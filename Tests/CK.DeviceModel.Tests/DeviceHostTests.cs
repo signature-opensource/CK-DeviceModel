@@ -15,55 +15,64 @@ namespace CK.DeviceModel.Tests
     {
 
         [Test]
-        public async Task playing_with_configurations()
+        [Timeout( 200 )]
+        public async Task playing_with_configurations_Async()
         {
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            using var _ = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations_Async ) );
 
-            var config1 = new CameraConfiguration() { Name = "First" };
-            var config2 = new CameraConfiguration { Name = "Another", Status = DeviceConfigurationStatus.Runnable };
-            var config3 = new CameraConfiguration { Name = "YetAnother", Status = DeviceConfigurationStatus.RunnableStarted };
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
+            FlashBulb.OnCommandComplededCount = 0;
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            var config1 = new FlashBulbConfiguration() { Name = "First" };
+            var config2 = new FlashBulbConfiguration { Name = "Another", Status = DeviceConfigurationStatus.Runnable };
+            var config3 = new FlashBulbConfiguration { Name = "YetAnother", Status = DeviceConfigurationStatus.RunnableStarted };
 
-            var hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
+            var host = new FlashBulbHost();
+
+            var hostConfig = new DeviceHostConfiguration<FlashBulbConfiguration>();
             hostConfig.IsPartialConfiguration.Should().BeTrue( "By default a configuration is partial." );
             hostConfig.Items.Add( config1 );
 
             host.Count.Should().Be( 0 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 1 );
-            Camera.TotalCount.Should().Be( 1 );
+            FlashBulb.TotalCount.Should().Be( 1 );
 
             hostConfig.Items.Add( config2 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 2 );
-            Camera.TotalCount.Should().Be( 2 );
-            Camera.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount.Should().Be( 2 );
+            FlashBulb.TotalRunning.Should().Be( 0 );
 
             hostConfig.Items.Add( config3 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 3 );
-            Camera.TotalCount.Should().Be( 3 );
-            Camera.TotalRunning.Should().Be( 1 );
+            FlashBulb.TotalCount.Should().Be( 3 );
+            FlashBulb.TotalRunning.Should().Be( 1 );
 
-            Camera? c1 = host.Find( "First" );
-            Camera? c2 = host.Find( "Another" );
-            Camera? c3 = host.Find( "YetAnother" );
+            FlashBulb? c1 = host.Find( "First" );
+            FlashBulb? c2 = host.Find( "Another" );
+            FlashBulb? c3 = host.Find( "YetAnother" );
             host.Find( "Not here" ).Should().BeNull();
             Debug.Assert( c1 != null && c2 != null && c3 != null );
 
+            c1.ExternalConfiguration.Should().NotBeSameAs( config1 );
+            c2.ExternalConfiguration.Should().NotBeSameAs( config2 );
+            c3.ExternalConfiguration.Should().NotBeSameAs( config3 );
+
             c1.Name.Should().Be( "First" );
-            c1.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
+            c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
             c2.Name.Should().Be( "Another" );
-            c2.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Runnable );
+            c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
             c3.Name.Should().Be( "YetAnother" );
-            c3.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.RunnableStarted );
+            c3.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.RunnableStarted );
 
             c3.IsRunning.Should().BeTrue();
             (await c3.StopAsync( TestHelper.Monitor )).Should().BeTrue();
-            Camera.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalRunning.Should().Be( 0 );
 
+            // Partial configuration here: leave only config2 (RunnableStarted).
             hostConfig.Items.Remove( config3 );
             hostConfig.Items.Remove( config1 );
 
@@ -74,9 +83,9 @@ namespace CK.DeviceModel.Tests
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 3 );
 
-            c1.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
-            c2.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
-            c3.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.RunnableStarted );
+            c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
+            c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
+            c3.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.RunnableStarted );
 
             hostConfig.IsPartialConfiguration = false;
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
@@ -86,51 +95,30 @@ namespace CK.DeviceModel.Tests
             host.Find( "Another" ).Should().BeSameAs( c2 );
             host.Find( "YetAnother" ).Should().BeNull();
 
-            await host.ClearAsync( TestHelper.Monitor );
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
+            FlashBulb.TotalCount.Should().Be( 0 );
+            FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 0, "Basic command (Start/Stop/Configure/Destroy) don't call OnCommandCompletedAsync." );
 
         }
 
         [Test]
-        public async Task testing_state_changed_PerfectEvent()
+        [Timeout( 200 )]
+        public async Task testing_state_changed_PerfectEvent_Async()
         {
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( testing_state_changed_PerfectEvent_Async ) );
 
-            int devicesSyncCalled = 0;
-            int devicesAsyncCalled = 0;
-            DeviceStatus? lastSyncEvent = null;
-            DeviceStatus? lastAsyncEvent = null;
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
 
-            void DevicesChanged_Sync( IActivityMonitor monitor, IDeviceHost sender )
-            {
-                ++devicesSyncCalled;
-            }
+            int devicesCalled = 0;
+            var lifetimeEvents = new System.Collections.Generic.List<DeviceLifetimeEvent>();
 
-            Task DevicesChanged_Async( IActivityMonitor monitor, IDeviceHost sender )
-            {
-                ++devicesAsyncCalled;
-                return Task.CompletedTask;
-            }
+            var host = new FlashBulbHost();
+            host.DevicesChanged.Sync += ( monitor, host, devices ) => ++devicesCalled;
 
-            void StateChanged_Sync( IActivityMonitor monitor, IDevice sender )
-            {
-                lastSyncEvent = sender.Status;
-            }
-
-            Task StateChanged_Async( IActivityMonitor monitor, IDevice sender )
-            {
-                lastAsyncEvent = sender.Status;
-                return Task.CompletedTask;
-            }
-
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
-            host.DevicesChanged.Sync += DevicesChanged_Sync;
-            host.DevicesChanged.Async += DevicesChanged_Async;
-
-            var config = new CameraConfiguration() { Name = "C" };
-            var hostConfig = new DeviceHostConfiguration<CameraConfiguration>();
+            var config = new FlashBulbConfiguration() { Name = "C" };
+            var hostConfig = new DeviceHostConfiguration<FlashBulbConfiguration>();
             hostConfig.Items.Add( config );
 
             var result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
@@ -138,108 +126,136 @@ namespace CK.DeviceModel.Tests
             result.HostConfiguration.Should().BeSameAs( hostConfig );
             result.Results![0].Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
 
-            devicesSyncCalled.Should().Be( 1 );
-            devicesAsyncCalled.Should().Be( 1 );
+            devicesCalled.Should().Be( 1 );
 
             var cameraC = host["C"];
             Debug.Assert( cameraC != null );
-            cameraC.StatusChanged.Async += StateChanged_Async;
-            cameraC.StatusChanged.Sync += StateChanged_Sync;
-            lastSyncEvent.Should().BeNull();
-            lastAsyncEvent.Should().BeNull();
+            {
+                var status = cameraC.Status;
+                status.HasStarted.Should().BeFalse();
+                status.HasBeenReconfigured.Should().BeFalse();
+                status.HasStopped.Should().BeFalse();
+                status.ReconfiguredResult.Should().Be( DeviceReconfiguredResult.None );
+                status.StartedReason.Should().Be( DeviceStartedReason.None );
+                status.StoppedReason.Should().Be( DeviceStoppedReason.None );
+                status.ToString().Should().Be( "Stopped (None)" );
+            }
+            cameraC.LifetimeEvent.Sync += ( m, e ) => lifetimeEvents.Add( e );
 
             var resultNoChange = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             resultNoChange.Success.Should().BeTrue();
             resultNoChange.Results![0].Should().Be( DeviceApplyConfigurationResult.None );
 
-            devicesSyncCalled.Should().Be( 1, "Still 1: no event raised." );
-            devicesAsyncCalled.Should().Be( 1 );
-            lastSyncEvent.Should().BeNull( "None doesn't raise." );
-            lastAsyncEvent.Should().BeNull();
+            devicesCalled.Should().Be( 1, "Still 1: no event raised." );
+            lifetimeEvents.Should().BeEmpty( "None doesn't raise." );
+            cameraC.Status.ToString().Should().Be( "Stopped (None)" );
 
+            // Applying a new configuration.
             config.FlashColor = 1;
-
             result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             result.Success.Should().BeTrue();
             result.Results![0].Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
 
-            devicesSyncCalled.Should().Be( 2 );
-            devicesAsyncCalled.Should().Be( 2 );
-            Debug.Assert( lastSyncEvent != null && lastSyncEvent.Equals( lastAsyncEvent ) );
+            devicesCalled.Should().Be( 1, "No new or destroyed devices." );
+            lifetimeEvents.Should().HaveCount( 1, "Reconfiguration emits only one final event." );
+            lifetimeEvents[0].StatusChanged.Should().BeTrue();
+            {
+                var status = lifetimeEvents[0].DeviceStatus;
+                status.HasStarted.Should().BeFalse();
+                status.HasBeenReconfigured.Should().BeTrue();
+                status.HasStopped.Should().BeFalse();
+                status.ReconfiguredResult.Should().Be( DeviceReconfiguredResult.UpdateSucceeded );
+                status.StartedReason.Should().Be( DeviceStartedReason.None );
+                status.StoppedReason.Should().Be( DeviceStoppedReason.None );
+                status.ToString().Should().Be( "Stopped (UpdateSucceeded)" );
+            }
+            lifetimeEvents[0].ConfigurationChanged.Should().BeTrue();
+            {
+                var c = lifetimeEvents[0].Configuration;
+                c.Should().NotBeSameAs( config ).And.BeEquivalentTo( config );
+            }
+            lifetimeEvents.Clear();
 
-            lastSyncEvent.Value.HasStarted.Should().BeFalse();
-            lastSyncEvent.Value.HasBeenReconfigured.Should().BeTrue();
-            lastSyncEvent.Value.HasStopped.Should().BeFalse();
-            lastSyncEvent.Value.ReconfiguredResult.Should().Be( DeviceReconfiguredResult.UpdateSucceeded );
-            lastSyncEvent.ToString().Should().Be( "Stopped (UpdateSucceeded)" );
-
+            // Try to start...
             (await cameraC.StartAsync( TestHelper.Monitor )).Should().BeFalse( "Disabled." );
-            cameraC.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Disabled );
+            cameraC.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
+            lifetimeEvents.Should().BeEmpty();
 
-            lastSyncEvent = null;
+            // No change.
             result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
-            lastSyncEvent.Should().BeNull( "No official change (DeviceReconfiguredResult.None returned by Device.DoReconfigureAsync) and no ConfigurationStatus nor ControllerKey change." );
-            devicesSyncCalled.Should().Be( 2 );
-            devicesAsyncCalled.Should().Be( 2 );
+            lifetimeEvents.Should().BeEmpty();
+            devicesCalled.Should().Be( 1 );
 
             // Changes the Configuration status. Nothing change except this Device.ConfigurationStatus...
             config.Status = DeviceConfigurationStatus.Runnable;
             result = await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             result.Results[0].Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+            lifetimeEvents.Should().HaveCount( 1 );
+            lifetimeEvents[0].ConfigurationChanged.Should().BeTrue();
+            cameraC.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable, "The Status has been updated." );
+            devicesCalled.Should().Be( 1 );
 
-            // The Status did not change but the ConfigurationStatus did.
-            lastSyncEvent.ToString().Should().Be( "Stopped (UpdateSucceeded)" );
-            cameraC.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.Runnable );
-
-            devicesSyncCalled.Should().Be( 3 );
-            devicesAsyncCalled.Should().Be( 3 );
-
-            var cAndConfig = host.GetConfiguredDevice( "C" );
-            Debug.Assert( cAndConfig != null );
-            cAndConfig.Value.Configuration.Status.Should().Be( DeviceConfigurationStatus.Runnable, "Even if Device decided that nothing changed, the updated configuration is captured." );
-
-            // Starting the camera triggers a Device event.
+            lifetimeEvents.Clear();
+            // Starting the camera triggers a StatusChanged event.
             (await cameraC.StartAsync( TestHelper.Monitor )).Should().BeTrue();
-            Debug.Assert( lastSyncEvent != null && lastSyncEvent.Equals( lastAsyncEvent ) );
+            lifetimeEvents.Should().HaveCount( 1 );
+            lifetimeEvents[0].StatusChanged.Should().BeTrue();
+            lifetimeEvents[0].ConfigurationChanged.Should().BeFalse();
+            lifetimeEvents[0].ControllerKeyChanged.Should().BeFalse();
 
-            lastSyncEvent.Value.HasStarted.Should().BeTrue();
-            lastSyncEvent.Value.HasBeenReconfigured.Should().BeFalse();
-            lastSyncEvent.Value.HasStopped.Should().BeFalse();
-            lastSyncEvent.Value.StartedReason.Should().Be( DeviceStartedReason.StartedCall );
+            lifetimeEvents.Should().HaveCount( 1 );
+            {
+                var status = lifetimeEvents[0].DeviceStatus;
+                status.HasStarted.Should().BeTrue();
+                status.HasBeenReconfigured.Should().BeFalse();
+                status.HasStopped.Should().BeFalse();
+                status.StartedReason.Should().Be( DeviceStartedReason.StartCall );
+                status.ToString().Should().Be( "Running (StartCall)" );
+            }
 
-            // AutoDestroying.
-            lastSyncEvent = null;
-            await cameraC.TestAutoDestroyAsync( TestHelper.Monitor );
-            devicesSyncCalled.Should().Be( 4, "Device removed!" );
-            devicesAsyncCalled.Should().Be( 4 );
+            lifetimeEvents.Clear();
+            // AutoDestroying by sending the command to host.
+            var cmd = new DestroyDeviceCommand<FlashBulbHost>() { DeviceName = "C" };
+            host.SendCommand( TestHelper.Monitor, cmd ).Should().Be( DeviceHostCommandResult.Success );
+            await cmd.Completion.Task;
+
+            devicesCalled.Should().Be( 2, "Device removed!" );
             host.Find( "C" ).Should().BeNull();
-            Debug.Assert( lastSyncEvent != null && lastSyncEvent.Equals( lastAsyncEvent ) );
-            lastSyncEvent.Value.HasStarted.Should().BeFalse();
-            lastSyncEvent.Value.HasBeenReconfigured.Should().BeFalse();
-            lastSyncEvent.Value.HasStopped.Should().BeTrue();
-            lastSyncEvent.Value.StoppedReason.Should().Be( DeviceStoppedReason.Destroyed );
+            lifetimeEvents.Should().HaveCount( 1 );
+            lifetimeEvents[0].StatusChanged.Should().BeTrue();
+            {
+                var status = lifetimeEvents[0].DeviceStatus;
+                status.HasStarted.Should().BeFalse();
+                status.HasBeenReconfigured.Should().BeFalse();
+                status.HasStopped.Should().BeTrue();
+                status.StoppedReason.Should().Be( DeviceStoppedReason.Destroyed );
+                status.ToString().Should().Be( "Stopped (Destroyed)" );
+            }
 
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount.Should().Be( 0 );
+            FlashBulb.TotalRunning.Should().Be( 0 );
         }
 
 
         [Test]
-        public async Task apply_device_configuration()
+        [Timeout( 200 )]
+        public async Task ensure_device_Async()
         {
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( ensure_device_Async ) );
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
+
+            var host = new FlashBulbHost();
             var d = host.Find( "n°1" );
             d.Should().BeNull();
 
-            var config = new CameraConfiguration()
+            var config = new FlashBulbConfiguration()
             {
                 Name = "n°1",
                 FlashColor = 78
             };
-            DeviceApplyConfigurationResult reconfigResult = await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config );
+            DeviceApplyConfigurationResult reconfigResult = await host.EnsureDeviceAsync( TestHelper.Monitor, config );
             reconfigResult.Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
 
             d = host.Find( "n°1" );
@@ -254,16 +270,16 @@ namespace CK.DeviceModel.Tests
             d.Status.ReconfiguredResult.Should().Be( DeviceReconfiguredResult.None );
 
             config.Status = DeviceConfigurationStatus.AlwaysRunning;
-            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
 
-            d.ConfigurationStatus.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
+            d.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
             d.Status.IsRunning.Should().BeTrue();
             d.Status.StartedReason.Should().Be( DeviceStartedReason.StartedByAlwaysRunningConfiguration );
 
-            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.None, "No change: the Camera detects it." );
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.None, "No change: the Camera detects it." );
 
             config.ControllerKey = "Control";
-            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded, "Even if the specific configuration did not change, changing the ControllerKey is a change." );
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded, "Even if the specific configuration did not change, changing the ControllerKey is a change." );
 
             d.Status.StartedReason.Should().Be( DeviceStartedReason.None );
             d.Status.HasBeenReconfigured.Should().BeTrue();
@@ -271,144 +287,257 @@ namespace CK.DeviceModel.Tests
             d.ControllerKey.Should().Be( "Control" );
 
             config.Status = DeviceConfigurationStatus.Disabled;
-            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
             d.Status.HasStopped.Should().BeTrue();
             d.Status.StoppedReason.Should().Be( DeviceStoppedReason.StoppedByDisabledConfiguration );
 
-            await host.DestroyDeviceAsync( TestHelper.Monitor, "n°1" );
+            await host.Find( "n°1" )!.DestroyAsync( TestHelper.Monitor );
 
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            FlashBulb.TotalCount.Should().Be( 0 );
+            FlashBulb.TotalRunning.Should().Be( 0 );
 
-            host.Awaiting( h => h.DestroyDeviceAsync( TestHelper.Monitor, "n°1" ) ).Should().NotThrow();
-
+            await d.Awaiting( _ => _.DestroyAsync( TestHelper.Monitor ) ).Should().NotThrowAsync();
         }
 
         [Test]
-        public async Task executing_commands_from_the_host_without_ControllerKey()
+        [Timeout( 200 )]
+        public async Task executing_commands_from_the_host_without_ControllerKey_Async()
         {
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( executing_commands_from_the_host_without_ControllerKey_Async ) );
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
-            var config = new CameraConfiguration()
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
+
+            var host = new FlashBulbHost();
+            var config = new FlashBulbConfiguration()
             {
                 Name = "n°1",
                 FlashColor = 78,
                 Status = DeviceConfigurationStatus.RunnableStarted
             };
-            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
 
             var d = host.Find( "n°1" );
             Debug.Assert( d != null );
 
             int flashLastColor = 0;
-            d.Flash.Sync += (m,c,color) => flashLastColor = color;
+            d.TestFlash.Sync += ( m, c, color ) => flashLastColor = color;
 
-            var cmdAsync = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
-            var execA = host.Handle( TestHelper.Monitor, cmdAsync );
-            execA.Success.Should().BeTrue();
-            execA.IsAsync.Should().BeTrue();
-            execA.Invoking( x => x.Execute( TestHelper.Monitor ) ).Should().Throw<InvalidCastException>();
-            execA.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().NotThrow();
+            var cmdF = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
+            host.SendCommand( TestHelper.Monitor, cmdF ).Should().Be( DeviceHostCommandResult.Success );
+            await cmdF.Completion.Task;
 
             flashLastColor.Should().Be( 78 );
 
-            var cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 }; ;
-            RoutedDeviceCommand execS = host.Handle( TestHelper.Monitor, cmdS );
-            execS.Success.Should().BeTrue();
-            execS.IsAsync.Should().BeFalse();
-            execS.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().Throw<InvalidCastException>();
-            execS.Invoking( x => x.Execute( TestHelper.Monitor ) ).Should().NotThrow();
+            var cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 };
+            host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
+            await cmdS.Completion.Task;
 
             flashLastColor.Should().Be( 78 );
-            execA.Awaiting( x => x.ExecuteAsync( TestHelper.Monitor ) ).Should().NotThrow();
+            cmdF = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
+            host.SendCommand( TestHelper.Monitor, cmdF ).Should().Be( DeviceHostCommandResult.Success );
+            await cmdF.Completion.Task;
+
             flashLastColor.Should().Be( 3712 );
 
-            cmdS.DeviceName = "Not the 1";
-            execS = host.Handle( TestHelper.Monitor, cmdS );
-            execS.Success.Should().BeFalse();
-            execS.IsAsync.Should().BeNull();
+            host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.CommandCheckValidityFailed );
 
-            await host.DestroyDeviceAsync( TestHelper.Monitor, "n°1" );
+            cmdS = new SetFlashColorCommand() { DeviceName = "Not the 1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 };
+            host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.DeviceNameNotFound );
 
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            await d.SetControllerKeyAsync( TestHelper.Monitor, null, "The controlling key." );
+            cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Controller key will fail!", Color = 3712 };
+            host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
+            await FluentActions.Awaiting( () => cmdS.Completion.Task ).Should().ThrowAsync<InvalidControllerKeyException>();
+
+            cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "The controlling key.", Color = 3712 };
+            host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
+
+            await cmdS.Completion.Task;
+
+            await host.Find( "n°1" )!.DestroyAsync( TestHelper.Monitor );
+
+            FlashBulb.TotalCount.Should().Be( 0 );
+            FlashBulb.TotalRunning.Should().Be( 0 );
 
         }
 
-        [Test]
-        public async Task executing_commands_directly_on_the_device()
+        [TestCase( "UseSendCommand" )]
+        [TestCase( "UseSendCommandImmediate" )]
+        [Timeout( 1000 )]
+        public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async( string mode )
         {
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async )}(\"{mode}\")" );
 
-            var host = new CameraHost( new DefaultDeviceAlwaysRunningPolicy() );
-            var config = new CameraConfiguration()
+            FlashBulb.TotalCount = 0;
+            FlashBulb.TotalRunning = 0;
+            FlashBulb.OnCommandComplededCount = 0;
+
+            var host = new FlashBulbHost();
+            var config = new FlashBulbConfiguration()
             {
                 Name = "n°1",
                 FlashColor = 78,
                 Status = DeviceConfigurationStatus.RunnableStarted
             };
-            (await host.ApplyDeviceConfigurationAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
 
-            var d = host.Find( "n°1" );
+            FlashBulb? d = host.Find( "n°1" );
             Debug.Assert( d != null );
 
-            int flashLastColor = 0;
-            d.Flash.Sync += (m,c,color) => flashLastColor = color;
-
-            var cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1" };
-            var cmdSync = new SetFlashColorCommand() { DeviceName = "n°1" };
-
-            cmdSync.ControllerKey = "Never mind since the device's ControllerKey is null.";
-            cmdSync.Color = 6;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync );
-            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash );
-            flashLastColor.Should().Be( 6 );
-
-            // Use the basic (async) command to set a ControllerKey.
-            var setControllerKey = new BasicControlDeviceCommand<CameraHost>( BasicControlDeviceOperation.ResetControllerKey )
+            bool SendCommand( BaseDeviceCommand c, bool checkDeviceName = true, bool checkControllerKey = true )
             {
-                ControllerKey = "I'm controlling.",
+                c.ImmediateSending = mode == "UseSendCommandImmediate";
+                return d.SendCommand( TestHelper.Monitor, c, checkDeviceName, checkControllerKey );
+            }
+
+            int flashLastColor = 0;
+            d.TestFlash.Sync += ( m, c, color ) => flashLastColor = color;
+
+            var cmdSet = new SetFlashColorCommand()
+            {
+                DeviceName = "n°1",
+                ControllerKey = "Never mind since the device's ControllerKey is null.",
+                Color = 6
+            };
+            var cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1" };
+
+            SendCommand( cmdSet );
+            SendCommand( cmdRaiseFlash );
+
+            (await cmdSet.Completion).Should().Be( 78 );
+            await cmdRaiseFlash.Completion.Task;
+            flashLastColor.Should().Be( 6 );
+            // Completion is signaled and then OnCommandComplededAsyc is called.
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 2 );
+
+            // Use the basic command to set a ControllerKey.
+            var setControllerKey = new SetControllerKeyDeviceCommand<FlashBulbHost>()
+            {
+                ControllerKey = "Never mind since the device's ControllerKey is null.",
+                NewControllerKey = "I'm controlling.",
                 DeviceName = "n°1"
             };
-            await d.ExecuteCommandAsync( TestHelper.Monitor, setControllerKey );
+            SendCommand( setControllerKey );
 
-            cmdSync.ControllerKey = "I'm not in charge. This will throw an ArgumentException.";
-            d.Invoking( _ => _.ExecuteCommand( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
+            cmdSet = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "I'm not in charge. Completion will throw an InvalidControllerKeyException." };
+            SendCommand( cmdSet ).Should().BeTrue();
 
-            cmdSync.ControllerKey = "I'm controlling.";
-            cmdSync.Color = 18;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync );
-            d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
-            cmdRaiseFlash.ControllerKey = "I'm controlling.";
-            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash );
+            do
+            {
+                await Task.Delay( 100 );
+            }
+            while( !cmdSet.Completion.IsCompleted );
+
+            cmdSet = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "I'm controlling.", Color = 18 };
+            SendCommand( cmdSet );
+
+            cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1" };
+            SendCommand( cmdRaiseFlash ).Should().BeTrue();
+            await FluentActions.Awaiting( () => cmdRaiseFlash.Completion.Task ).Should().ThrowAsync<InvalidControllerKeyException>();
+
+            flashLastColor.Should().Be( 6 );
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 5 );
+
+            cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1", ControllerKey = "I'm controlling." };
+            SendCommand( cmdRaiseFlash );
+
+            await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 18 );
 
-            cmdSync.ControllerKey = "I'm NOT controlling, but checkControllerKey: false is used.";
-            cmdSync.Color = 1;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync, checkControllerKey: false );
-            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash, checkControllerKey: false );
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 6 );
+
+            cmdSet = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "I'm NOT controlling, but checkControllerKey: false is used.", Color = 1 };
+            cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1", ControllerKey = "I'm NOT controlling too." };
+            SendCommand( cmdSet, checkControllerKey: false );
+            SendCommand( cmdRaiseFlash, checkControllerKey: false );
+            await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 1 );
 
-            cmdSync.ControllerKey = "I'm controlling.";
-            cmdSync.DeviceName = "Not the right device name: this will throw an ArgumentException.";
-            d.Invoking( _ => _.ExecuteCommand( TestHelper.Monitor, cmdSync ) ).Should().Throw<ArgumentException>();
-            cmdRaiseFlash.DeviceName = "Not the right device name: this will throw an ArgumentException.";
-            d.Awaiting( _ => _.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 8 );
 
-            cmdSync.DeviceName = "Not the right device name but checkDeviceName: false is used.";
-            cmdSync.Color = 3712;
-            d.ExecuteCommand( TestHelper.Monitor, cmdSync, checkDeviceName: false );
-            await d.ExecuteCommandAsync( TestHelper.Monitor, cmdRaiseFlash, checkDeviceName: false );
+            cmdSet = new SetFlashColorCommand() { DeviceName = "Not the right device name: this will throw an ArgumentException.", ControllerKey = "I'm controlling.", Color = 1 };
+            FluentActions.Invoking( () => SendCommand( cmdSet ) ).Should().Throw<ArgumentException>();
+
+            cmdRaiseFlash = new FlashCommand() { DeviceName = "Not the right device name: this will throw an ArgumentException.", ControllerKey = "I'm controlling." };
+            cmdRaiseFlash.DeviceName = "Not the right device name: this will throw an ArgumentException.";
+            FluentActions.Invoking( () => SendCommand( cmdRaiseFlash ) ).Should().Throw<ArgumentException>();
+
+            FlashBulb.OnCommandComplededCount.Should().Be( 8 );
+
+            cmdSet = new SetFlashColorCommand() { DeviceName = "Not the right device name but checkDeviceName: false is used.", ControllerKey = "I'm controlling.", Color = 3712 };
+            cmdRaiseFlash = new FlashCommand() { DeviceName = "Not the right device name too.", ControllerKey = "I'm controlling." };
+            SendCommand( cmdSet, checkDeviceName: false );
+            SendCommand( cmdRaiseFlash, checkDeviceName: false );
+            await cmdRaiseFlash.Completion.Task;
             flashLastColor.Should().Be( 3712 );
 
-            await host.DestroyDeviceAsync( TestHelper.Monitor, "n°1" );
+            await Task.Delay( 50 );
+            FlashBulb.OnCommandComplededCount.Should().Be( 10 );
 
-            Camera.TotalCount.Should().Be( 0 );
-            Camera.TotalRunning.Should().Be( 0 );
+            await d.DestroyAsync( TestHelper.Monitor );
 
+            FlashBulb.TotalCount.Should().Be( 0 );
+            FlashBulb.TotalRunning.Should().Be( 0 );
+
+            FlashBulb.OnCommandComplededCount.Should().Be( 10 );
+
+        }
+
+        [Test]
+        [Timeout( 200 )]
+        public async Task Disabling_sends_a_stop_status_change_Async()
+        {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( Disabling_sends_a_stop_status_change_Async ) );
+            var host = new MachineHost();
+
+            var config = new MachineConfiguration()
+            {
+                Name = "Test",
+                Status = DeviceConfigurationStatus.AlwaysRunning
+            };
+
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+
+            var device = host["Test"];
+            Debug.Assert( device != null );
+
+            bool stopReceived = false;
+            bool destroyReceived = false;
+
+            device.LifetimeEvent.Sync += ( monitor, e ) =>
+            {
+                if( e.StatusChanged )
+                {
+                    // The device's status is up to date.
+                    Debug.Assert( e.Device.Status == e.DeviceStatus );
+                    TestHelper.Monitor.Info( $"Status change." );
+                    if( e.DeviceStatus.IsDestroyed )
+                    {
+                        destroyReceived.Should().BeFalse();
+                        destroyReceived = true;
+                    }
+                    else if( e.DeviceStatus.HasStopped )
+                    {
+                        // HasStopped is true when IsDestroyed is sent.
+                        stopReceived.Should().BeFalse();
+                        stopReceived = true;
+                    }
+                }
+            };
+
+            config.Status = DeviceConfigurationStatus.Disabled;
+            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+
+            stopReceived.Should().BeTrue();
+            destroyReceived.Should().BeFalse();
+
+            await device.DestroyAsync( TestHelper.Monitor );
+            destroyReceived.Should().BeTrue();
         }
 
     }

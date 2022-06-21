@@ -1,6 +1,6 @@
 using Cake.Common.Diagnostics;
 using Cake.Common.Solution;
-using Cake.Common.Tools.DotNetCore;
+using Cake.Common.Tools.DotNet;
 using Cake.Common.Tools.DotNetCore.Pack;
 using CodeCake.Abstractions;
 using CSemVer;
@@ -14,7 +14,7 @@ namespace CodeCake
 
     public partial class DotnetSolution : ICIPublishWorkflow
     {
-        private ArtifactType _artifactType;
+        private ArtifactType? _artifactType;
 
         public ArtifactType ArtifactType
         {
@@ -31,14 +31,13 @@ namespace CodeCake
             var settings = new DotNetCorePackSettings().AddVersionArguments( _globalInfo.BuildInfo, c =>
             {
                 c.NoBuild = true;
-                c.IncludeSymbols = true;
                 c.Configuration = _globalInfo.BuildInfo.BuildConfiguration;
                 c.OutputDirectory = _globalInfo.ReleasesFolder.Path;
             } );
             foreach( var p in nugetInfo.GetNuGetArtifacts() )
             {
                 _globalInfo.Cake.Information( p.ArtifactInstance );
-                _globalInfo.Cake.DotNetCorePack( p.Project.Path.FullPath, settings );
+                _globalInfo.Cake.DotNetPack( p.Project.Path.FullPath, settings );
             }
         }
     }
@@ -92,7 +91,7 @@ namespace CodeCake
             /// <summary>
             /// Gets the local target feeds.
             /// </summary>
-            /// <returns>The set of remote NuGet feeds (in practice at moste one).</returns>
+            /// <returns>The set of remote NuGet feeds (in practice at most one).</returns>
             protected override IEnumerable<ArtifactFeed> GetLocalFeeds()
             {
                 return new NuGetHelper.NuGetFeed[] {

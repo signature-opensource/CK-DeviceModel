@@ -1,13 +1,17 @@
-using System.Threading.Tasks;
 using CK.Core;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
-    interface IInternalDevice
+    interface IInternalDevice : IDevice
     {
-        void Execute( IActivityMonitor monitor, SyncDeviceCommand c );
+        DeviceConfigurationStatus ConfigStatus { get; }
 
-        Task ExecuteAsync( IActivityMonitor monitor, AsyncDeviceCommand c );
+        void OnCommandCompleted( BaseDeviceCommand cmd );
+
+        Task EnsureInitialLifetimeEventAsync( IActivityMonitor monitor );
     }
-
 }

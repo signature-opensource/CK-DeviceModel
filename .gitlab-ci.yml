@@ -6,9 +6,7 @@ codecakebuilder:
     - dotnet run --project CodeCakeBuilder -nointeraction
   artifacts:
     paths:
-      - '**\*.log'
-      - '**\*.trx'
-      - '**\Tests\**\TestResult*.xml'
+      - '**\Tests\**\TestResults\*.trx'
       - '**Tests\**\Logs\**\*'
     when: always
     expire_in: 6 month

@@ -2,30 +2,47 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Internal interface that define non-generic host behaviors: Devices
+    /// Internal interface that define non-generic host behaviors: Devices and DeviceHostDaemon
     /// call these methods.
     /// </summary>
     interface IInternalDeviceHost : IDeviceHost
     {
-        Task<bool> StartAsync( IDevice d, IActivityMonitor monitor );
+        BaseConfigureDeviceCommand CreateLockedConfigureCommand( string name,
+                                                                 string? controllerKey,
+                                                                 DeviceConfiguration? configuration,
+                                                                 DeviceConfiguration? clonedConfiguration );
 
-        Task<bool> StopAsync( IDevice d, IActivityMonitor monitor );
+        BaseStartDeviceCommand CreateStartCommand( string name );
 
-        Task<bool> AutoStopAsync( IDevice d, IActivityMonitor monitor, bool ignoreAlwaysRunning );
+        BaseStopDeviceCommand CreateStopCommand( string name, bool ignoreAlwaysRunning );
 
-        Task<bool> SetControllerKeyAsync( IDevice d, IActivityMonitor monitor, bool checkCurrent, string? current, string? key );
+        BaseDestroyDeviceCommand CreateDestroyCommand( string name );
 
-        Task AutoDestroyAsync( IDevice d, IActivityMonitor monitor );
+        BaseSetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
 
-        void OnAlwaysRunningCheck( IDevice d, IActivityMonitor monitor );
+        /// <summary>
+        /// Called synchronously (interact with the reconfiguring sync lock).
+        /// </summary>
+        bool OnDeviceDoDestroy( IActivityMonitor monitor, IDevice device );
+
+        void DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor, bool fromStart );
+
+        Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor );
+
+        Task RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e );
+
+        Task RaiseAllDevicesEventAsync( IActivityMonitor monitor, BaseDeviceEvent e );
 
         void SetDaemon( DeviceHostDaemon daemon );
 
-        ValueTask<long> CheckAlwaysRunningAsync( IActivityMonitor monitor, DateTime now );
+        ValueTask<long> DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, DateTime now );
+
+        CancellationToken DaemonStoppedToken { get; }
     }
 }

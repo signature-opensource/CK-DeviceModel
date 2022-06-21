@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30320.27
@@ -18,13 +18,21 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 		.gitlab-ci.yml = .gitlab-ci.yml
+		README.md = README.md
 		RepositoryInfo.xml = RepositoryInfo.xml
-		Common\Shared.props = Common\Shared.props
+		Directory.Build.props = Directory.Build.props
+		.gitignore = .gitignore
+		NuGet.config = NuGet.config
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel.Configuration", "CK.DeviceModel.Configuration\CK.DeviceModel.Configuration.csproj", "{ECD3ABA8-FDB4-4B73-A2DF-F82945664D90}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.DeviceModel.Configuration.Tests", "Tests\CK.DeviceModel.Configuration.Tests\CK.DeviceModel.Configuration.Tests.csproj", "{AA48665E-D3EE-4E3B-BEAE-6E94FF92189A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Doc", "Doc", "{0C916C66-EFEA-427C-BAB2-CC33B8CD42E0}"
+	ProjectSection(SolutionItems) = preProject
+		Common\Doc\BasicCommands.png = Common\Doc\BasicCommands.png
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,6 +67,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{722D5670-E000-4C3D-AED9-113028524CD3} = {72DA97E4-D00C-4960-8D63-A41CFBF5835B}
 		{AA48665E-D3EE-4E3B-BEAE-6E94FF92189A} = {72DA97E4-D00C-4960-8D63-A41CFBF5835B}
+		{0C916C66-EFEA-427C-BAB2-CC33B8CD42E0} = {407D6A87-6955-4F6D-A642-0EFAF97CE3A5}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FDD08DC2-8897-4301-8172-ACC41D1FF754}

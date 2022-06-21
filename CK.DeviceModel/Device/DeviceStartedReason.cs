@@ -6,7 +6,7 @@ namespace CK.DeviceModel
     public enum DeviceStartedReason
     {
         /// <summary>
-        /// Not applicable.
+        /// Not applicable (not started yet).
         /// </summary>
         None = 0,
 
@@ -21,10 +21,25 @@ namespace CK.DeviceModel
         StartedByRunnableStartedConfiguration,
 
         /// <summary>
-        /// The device started because of a call to the public <see cref="IDevice.StartAsync(Core.IActivityMonitor)"/>.
+        /// The device started because of a call to <see cref="IDevice.StartAsync(Core.IActivityMonitor)"/>.
         /// </summary>
-        StartedCall,
+        StartCall,
 
+        /// <summary>
+        /// The device started because of a call to <see cref="IDevice.StartAsync(Core.IActivityMonitor)"/> while it is handling a command.
+        /// </summary>
+        SelfStart,
+
+        /// <summary>
+        /// The device started because of a <see cref="DeviceCommandStoppedBehavior.AutoStartAndKeepRunning"/> command's <see cref="BaseDeviceCommand.StoppedBehavior"/>.
+        /// </summary>
+        StartAndKeepRunningStoppedBehavior,
+
+        /// <summary>
+        /// The device started because of a <see cref="DeviceCommandStoppedBehavior.SilentAutoStartAndStop"/> command's <see cref="BaseDeviceCommand.StoppedBehavior"/>.
+        /// This status is not published to the external world.
+        /// </summary>
+        SilentAutoStartAndStopStoppedBehavior,
     }
 
 }

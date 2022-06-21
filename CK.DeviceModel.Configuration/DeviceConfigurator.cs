@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Primitives;
@@ -21,50 +20,59 @@ namespace CK.DeviceModel
     public class DeviceConfigurator : ISingletonAutoService, IHostedService
     {
         readonly IConfigurationSection _configuration;
+        readonly IConfiguration _configurationRoot;
         readonly IDeviceHost[] _deviceHosts;
         readonly CancellationTokenSource _run;
-        IActivityMonitor? _changeMonitor;
+        readonly IActivityMonitor _changeMonitor;
+        readonly DeviceHostDaemon _daemon;
         IDisposable? _changeSubscription;
         readonly Channel<(IDeviceHost, IDeviceHostConfiguration)[]> _applyChannel;
 
         /// <summary>
         /// Initializes a new <see cref="DeviceConfigurator"/>.
         /// </summary>
+        /// <param name="daemon">The daemon.</param>
         /// <param name="configuration">The global configuration.</param>
         /// <param name="deviceHosts">The available hosts.</param>
-        public DeviceConfigurator( IConfigurationRoot configuration, IEnumerable<IDeviceHost> deviceHosts )
+        public DeviceConfigurator( DeviceHostDaemon daemon, IConfiguration configuration, IEnumerable<IDeviceHost> deviceHosts )
         {
+            _daemon = daemon;
+            _configurationRoot = configuration;
+            _changeMonitor = new ActivityMonitor( "CK-DeviceModel Configurator (Initializing)" );
+            _changeMonitor.AutoTags += IDeviceHost.DeviceModel;
+
             _run = new CancellationTokenSource();
-            _configuration = configuration.GetSection( "Device" );
+            _configuration = configuration.GetSection( "CK-DeviceModel" );
             _deviceHosts = deviceHosts.ToArray();
             _applyChannel = Channel.CreateUnbounded<(IDeviceHost, IDeviceHostConfiguration)[]>( new UnboundedChannelOptions() { SingleReader = true, SingleWriter = true } );
+            // If the daemon is stopped before us, we preemptively stops the watch.
+            daemon.StoppedToken.Register( DoStop );
         }
 
         async Task IHostedService.StartAsync( CancellationToken cancellationToken )
         {
-            _changeMonitor = new ActivityMonitor( nameof( DeviceConfigurator ) + " (Initializing)" );
             OnConfigurationChanged();
             if( _applyChannel.Reader.TryRead( out var toApply ))
             {
-                await ApplyOnceAsync( _changeMonitor, toApply, cancellationToken );
+                await ApplyOnceAsync( _changeMonitor, toApply );
             }
-            _changeMonitor.SetTopic( nameof( DeviceConfigurator ) + " (ConfigurationChange detection)" );
+            _changeMonitor.SetTopic( "CK-DeviceModel Configurator (Configuration change detection)" );
             _changeSubscription = ChangeToken.OnChange( _configuration.GetReloadToken, OnConfigurationChanged );
-            _ = Task.Run( TheLoop );
+            _ = Task.Run( TheLoopAsync, cancellationToken: default );
         }
 
-        async Task TheLoop()
+        async Task TheLoopAsync()
         {
-            Debug.Assert( _changeMonitor != null );
             var tRun = _run.Token;
             while( !_run.IsCancellationRequested )
             {
                 var toApply = await _applyChannel.Reader.ReadAsync( tRun );
-                await ApplyOnceAsync( _changeMonitor, toApply, tRun );
+                await ApplyOnceAsync( _changeMonitor, toApply );
             }
+            _changeMonitor.MonitorEnd();
         }
 
-        async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply, CancellationToken cancellationToken )
+        static async Task ApplyOnceAsync( IActivityMonitor monitor, (IDeviceHost, IDeviceHostConfiguration)[] toApply )
         {
             foreach( var (host, config) in toApply )
             {
@@ -82,16 +90,32 @@ namespace CK.DeviceModel
 
         void OnConfigurationChanged()
         {
-            Debug.Assert( _changeMonitor != null );
             using( _changeMonitor.OpenInfo( "Building configuration objects for Devices." ) )
             {
                 NoItemsSectionWrapper noItemsSection = new NoItemsSectionWrapper();
                 try
                 {
+                    if( !_configuration.Exists() )
+                    {
+                        var foundDevice = _configurationRoot.GetSection( "Device" ).Exists();
+                        var foundDeviceModel = _configurationRoot.GetSection( "DeviceModel" ).Exists();
+                        var foundCKDeviceModel = _configurationRoot.GetSection( "CKDeviceModel" ).Exists();
+                        _changeMonitor.Warn( "Missing 'CK-DeviceModel' configuration section. No devices to configure." );
+                        if( foundDevice || foundDeviceModel || foundCKDeviceModel )
+                        {
+                            _changeMonitor.Error( $"Configuration section must be 'CK-DeviceModel'. A '{(foundDevice ? "Device" : (foundDeviceModel ? "DeviceModel" : "CKDeviceModel"))}' section exists. It should be renamed." );
+                        }
+                        return;
+                    }
                     int idxResult = 0;
                     (IDeviceHost, IDeviceHostConfiguration)[]? toApply = null;
                     foreach( var c in _configuration.GetChildren() )
                     {
+                        if( c.Key == "Daemon" )
+                        {
+                            HandleDaemonConfiguration( c );
+                            continue;
+                        }
                         var d = _deviceHosts.FirstOrDefault( h => h.DeviceHostName == c.Key );
                         if( d == null )
                         {
@@ -143,8 +167,7 @@ namespace CK.DeviceModel
                                             foreach( var deviceConfig in items.GetChildren() )
                                             {
                                                 _changeMonitor.Debug( $"Handling Device item: {deviceConfig.Key}." );
-                                                Type tConfig = d.GetDeviceConfigurationType();
-                                                var configObject = (DeviceConfiguration)deviceConfig.Get( tConfig );
+                                                var configObject = (DeviceConfiguration)deviceConfig.Get( d.GetDeviceConfigurationType() );
                                                 configObject.Name = deviceConfig.Key;
                                                 config.Add( configObject );
                                             }
@@ -169,6 +192,31 @@ namespace CK.DeviceModel
                 catch( Exception ex )
                 {
                     _changeMonitor.Error( ex );
+                }
+            }
+        }
+
+        void HandleDaemonConfiguration( IConfigurationSection daemonSection )
+        {
+            Debug.Assert( nameof( DeviceHostDaemon.StoppedBehavior ) == "StoppedBehavior", "This should not be changed since it's used in configuration!" );
+            foreach( var daemonConfig in daemonSection.GetChildren() )
+            {
+                if( daemonConfig.Key == "StoppedBehavior" )
+                {
+                    if( !Enum.TryParse<OnStoppedDaemonBehavior>( daemonConfig.Value, out var behavior ) )
+                    {
+                        var validNames = string.Join( ", ", Enum.GetNames( typeof( OnStoppedDaemonBehavior ) ) );
+                        _changeMonitor.Warn( $"Invalid Daemon.StoppedBehavior configuration '{daemonConfig.Value}'. Keeping current '{_daemon.StoppedBehavior}' behavior. Valid values are: {validNames}." );
+                    }
+                    else if( _daemon.StoppedBehavior != behavior )
+                    {
+                        _changeMonitor.Trace( $"Daemon.StoppedBehavior set to '{_daemon.StoppedBehavior}'." );
+                        _daemon.StoppedBehavior = behavior;
+                    }
+                }
+                else
+                {
+                    _changeMonitor.Warn( $"Skipped invalid Daemon configuration key '{daemonSection.Key}'. Valid keys are 'StoppedBehavior'." );
                 }
             }
         }
@@ -209,7 +257,7 @@ namespace CK.DeviceModel
 
             public string Path => InnerSection.Path;
 
-            public string Value
+            public string? Value
             {
                 get => InnerSection.Value;
                 set => throw new NotSupportedException();
@@ -236,11 +284,14 @@ namespace CK.DeviceModel
 
         Task IHostedService.StopAsync( CancellationToken cancellationToken )
         {
-            Debug.Assert( _changeMonitor != null );
+            DoStop();
+            return Task.CompletedTask;
+        }
+
+        void DoStop()
+        {
             _run.Cancel();
             _changeSubscription?.Dispose();
-            _changeMonitor.MonitorEnd();
-            return Task.CompletedTask;
         }
     }
 }
