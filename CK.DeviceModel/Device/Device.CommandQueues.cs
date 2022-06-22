@@ -47,21 +47,6 @@ namespace CK.DeviceModel
             }
         }
 
-        /// <summary>
-        /// Dummy command that is used to awake the command loop.
-        /// This does nothing and is ignored except that, just like any other commands that are
-        /// dequeued, this triggers the _commandQueueImmediate execution.
-        /// </summary>
-        sealed class CommandAwaker : BaseDeviceCommand
-        {
-            public CommandAwaker() : base( (string.Empty, null) ) { }
-            public override Type HostType => throw new NotImplementedException();
-            internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
-            protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            public override string ToString() => nameof( CommandAwaker );
-        }
-        static readonly CommandAwaker _commandAwaker = new();
-
         #region CommandCanceler
 
         /// <summary>
@@ -94,7 +79,7 @@ namespace CK.DeviceModel
             if( cancelQueuedCommands || cancelDelayedCommands || cancelDeferredCommands )
             {
                 var c = new CommandCanceler( cancelQueuedCommands, cancelDelayedCommands, cancelDeferredCommands );
-                if( _commandQueueImmediate.Writer.TryWrite( c ) && _commandQueue.Writer.TryWrite( _commandAwaker ) )
+                if( _commandQueueImmediate.Writer.TryWrite( c ) && _commandQueue.Writer.TryWrite( CommandAwaker.Instance ) )
                 {
                     return c.Completion.Task;
                 }
@@ -112,7 +97,7 @@ namespace CK.DeviceModel
                     while( _commandQueue.Reader.TryRead( out var c ) )
                     {
                         Debug.Assert( c.IsLocked );
-                        if( c != _commandAwaker )
+                        if( c != CommandAwaker.Instance )
                         {
                             if( c is WaitForSynchronizationCommand sync )
                             {
@@ -126,7 +111,7 @@ namespace CK.DeviceModel
                         }
                     }
                     // Security: run the loop once done.
-                    _commandQueue.Writer.TryWrite( _commandAwaker );
+                    _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
                     _commandMonitor.Info( $"Canceled {cRemoved} waiting commands." );
                 }
                 int tRemoved = 0;
@@ -231,7 +216,7 @@ namespace CK.DeviceModel
             // If the command is already completed, OnCommandSend returns false.
             if( !command.OnCommandSend( this, checkControllerKey, token ) ) return true;
             return _commandQueueImmediate.Writer.TryWrite( command )
-                   && _commandQueue.Writer.TryWrite( _commandAwaker );
+                   && _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
         }
 
         void CheckDirectCommandParameter( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName )
@@ -264,13 +249,13 @@ namespace CK.DeviceModel
             while( !IsDestroyed )
             {
                 Debug.Assert( cmd == null
-                              || cmd == _commandAwaker    
+                              || cmd == CommandAwaker.Instance    
                               || cmd.LongRunningReason.IsCompleted, $"Whatever happened to the previous command, its long/short running status is known '{cmd}'." );
 
                 cmd = _currentlyExecuting = null;
                 try
                 {
-                    // Before waiting for the next regular command or _commandAwaker, tries to retrieve
+                    // Before waiting for the next regular command or CommandAwaker.Instance, tries to retrieve
                     // a delayed command that must be executed.
                     // Ready-to-run delayed commands are picked one by one and handled as if they were coming from the
                     // regular queue. Immediate commands are always handled first.
@@ -360,7 +345,7 @@ namespace CK.DeviceModel
 
                     if( IsDestroyed )
                     {
-                        if( cmd != _commandAwaker )
+                        if( cmd != CommandAwaker.Instance )
                         {
                             _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (about to be handled)." );
                             cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
@@ -371,18 +356,18 @@ namespace CK.DeviceModel
 
                     // Before flushing any command awaker to get an actual command,
                     // if a delayed command is ready to run, give it the priority.
-                    if( cmd == _commandAwaker && delayedCommandReady ) continue;
+                    if( cmd == CommandAwaker.Instance && delayedCommandReady ) continue;
 
                     // Updates the wasStop flag.
                     wasStop = !IsRunning;
 
-                    while( cmd == _commandAwaker )
+                    while( cmd == CommandAwaker.Instance )
                     {
                         if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) break;
                         cmd = oneRegular;
-                        if( cmd == _commandAwaker ) _commandMonitor.Debug( "CommandAwaker flushed." );
+                        if( cmd == CommandAwaker.Instance ) _commandMonitor.Debug( "CommandAwaker flushed." );
                     }
-                    if( cmd == _commandAwaker )
+                    if( cmd == CommandAwaker.Instance )
                     {
                         // No regular command found. Before awaiting the next command,
                         // handle any potential immediate ones since we may have dequeued the last
@@ -465,7 +450,7 @@ namespace CK.DeviceModel
                 }
                 while( _commandQueue.Reader.TryRead( out cmd ) )
                 {
-                    if( cmd != _commandAwaker )
+                    if( cmd != CommandAwaker.Instance )
                     {
                         _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (from command queue)." );
                         cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
@@ -528,7 +513,7 @@ namespace CK.DeviceModel
             // that shows that a Write followed by a Read MAY be swapped).
             // To stay on the safe side, we use Interlocked here.
             Interlocked.Exchange( ref _timerFired, 1 );
-            _commandQueue.Writer.TryWrite( _commandAwaker );
+            _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
         }
 
         (BaseDeviceCommand?,bool) TryGetDelayedCommand()
@@ -600,7 +585,7 @@ namespace CK.DeviceModel
                 if( _delayedQueue.TryPeek( out delayed, out nextDelayedTime ) )
                 {
                     var delta = nextDelayedTime - now;
-                    // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
+                    // If a delayed command is waiting, we activate the timer that will send a CommandAwaker.Instance.
                     if( delta > _tickCountResolution )
                     {
                         Debug.Assert( _delayedQueue.Count > 0 );
@@ -639,7 +624,7 @@ namespace CK.DeviceModel
             if( _failedTimerSet = !_timer.Change( (uint)delta, _unsignedTimeoutInfinite ) )
             {
                 _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
-                _commandQueue.Writer.TryWrite( _commandAwaker );
+                _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
             }
         }
 
@@ -651,7 +636,7 @@ namespace CK.DeviceModel
             if( _failedTimerSet = !_timer.Change( _unsignedTimeoutInfinite, _unsignedTimeoutInfinite ) )
             {
                 _commandMonitor.Error( "Failed to Stop timer. Sending CommandAwaker to loop." );
-                _commandQueue.Writer.TryWrite( _commandAwaker );
+                _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
             }
         }
 
@@ -666,7 +651,7 @@ namespace CK.DeviceModel
                     if( !_timer.Change( (uint)delta, _unsignedTimeoutInfinite ) )
                     {
                         _commandMonitor.Error( $"Failed to Change timer (again) to {delta} ms. Sending CommandAwaker to loop." );
-                        _commandQueue.Writer.TryWrite( _commandAwaker );
+                        _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
                     }
                     else
                     {
@@ -841,7 +826,7 @@ namespace CK.DeviceModel
                         if( IsRunning )
                         {
                             // Awake the queue for deferred commands.
-                            _commandQueue.Writer.TryWrite( _commandAwaker );
+                            _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
                         }
                     }
                 }
@@ -1087,7 +1072,7 @@ namespace CK.DeviceModel
         void IInternalDevice.OnCommandCompleted( BaseDeviceCommand cmd )
         {
             Debug.Assert( cmd.InternalCompletion.IsCompleted );
-            if( _commandQueueImmediate.Writer.TryWrite( cmd ) ) _commandQueue.Writer.TryWrite( _commandAwaker );
+            if( _commandQueueImmediate.Writer.TryWrite( cmd ) ) _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
         }
 
         sealed class Reminder : BaseDeviceCommand
