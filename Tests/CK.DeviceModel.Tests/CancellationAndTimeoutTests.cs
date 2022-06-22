@@ -111,10 +111,10 @@ namespace CK.DeviceModel.Tests
                 await base.DoHandleCommandAsync( monitor, command );
             }
 
-            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state )
+            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state, bool immediateHandling )
             {
                 var cmd = (DCommand)state!;
-                monitor.Trace( $"OnReminderAsync for {cmd}" );
+                monitor.Trace( $"OnReminderAsync for {cmd} (immediateHandling: {immediateHandling})." );
                 DoComplete( (DCommand)state! );
                 return Task.CompletedTask;
             }
@@ -291,6 +291,8 @@ namespace CK.DeviceModel.Tests
                     c.Trace = $"n°{i}-{c.ExpectedCancellationReason ?? "<Success>"}'";
                     d.UnsafeSendCommand( TestHelper.Monitor, c, sendCommandTimeout?.Token ?? default );
                 }
+                // This is rather useless since in this test, completion is not the handling (long running commands).
+                await d.WaitForSynchronizationAsync( false );
                 foreach( var c in all )
                 {
                     TestHelper.Monitor.Trace( $"Waiting for {c}." );
