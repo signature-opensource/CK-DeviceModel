@@ -14,7 +14,7 @@ namespace CK.DeviceModel
         public interface IEventLoop : IMonitoredWorker
         {
             /// <summary>
-            /// Sends a device event into <see cref="DeviceEvent"/>.
+            /// Sends a device event into <see cref="DeviceEvent"/> and <see cref="AllEvent"/>.
             /// </summary>
             /// <param name="e">The event to send.</param>
             /// <returns>The event.</returns>

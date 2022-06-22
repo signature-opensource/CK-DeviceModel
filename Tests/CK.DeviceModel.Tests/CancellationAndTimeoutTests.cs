@@ -111,10 +111,10 @@ namespace CK.DeviceModel.Tests
                 await base.DoHandleCommandAsync( monitor, command );
             }
 
-            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state )
+            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state, bool immediateHandling )
             {
                 var cmd = (DCommand)state!;
-                monitor.Trace( $"OnReminderAsync for {cmd}" );
+                monitor.Trace( $"OnReminderAsync for {cmd} (immediateHandling: {immediateHandling})." );
                 DoComplete( (DCommand)state! );
                 return Task.CompletedTask;
             }

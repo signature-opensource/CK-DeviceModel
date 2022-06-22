@@ -148,7 +148,8 @@ namespace CK.DeviceModel
                 // 2 - this is pointless since Lock() is called after the routing between Immediate and regular
                 //     command queues has been made.
                 // The side effect is that if Lock() is called by user code before sending the command, this can
-                // still be changed. But we don't care :).
+                // still be changed. But we don't care :) and more importantly, we use this for Reminder sent
+                // as immediate commands (because their due date is in the past).
                 _sendTime = value ? DateTime.MinValue : Util.UtcMinValue;
             }
         }

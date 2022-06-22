@@ -146,7 +146,7 @@ namespace CK.DeviceModel.Tests
                 return Task.CompletedTask;
             }
 
-            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state )
+            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state, bool immediateHandling )
             {
                 ++ReminderFiredCount;
                 monitor.Trace( $"Reminder: Command {state}, Delta:{(int)(DateTime.UtcNow - reminderTimeUtc).TotalMilliseconds} ms. (ReminderCount is {ReminderCount}, ReminderFiredCount is {ReminderFiredCount}.)" );
