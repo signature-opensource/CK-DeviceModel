@@ -291,6 +291,8 @@ namespace CK.DeviceModel.Tests
                     c.Trace = $"n°{i}-{c.ExpectedCancellationReason ?? "<Success>"}'";
                     d.UnsafeSendCommand( TestHelper.Monitor, c, sendCommandTimeout?.Token ?? default );
                 }
+                // This is rather useless since in this test, completion is not the handling (long running commands).
+                await d.WaitForSynchronizationAsync( false );
                 foreach( var c in all )
                 {
                     TestHelper.Monitor.Trace( $"Waiting for {c}." );
