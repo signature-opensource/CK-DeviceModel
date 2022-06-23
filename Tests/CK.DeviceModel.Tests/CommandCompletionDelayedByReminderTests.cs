@@ -82,7 +82,7 @@ namespace CK.DeviceModel.Tests
                 await base.DoHandleCommandAsync( monitor, command );
             }
 
-            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state )
+            protected override Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state, bool immediateHandling )
             {
                 switch( _rnd.Next( 3 ) )
                 {

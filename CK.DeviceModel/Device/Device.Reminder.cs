@@ -1,43 +1,96 @@
 using CK.Core;
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
 {
-
     public abstract partial class Device<TConfiguration>
     {
-        /// <summary>
-        /// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
-        /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
-        /// eventually be called even if the device is stopped.
-        /// </summary>
-        /// <param name="timeUtc">The time in the future at which <see cref="OnReminderAsync"/> will be called.</param>
-        /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
-        /// <param name="throwIfPast">False to returns false instead of throwing an ArgumentExcetion if the reminder cannot be registered.</param>
-        /// <returns>True on success or false if the reminder cannot be set and <paramref name="throwIfPast"/> is false.</returns>
-        protected bool AddReminder( DateTime timeUtc, object? state, bool throwIfPast = true )
+        // I'm a bit reluctant to use a static ConcurrentBag<Reminder> since this beast
+        // adds a TLS entry and favors thread-bound instances (work stealing from other threads
+        // invokes a lock).
+        // Reminders in our async world on the tread pool have no thread affinity and won't be
+        // needed really often (regarding the global job that must be done).
+        // However, a shared pool seems a good idea and the single linked list is rather acquire/release
+        // is rather efficient: let's use a simple lock here (it won't be held for a long time). 
+        // To avoid out-of-control expansion of the pool, rather than centrally managed this, each device
+        // is alloted a MaxPooledReminderSize (that may be configurable... but come on!): each device
+        // tracks its own count and cannot ask for more than MaxPooledReminderSize pooled Reminders.
+        // This avoids a "bad device" to negatively impact the system (only the device that uses too much
+        // reminders will "suffer").
+        // The pool and the Reminder command are implemented below (outside of this generic type).
+        const int MaxPooledReminderSize = 100;
+        int _inUseReminderCount;
+
+        Reminder AcquireReminder( DateTime time, object? state )
         {
-            Throw.CheckArgument( timeUtc.Kind == DateTimeKind.Utc );
-            var c = new Reminder( timeUtc, state );
-            if( !EnqueueDelayed( c ) )
+            if( _inUseReminderCount++ < MaxPooledReminderSize )
             {
-                if( throwIfPast ) Throw.ArgumentException( nameof( timeUtc ), $"Must be in the future: value '{timeUtc:O}' is before now '{DateTime.UtcNow:O}'." );
-                return false;
+                return ReminderPool.AcquireReminder( time, state );
             }
-            return true;
+            _commandMonitor.Warn( $"This device uses {_inUseReminderCount} reminders. MaxPooledReminderSize is {MaxPooledReminderSize}. The new Reminder will not be pooled." );
+            return new Reminder( time, state, pooled: false );
+        }
+
+        void ReleaseReminder( Reminder c )
+        {
+            --_inUseReminderCount;
+            if( c.Pooled ) ReminderPool.ReleaseReminder( c );
         }
 
         /// <summary>
-        /// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
+        /// Registers a reminder in the delayed or immediate queue if the delay is too short to be delayed.
+        /// The <paramref name="timeUtc"/> can be in the past (an immediate queuing will be done), but not
+        /// in more than approximately 49 days (a <see cref="NotSupportedException"/> will be raised).
+        /// <para>
         /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
         /// eventually be called even if the device is stopped.
+        /// </para>
+        /// </summary>
+        /// <param name="timeUtc">The time at which <see cref="OnReminderAsync"/> will be called.</param>
+        /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
+        protected void AddReminder( DateTime timeUtc, object? state )
+        {
+            Throw.CheckArgument( timeUtc.Kind == DateTimeKind.Utc );
+            var c = AcquireReminder( timeUtc, state );
+            if( !EnqueueDelayed( c, true ) )
+            {
+                if( _commandQueueImmediate.Writer.TryWrite( c ) ) _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
+            }
+        }
+
+        /// <summary>
+        /// Registers a reminder in the delayed or immediate queue if the delay is too short to be delayed.
+        /// The <paramref name="timeUtc"/> can be in the past (an immediate queuing will be done), but not
+        /// in more than approximately 49 days (a <see cref="NotSupportedException"/> will be raised).
+        /// <para>
+        /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
+        /// eventually be called even if the device is stopped.
+        /// </para>
         /// </summary>
         /// <param name="delay">Positive time span.</param>
         /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
-        /// <param name="throwIfPast">False to returns false instead of throwing an ArgumentExcetion if the reminder cannot be registered.</param>
-        /// <returns>True on success or false if the reminder cannot be set and <paramref name="throwIfPast"/> is false.</returns>
-        protected bool AddReminder( TimeSpan delay, object? state, bool throwIfPast = true ) => AddReminder( DateTime.UtcNow.Add( delay ), state, throwIfPast );
+        protected void AddReminder( TimeSpan delay, object? state, bool throwIfPast = true ) => AddReminder( DateTime.UtcNow.Add( delay ), state );
+
+        async Task HandleReminderCommandAsync( Reminder reminder, bool immediateHandling )
+        {
+            try
+            {
+                await OnReminderAsync( _commandMonitor, reminder.Time, reminder.State, immediateHandling ).ConfigureAwait( false );
+            }
+            catch( Exception ex )
+            {
+                using( _commandMonitor.OpenFatal( $"Unhandled error in OnReminderAsync. Stopping the device '{FullName}'.", ex ) )
+                {
+                    await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall ).ConfigureAwait( false );
+                }
+            }
+            finally
+            {
+                ReleaseReminder( reminder );
+            }
+        }
 
         /// <summary>
         /// Reminder callback triggered by <see cref="AddReminder(DateTime, object?, bool)"/>.
@@ -46,25 +99,31 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reminderTimeUtc">The exact time configured on the reminder.</param>
         /// <param name="state">The optional state.</param>
+        /// <param name="immediateHandling">True if the reminder has not been delayed but posted to the immediate queue.</param>
         /// <returns>The awaitable.</returns>
-        protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state ) => Task.CompletedTask;
+        protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state, bool immediateHandling ) => Task.CompletedTask;
 
     }
 
-    // Avoid the Device<TConfiguration> generics host.
     sealed class Reminder : BaseDeviceCommand
     {
-        public readonly DateTime Time;
-        public readonly object? State;
-        public Reminder( DateTime time, object? state )
+        public Reminder? _nextFreeReminder;
+        public DateTime Time;
+        public object? State;
+        public readonly bool Pooled;
+
+        public Reminder( DateTime time, object? state, bool pooled )
             : base( (string.Empty, null) )
         {
+            Pooled = pooled;
             // SendTime is reset when the command is extracted from the _delayedQueue.
-            // Time field preserves it.
+            // The Time field preserves it.
             _sendTime = Time = time;
             State = state;
             // A reminder is enqueued in the delayed queue (as soon as it is instantiated) but
             // this internal command must not be considered as a real long running command.
+            // Moreover, if it cannot be enqueued (because it's in the past), it is enqueued as
+            // an immediate command.
             TrySetLongRunningReason( null );
         }
         public override Type HostType => throw new NotImplementedException();
@@ -72,5 +131,42 @@ namespace CK.DeviceModel
         protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
         public override string ToString() => nameof( Reminder );
     }
+
+    static class ReminderPool
+    {
+        static object _lock = new object();
+        static Reminder? _firstFreeReminder;
+
+        public static Reminder AcquireReminder( DateTime time, object? state )
+        {
+            Reminder? c = null;
+            lock( _lock )
+            {
+                c = _firstFreeReminder;
+                if( c != null )
+                {
+                    _firstFreeReminder = c._nextFreeReminder;
+                }
+            }
+            if( c != null )
+            {
+                c.Time = time;
+                c.State = state;
+                return c;
+            }
+            return new Reminder( time, state, pooled: true );
+        }
+
+        public static void ReleaseReminder( Reminder c )
+        {
+            Debug.Assert( c.Pooled );
+            lock( _lock )
+            {
+                c._nextFreeReminder = _firstFreeReminder;
+                _firstFreeReminder = c;
+            }
+        }
+    }
+
 
 }

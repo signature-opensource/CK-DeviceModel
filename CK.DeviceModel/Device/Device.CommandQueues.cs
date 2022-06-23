@@ -284,17 +284,7 @@ namespace CK.DeviceModel
                     #region Handles low-level ReminderCommand (from the _delayedQueue).
                     if( cmd is Reminder reminder )
                     {
-                        try
-                        {
-                            await OnReminderAsync( _commandMonitor, reminder.Time, reminder.State ).ConfigureAwait( false );
-                        }
-                        catch( Exception ex )
-                        {
-                            using( _commandMonitor.OpenFatal( $"Unhandled error in OnReminderAsync. Stopping the device '{FullName}'.", ex ) )
-                            {
-                                await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall ).ConfigureAwait( false );
-                            }
-                        }
+                        await HandleReminderCommandAsync( reminder, false ).ConfigureAwait( false );
                         continue;
                     }
                     #endregion
@@ -385,7 +375,7 @@ namespace CK.DeviceModel
                     }
                     Debug.Assert( cmd.IsLocked );
                     // Now that immediate and potential deferred have been handled, consider the SendingTimeUtc.
-                    if( EnqueueDelayed( cmd ) )
+                    if( EnqueueDelayed( cmd, false ) )
                     {
                         _commandMonitor.Trace( $"Delaying '{cmd}', SendingTimeUtc: {cmd.SendingTimeUtc:O}." );
                         await TrySetLongRunningCommandAsync( cmd, BaseDeviceCommand.LongRunningDelayedReason ).ConfigureAwait( false );
@@ -468,7 +458,7 @@ namespace CK.DeviceModel
             _commandMonitor.MonitorEnd();
         }
 
-        bool EnqueueDelayed( BaseDeviceCommand cmd )
+        bool EnqueueDelayed( BaseDeviceCommand cmd, bool fromReminder )
         {
             Debug.Assert( cmd._sendTime.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
             long time = cmd._sendTime.Ticks / TimeSpan.TicksPerMillisecond;
@@ -478,8 +468,14 @@ namespace CK.DeviceModel
                 long lDelta = time - now;
                 if( lDelta >= uint.MaxValue )
                 {
-                    _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is ignored." );
-                    return false;
+                    // Two different behaviors here.
+                    // - Reminders are set by this device, this is local code that has
+                    // no reason to provide us stupid delay like this. The device is buggy, we throw, it must be fixed.
+                    // - Commands come from the external world. There is no point to kill the device: this is not an issue
+                    // of the device itself, we handle the value as we can but emit an Error log (not a warn) to signal the issue.
+                    if( fromReminder ) Throw.NotSupportedException( $"Invalid reminder delay (more than 49 days)." );
+                    _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is set to the maximal possible delay (approx. 49 days) but this should be investigated." );
+                    lDelta = uint.MaxValue - 1;
                 }
                 var delta = (uint)lDelta;
                 // If the command must be handled in tickCountResolution ms or less, handle it now.
@@ -706,6 +702,10 @@ namespace CK.DeviceModel
                     if( immediate is CommandCanceler c )
                     {
                         HandleCancelAllPendingCommands( c );
+                    }
+                    else if( immediate is Reminder reminder )
+                    {
+                        await HandleReminderCommandAsync( reminder, true ).ConfigureAwait( false );
                     }
                     else if( immediate.InternalCompletion.IsCompleted )
                     {
