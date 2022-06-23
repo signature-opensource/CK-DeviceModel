@@ -19,6 +19,7 @@ namespace CK.DeviceModel
         // Unsigned integer for infinite.
         const uint _unsignedTimeoutInfinite = unchecked((uint)Timeout.Infinite);
         const uint _tickCountResolution = 15;
+        const uint _ourMax = uint.MaxValue - 2*_tickCountResolution;
 
         Timer? _timer;
         long _nextTimerTime;
@@ -484,7 +485,7 @@ namespace CK.DeviceModel
             if( time > 0 )
             {
                 long lDelta = time - now;
-                if( lDelta >= uint.MaxValue )
+                if( lDelta >= _ourMax )
                 {
                     // Two different behaviors here.
                     // - Reminders are set by this device, this is local code that has
@@ -494,7 +495,7 @@ namespace CK.DeviceModel
                     // (not a warn) to signal the issue.
                     if( fromReminder ) Throw.NotSupportedException( $"Invalid reminder delay (more than 49 days)." );
                     _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is set to the maximal possible delay (approx. 49 days) but this should be investigated." );
-                    lDelta = uint.MaxValue - 1;
+                    lDelta = _ourMax;
                     // Modify the SendingTimeUtc: at least the command exposes the change...
                     cmd._sendTime = DateTime.UtcNow.AddMilliseconds( lDelta );
                 }
