@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel
@@ -15,21 +16,37 @@ namespace CK.DeviceModel
         // However, a shared pool seems a good idea and the single linked list is rather acquire/release
         // is rather efficient: let's use a simple lock here (it won't be held for a long time). 
         // To avoid out-of-control expansion of the pool, rather than centrally managed this, each device
-        // is alloted a MaxPooledReminderSize (that may be configurable... but come on!): each device
-        // tracks its own count and cannot ask for more than MaxPooledReminderSize pooled Reminders.
+        // is alloted a MaxPooledReminderPerDevice (that may be configurable... but come on!): each device
+        // tracks its own count and cannot ask for more than MaxPooledReminderPerDevice pooled Reminders.
         // This avoids a "bad device" to negatively impact the system (only the device that uses too much
         // reminders will "suffer").
         // The pool and the Reminder command are implemented below (outside of this generic type).
-        const int MaxPooledReminderSize = 100;
+
+        /// <summary>
+        /// Gets the maximum number of pooled reminder that a given device can use.
+        /// When a device needs more reminders (at the same time), those reminders are not pooled.
+        /// </summary>
+        public static int MaxPooledReminderPerDevice => ReminderPool._maxPooledReminderPerDevice;
+
+        /// <summary>
+        /// Gets the current number of pooled reminder that are being used (out of the pool).
+        /// </summary>
+        public static int ReminderPoolInUseCount => ReminderPool._inUsePooledReminder;
+
+        /// <summary>
+        /// Gets the total number of pooled reminders.
+        /// </summary>
+        public static int ReminderPoolTotalCount => ReminderPool._totalPooledReminder;
+
         int _inUseReminderCount;
 
         Reminder AcquireReminder( DateTime time, object? state )
         {
-            if( _inUseReminderCount++ < MaxPooledReminderSize )
+            if( _inUseReminderCount++ < MaxPooledReminderPerDevice )
             {
                 return ReminderPool.AcquireReminder( time, state );
             }
-            _commandMonitor.Warn( $"This device uses {_inUseReminderCount} reminders. MaxPooledReminderSize is {MaxPooledReminderSize}. The new Reminder will not be pooled." );
+            _commandMonitor.Warn( $"The device '{FullName}' uses {_inUseReminderCount} reminders. MaxPooledReminderPerDevice is {MaxPooledReminderPerDevice}. The new Reminder will not be pooled." );
             return new Reminder( time, state, pooled: false );
         }
 
@@ -71,7 +88,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="delay">Positive time span.</param>
         /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
-        protected void AddReminder( TimeSpan delay, object? state, bool throwIfPast = true ) => AddReminder( DateTime.UtcNow.Add( delay ), state );
+        protected void AddReminder( TimeSpan delay, object? state ) => AddReminder( DateTime.UtcNow.Add( delay ), state );
 
         async Task HandleReminderCommandAsync( Reminder reminder, bool immediateHandling )
         {
@@ -89,11 +106,12 @@ namespace CK.DeviceModel
             finally
             {
                 ReleaseReminder( reminder );
+                _commandMonitor.Debug( $"ReminderPool: in use {ReminderPool._inUsePooledReminder} out of {ReminderPool._totalPooledReminder}." );
             }
         }
 
         /// <summary>
-        /// Reminder callback triggered by <see cref="AddReminder(DateTime, object?, bool)"/>.
+        /// Reminder callback triggered by <see cref="AddReminder(DateTime, object?)"/>.
         /// This does nothing at this level.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -137,6 +155,12 @@ namespace CK.DeviceModel
         static object _lock = new object();
         static Reminder? _firstFreeReminder;
 
+        // May be made settable one day.
+        internal const int _maxPooledReminderPerDevice = 100;
+
+        internal static int _totalPooledReminder;
+        internal static int _inUsePooledReminder;
+
         public static Reminder AcquireReminder( DateTime time, object? state )
         {
             Reminder? c = null;
@@ -150,10 +174,13 @@ namespace CK.DeviceModel
             }
             if( c != null )
             {
-                c.Time = time;
+                c.Time = c._sendTime = time;
                 c.State = state;
+                Interlocked.Increment( ref _inUsePooledReminder );
                 return c;
             }
+            Interlocked.Increment( ref _totalPooledReminder );
+            Interlocked.Increment( ref _inUsePooledReminder );
             return new Reminder( time, state, pooled: true );
         }
 
@@ -165,6 +192,7 @@ namespace CK.DeviceModel
                 c._nextFreeReminder = _firstFreeReminder;
                 _firstFreeReminder = c;
             }
+            Interlocked.Decrement( ref _inUsePooledReminder );
         }
     }
 

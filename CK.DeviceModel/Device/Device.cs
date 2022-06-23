@@ -28,6 +28,8 @@ namespace CK.DeviceModel
         TConfiguration _currentConfiguration;
         volatile TConfiguration _externalConfiguration;
 
+        readonly Task _commandRunLoop;
+
         // For safety, ConfigurationStatus is copied: we don't trust the ExternalConfiguration.
         // This is internal so that the DeviceHostDaemon can use
         internal DeviceConfigurationStatus _configStatus;
@@ -111,7 +113,7 @@ namespace CK.DeviceModel
             _deferredCommands = new Queue<BaseDeviceCommand>();
             _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
             _immediateCommandLimitDirty = true;
-            _ = Task.Run( CommandRunLoopAsync );
+            _commandRunLoop = Task.Run( CommandRunLoopAsync );
         }
 
         /// <summary>
@@ -799,6 +801,7 @@ namespace CK.DeviceModel
                 {
                     if( waitForDeviceDestroyed ) await cmd.Completion.Task.ConfigureAwait( false );
                 }
+                if( waitForDeviceDestroyed ) await _commandRunLoop.ConfigureAwait( false );
             }
         }
 

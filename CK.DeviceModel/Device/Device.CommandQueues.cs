@@ -429,29 +429,47 @@ namespace CK.DeviceModel
                 {
                     if( immediateObject is BaseDeviceCommand immediate )
                     {
-                        _commandMonitor.Trace( $"Setting UnavailableDeviceException on '{immediate}' (from immediate queue)." );
-                        immediate.InternalCompletion.TrySetException( new UnavailableDeviceException( this, immediate ) );
+                        if( immediate is Reminder r )
+                        {
+                            if( r.Pooled ) ReminderPool.ReleaseReminder( r );
+                        }
+                        else if( immediate.InternalCompletion.TrySetException( new UnavailableDeviceException( this, immediate ) ) )
+                        {
+                            _commandMonitor.Trace( $"Set UnavailableDeviceException on '{immediate}' (from immediate queue)." );
+                        }
                     }
                 }
                 while( _deferredCommands.TryDequeue( out cmd ) )
                 {
-                    _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (from deferred queue)." );
-                    cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
+                    Debug.Assert( cmd is not Reminder );
+                    if( cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) ) )
+                    {
+                        _commandMonitor.Trace( $"Set UnavailableDeviceException on {cmd} (from deferred queue)." );
+                    }
                 }
                 while( _commandQueue.Reader.TryRead( out cmd ) )
                 {
                     if( cmd != CommandAwaker.Instance )
                     {
-                        _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (from command queue)." );
-                        cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
+                        Debug.Assert( cmd is not Reminder );
+                        if( cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) ) )
+                        {
+                            _commandMonitor.Trace( $"Set UnavailableDeviceException on {cmd} (from command queue)." );
+                        }
                     }
                 }
                 if( _delayedQueue != null )
                 {
                     foreach( var (d, _) in _delayedQueue.UnorderedItems )
                     {
-                        _commandMonitor.Trace( $"Setting UnavailableDeviceException on {d} (from delayed command queue)." );
-                        d.InternalCompletion.TrySetException( new UnavailableDeviceException( this, d ) );
+                        if( d is Reminder r )
+                        {
+                            if( r.Pooled ) ReminderPool.ReleaseReminder( r );
+                        }
+                        else if( d.InternalCompletion.TrySetException( new UnavailableDeviceException( this, d ) ) )
+                        {
+                            _commandMonitor.Trace( $"Set UnavailableDeviceException on {d} (from delayed command queue)." );
+                        }
                     }
                 }
             }
@@ -472,10 +490,13 @@ namespace CK.DeviceModel
                     // - Reminders are set by this device, this is local code that has
                     // no reason to provide us stupid delay like this. The device is buggy, we throw, it must be fixed.
                     // - Commands come from the external world. There is no point to kill the device: this is not an issue
-                    // of the device itself, we handle the value as we can but emit an Error log (not a warn) to signal the issue.
+                    // of the device itself, we handle the value as we can (longest possible delay) but emit an Error log
+                    // (not a warn) to signal the issue.
                     if( fromReminder ) Throw.NotSupportedException( $"Invalid reminder delay (more than 49 days)." );
                     _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is set to the maximal possible delay (approx. 49 days) but this should be investigated." );
                     lDelta = uint.MaxValue - 1;
+                    // Modify the SendingTimeUtc: at least the command exposes the change...
+                    cmd._sendTime = DateTime.UtcNow.AddMilliseconds( lDelta );
                 }
                 var delta = (uint)lDelta;
                 // If the command must be handled in tickCountResolution ms or less, handle it now.
@@ -693,6 +714,7 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         async Task HandleImmediateObjectsAsync( object? immediateObject )
         {
+            Debug.Assert( immediateObject != CommandAwaker.Instance );
             if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
             int maxCount = _currentImmediateCommandLimit;
             do

@@ -111,7 +111,7 @@ namespace CK.DeviceModel.Tests
         [Test]
         public async Task deferred_commands_can_be_awaited_Async()
         {
-            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( cancellation_and_timeout_are_handled_Async )}" );
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( deferred_commands_can_be_awaited_Async )}" );
 
             var h = new DHost();
             var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.Runnable };
@@ -136,8 +136,8 @@ namespace CK.DeviceModel.Tests
             await Task.Delay( 50 );
             taskResult.IsCompleted.Should().BeFalse();
 
-            // After 100 ms, the command must have been handled: the WaitForSynchronizationAsync should be resolved.
-            await Task.Delay( 50 );
+            // After 100 ms (+20 ms for security), the command must have been handled: the WaitForSynchronizationAsync should be resolved.
+            await Task.Delay( 50 + 20 );
             taskResult.IsCompleted.Should().BeTrue();
 
             static DCommand NewCommand()

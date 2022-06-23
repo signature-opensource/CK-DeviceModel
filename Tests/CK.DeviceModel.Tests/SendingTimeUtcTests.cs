@@ -69,14 +69,14 @@ namespace CK.DeviceModel.Tests
             {
             }
 
+            public int ExecTimeMS { get; set; }
+
             public DConfiguration( ICKBinaryReader r )
                 : base( r )
             {
                 r.ReadByte();
                 ExecTimeMS = r.ReadInt32();
             }
-
-            public int ExecTimeMS { get; set; }
 
             public override void Write( ICKBinaryWriter w )
             {
@@ -285,6 +285,34 @@ namespace CK.DeviceModel.Tests
                 fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
 
             } ).RunAsync( nb, sendingDeltaMS, execTimeMS );
+        }
+
+        [Test]
+        public async Task sendig_time_in_more_than_49_days_simply_warns_Async()
+        {
+            using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sendig_time_in_more_than_49_days_simply_warns_Async )}" );
+            var h = new DHost();
+            var config = new DConfiguration() { Name = "D", ExecTimeMS = 0, Status = DeviceConfigurationStatus.RunnableStarted };
+            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+            D? d = h["D"];
+            Debug.Assert( d != null );
+
+            var tooLate = DateTime.UtcNow.AddDays( 50 );
+
+            var cToolate = new DCommand() { SendingTimeUtc = tooLate };
+
+            // The adjustment is done when the command enters the delayed queue.
+            cToolate.SendingTimeUtc.Should().Be( tooLate );
+
+            d.SendCommand( TestHelper.Monitor, cToolate, checkDeviceName: false );
+            await d.WaitForSynchronizationAsync( false );
+
+            // When the command is delayed and its time overflows, we update the SendingTimeUtc.
+            // We can use this to check the adjustment.
+            cToolate.SendingTimeUtc.Should().BeBefore( tooLate );
+
+            await h.ClearAsync( TestHelper.Monitor, true );
+
         }
     }
 }

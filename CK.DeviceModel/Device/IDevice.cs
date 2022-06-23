@@ -241,7 +241,7 @@ namespace CK.DeviceModel
         /// <param name="cancelQueuedCommands">Cancels the current command queue.</param>
         /// <param name="cancelDelayedCommands">
         /// Cancels delayed commands waiting for their <see cref="BaseDeviceCommand.SendingTimeUtc"/> and any
-        /// registered <see cref="Device{TConfiguration}.AddReminder(DateTime, object?, bool)"/>.
+        /// registered <see cref="Device{TConfiguration}.AddReminder(DateTime, object?)"/>.
         /// </param>
         /// <param name="cancelDeferredCommands">
         /// Cancels deferred commands waiting for the device to be running.

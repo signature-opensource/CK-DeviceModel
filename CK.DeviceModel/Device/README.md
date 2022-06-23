@@ -35,7 +35,7 @@ Optional extension points of a Device are:
 ```csharp
 protected virtual DeviceCommandStoppedBehavior OnStoppedDeviceCommand( IActivityMonitor monitor, BaseDeviceCommand command );
 protected virtual DeviceImmediateCommandStoppedBehavior OnStoppedDeviceImmediateCommand( IActivityMonitor monitor, BaseDeviceCommand command );
-protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state );
+protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state, bool immediateHandling );
 protected virtual ValueTask<bool> OnUnhandledExceptionAsync( IActivityMonitor monitor, BaseDeviceCommand command, Exception ex );
 protected virtual ValueTask<int> GetCommandTimeoutAsync( IActivityMonitor monitor, BaseDeviceCommand command );
 protected virtual Task OnCommandCompletedAsync( IActivityMonitor monitor, BaseDeviceCommand command );
@@ -204,25 +204,28 @@ the Device's code only:
 
 ```csharp
 /// <summary>
-/// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
+/// Registers a reminder in the delayed or immediate queue if the delay is too short to be delayed.
+/// The <paramref name="timeUtc"/> can be in the past (an immediate queuing will be done), but not
+/// in more than approximately 49 days (a <see cref="NotSupportedException"/> will be raised).
+/// <para>
 /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
-/// eventually be called.
+/// eventually be called even if the device is stopped.
+/// </para>
 /// </summary>
-/// <param name="timeUtc">The time in the future at which <see cref="OnReminderAsync"/> will be called.</param>
+/// <param name="timeUtc">The time at which <see cref="OnReminderAsync"/> will be called.</param>
 /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
-/// <param name="throwIfPast">False to returns false instead of throwing an ArgumentExcetion if the reminder cannot be registered.</param>
-/// <returns>True on success or false if the reminder cannot be set and <paramref name="throwIfPast"/> is false.</returns>
-protected bool AddReminder( DateTime timeUtc, object? state, bool throwIfPast = true );
+protected void AddReminder( DateTime timeUtc, object? state )
 
 /// <summary>
-/// Reminder callback triggered by <see cref="AddReminder(DateTime, object?, bool)"/>.
+/// Reminder callback triggered by <see cref="AddReminder(DateTime, object?)"/>.
 /// This does nothing at this level.
 /// </summary>
 /// <param name="monitor">The monitor to use.</param>
 /// <param name="reminderTimeUtc">The exact time configured on the reminder.</param>
 /// <param name="state">The optional state.</param>
+/// <param name="immediateHandling">True if the reminder has not been delayed but posted to the immediate queue.</param>
 /// <returns>The awaitable.</returns>
-protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state );
+protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state, bool immediateHandling );
 ```
 
 Reminders can be added and are triggered regardless of the Device status (stopped or running).
