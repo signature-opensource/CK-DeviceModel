@@ -4,7 +4,7 @@ using System;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Dummy command that is used to awake the command loop.
+    /// Dummy singleton command that is used to awake the command loop.
     /// This does nothing and is ignored except that, just like any other commands that are
     /// dequeued, this triggers the _commandQueueImmediate execution.
     /// <para>
