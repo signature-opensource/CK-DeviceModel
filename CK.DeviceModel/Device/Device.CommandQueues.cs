@@ -18,7 +18,8 @@ namespace CK.DeviceModel
 
         // Unsigned integer for infinite.
         const uint _unsignedTimeoutInfinite = unchecked((uint)Timeout.Infinite);
-        const uint _tickCountResolution = 15;
+        const long _tickCountResolution = 15;
+        const long _ourMax = uint.MaxValue - 2*_tickCountResolution;
 
         Timer? _timer;
         long _nextTimerTime;
@@ -46,21 +47,6 @@ namespace CK.DeviceModel
                 _immediateCommandLimitDirty = true;
             }
         }
-
-        /// <summary>
-        /// Dummy command that is used to awake the command loop.
-        /// This does nothing and is ignored except that, just like any other commands that are
-        /// dequeued, this triggers the _commandQueueImmediate execution.
-        /// </summary>
-        sealed class CommandAwaker : BaseDeviceCommand
-        {
-            public CommandAwaker() : base( (string.Empty, null) ) { }
-            public override Type HostType => throw new NotImplementedException();
-            internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
-            protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            public override string ToString() => nameof( CommandAwaker );
-        }
-        static readonly CommandAwaker _commandAwaker = new();
 
         #region CommandCanceler
 
@@ -94,7 +80,7 @@ namespace CK.DeviceModel
             if( cancelQueuedCommands || cancelDelayedCommands || cancelDeferredCommands )
             {
                 var c = new CommandCanceler( cancelQueuedCommands, cancelDelayedCommands, cancelDeferredCommands );
-                if( _commandQueueImmediate.Writer.TryWrite( c ) && _commandQueue.Writer.TryWrite( _commandAwaker ) )
+                if( _commandQueueImmediate.Writer.TryWrite( c ) && _commandQueue.Writer.TryWrite( CommandAwaker.Instance ) )
                 {
                     return c.Completion.Task;
                 }
@@ -112,7 +98,7 @@ namespace CK.DeviceModel
                     while( _commandQueue.Reader.TryRead( out var c ) )
                     {
                         Debug.Assert( c.IsLocked );
-                        if( c != _commandAwaker )
+                        if( c != CommandAwaker.Instance )
                         {
                             if( c is WaitForSynchronizationCommand sync )
                             {
@@ -126,7 +112,7 @@ namespace CK.DeviceModel
                         }
                     }
                     // Security: run the loop once done.
-                    _commandQueue.Writer.TryWrite( _commandAwaker );
+                    _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
                     _commandMonitor.Info( $"Canceled {cRemoved} waiting commands." );
                 }
                 int tRemoved = 0;
@@ -231,7 +217,7 @@ namespace CK.DeviceModel
             // If the command is already completed, OnCommandSend returns false.
             if( !command.OnCommandSend( this, checkControllerKey, token ) ) return true;
             return _commandQueueImmediate.Writer.TryWrite( command )
-                   && _commandQueue.Writer.TryWrite( _commandAwaker );
+                   && _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
         }
 
         void CheckDirectCommandParameter( IActivityMonitor monitor, BaseDeviceCommand command, bool checkDeviceName )
@@ -264,13 +250,13 @@ namespace CK.DeviceModel
             while( !IsDestroyed )
             {
                 Debug.Assert( cmd == null
-                              || cmd == _commandAwaker    
+                              || cmd == CommandAwaker.Instance    
                               || cmd.LongRunningReason.IsCompleted, $"Whatever happened to the previous command, its long/short running status is known '{cmd}'." );
 
                 cmd = _currentlyExecuting = null;
                 try
                 {
-                    // Before waiting for the next regular command or _commandAwaker, tries to retrieve
+                    // Before waiting for the next regular command or CommandAwaker.Instance, tries to retrieve
                     // a delayed command that must be executed.
                     // Ready-to-run delayed commands are picked one by one and handled as if they were coming from the
                     // regular queue. Immediate commands are always handled first.
@@ -299,17 +285,7 @@ namespace CK.DeviceModel
                     #region Handles low-level ReminderCommand (from the _delayedQueue).
                     if( cmd is Reminder reminder )
                     {
-                        try
-                        {
-                            await OnReminderAsync( _commandMonitor, reminder.Time, reminder.State ).ConfigureAwait( false );
-                        }
-                        catch( Exception ex )
-                        {
-                            using( _commandMonitor.OpenFatal( $"Unhandled error in OnReminderAsync. Stopping the device '{FullName}'.", ex ) )
-                            {
-                                await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall ).ConfigureAwait( false );
-                            }
-                        }
+                        await HandleReminderCommandAsync( reminder, false ).ConfigureAwait( false );
                         continue;
                     }
                     #endregion
@@ -360,7 +336,7 @@ namespace CK.DeviceModel
 
                     if( IsDestroyed )
                     {
-                        if( cmd != _commandAwaker )
+                        if( cmd != CommandAwaker.Instance )
                         {
                             _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (about to be handled)." );
                             cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
@@ -371,18 +347,18 @@ namespace CK.DeviceModel
 
                     // Before flushing any command awaker to get an actual command,
                     // if a delayed command is ready to run, give it the priority.
-                    if( cmd == _commandAwaker && delayedCommandReady ) continue;
+                    if( cmd == CommandAwaker.Instance && delayedCommandReady ) continue;
 
                     // Updates the wasStop flag.
                     wasStop = !IsRunning;
 
-                    while( cmd == _commandAwaker )
+                    while( cmd == CommandAwaker.Instance )
                     {
                         if( !_commandQueue.Reader.TryRead( out var oneRegular ) ) break;
                         cmd = oneRegular;
-                        if( cmd == _commandAwaker ) _commandMonitor.Debug( "CommandAwaker flushed." );
+                        if( cmd == CommandAwaker.Instance ) _commandMonitor.Debug( "CommandAwaker flushed." );
                     }
-                    if( cmd == _commandAwaker )
+                    if( cmd == CommandAwaker.Instance )
                     {
                         // No regular command found. Before awaiting the next command,
                         // handle any potential immediate ones since we may have dequeued the last
@@ -400,7 +376,7 @@ namespace CK.DeviceModel
                     }
                     Debug.Assert( cmd.IsLocked );
                     // Now that immediate and potential deferred have been handled, consider the SendingTimeUtc.
-                    if( EnqueueDelayed( cmd ) )
+                    if( EnqueueDelayed( cmd, false ) )
                     {
                         _commandMonitor.Trace( $"Delaying '{cmd}', SendingTimeUtc: {cmd.SendingTimeUtc:O}." );
                         await TrySetLongRunningCommandAsync( cmd, BaseDeviceCommand.LongRunningDelayedReason ).ConfigureAwait( false );
@@ -454,69 +430,90 @@ namespace CK.DeviceModel
                 {
                     if( immediateObject is BaseDeviceCommand immediate )
                     {
-                        _commandMonitor.Trace( $"Setting UnavailableDeviceException on '{immediate}' (from immediate queue)." );
-                        immediate.InternalCompletion.TrySetException( new UnavailableDeviceException( this, immediate ) );
+                        if( immediate is Reminder r )
+                        {
+                            if( r.Pooled ) ReminderPool.ReleaseReminder( r );
+                        }
+                        else if( immediate.InternalCompletion.TrySetException( new UnavailableDeviceException( this, immediate ) ) )
+                        {
+                            _commandMonitor.Trace( $"Set UnavailableDeviceException on '{immediate}' (from immediate queue)." );
+                        }
                     }
                 }
                 while( _deferredCommands.TryDequeue( out cmd ) )
                 {
-                    _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (from deferred queue)." );
-                    cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
+                    Debug.Assert( cmd is not Reminder );
+                    if( cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) ) )
+                    {
+                        _commandMonitor.Trace( $"Set UnavailableDeviceException on {cmd} (from deferred queue)." );
+                    }
                 }
                 while( _commandQueue.Reader.TryRead( out cmd ) )
                 {
-                    if( cmd != _commandAwaker )
+                    if( cmd != CommandAwaker.Instance )
                     {
-                        _commandMonitor.Trace( $"Setting UnavailableDeviceException on {cmd} (from command queue)." );
-                        cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) );
+                        Debug.Assert( cmd is not Reminder );
+                        if( cmd.InternalCompletion.TrySetException( new UnavailableDeviceException( this, cmd ) ) )
+                        {
+                            _commandMonitor.Trace( $"Set UnavailableDeviceException on {cmd} (from command queue)." );
+                        }
                     }
                 }
                 if( _delayedQueue != null )
                 {
                     foreach( var (d, _) in _delayedQueue.UnorderedItems )
                     {
-                        _commandMonitor.Trace( $"Setting UnavailableDeviceException on {d} (from delayed command queue)." );
-                        d.InternalCompletion.TrySetException( new UnavailableDeviceException( this, d ) );
+                        if( d is Reminder r )
+                        {
+                            if( r.Pooled ) ReminderPool.ReleaseReminder( r );
+                        }
+                        else if( d.InternalCompletion.TrySetException( new UnavailableDeviceException( this, d ) ) )
+                        {
+                            _commandMonitor.Trace( $"Set UnavailableDeviceException on {d} (from delayed command queue)." );
+                        }
                     }
                 }
             }
             _commandMonitor.MonitorEnd();
         }
 
-        bool EnqueueDelayed( BaseDeviceCommand cmd )
+        bool EnqueueDelayed( BaseDeviceCommand cmd, bool fromReminder )
         {
             Debug.Assert( cmd._sendTime.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
             long time = cmd._sendTime.Ticks / TimeSpan.TicksPerMillisecond;
             long now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
-            if( time > 0 )
+            long lDelta = time - now;
+            // If the command must be handled in tickCountResolution ms or less, handle it now.
+            if( lDelta <= _tickCountResolution ) return false;
+            if( lDelta > _ourMax )
             {
-                long lDelta = time - now;
-                if( lDelta >= uint.MaxValue )
-                {
-                    _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is ignored." );
-                    return false;
-                }
-                var delta = (uint)lDelta;
-                // If the command must be handled in tickCountResolution ms or less, handle it now.
-                if( delta > _tickCountResolution )
-                {
-                    if( _delayedQueue == null )
-                    {
-                        Debug.Assert( _timer == null );
-                        _commandMonitor.Info( "Creating DelayedQueue and Timer." );
-                        _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
-                        _timer = new Timer( OnTimer, null, _unsignedTimeoutInfinite, _unsignedTimeoutInfinite );
-                    }
-                    _delayedQueue.Enqueue( cmd, time );
-                    if( _delayedQueue.Peek() == cmd )
-                    {
-                        _commandMonitor.Debug( $"Command '{cmd}' is now the first delayed command in {delta} ms." );
-                        StartTimer( time, delta );
-                    }
-                    return true;
-                }
+                // Two different behaviors here.
+                // - Reminders are set by this device, this is local code that has
+                // no reason to provide us stupid delay like this. The device is buggy, we throw, it must be fixed.
+                // - Commands come from the external world. There is no point to kill the device: this is not an issue
+                // of the device itself, we handle the value as we can (longest possible delay) but emit an Error log
+                // (not a warn) to signal the issue.
+                if( fromReminder ) Throw.NotSupportedException( $"Invalid reminder delay (more than 49 days)." );
+                _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is set to the maximal possible delay (approx. 49 days) but this should be investigated." );
+                lDelta = _ourMax;
+                // Modify the SendingTimeUtc: at least the command exposes the change...
+                cmd._sendTime = new DateTime( now + _ourMax, DateTimeKind.Utc );
             }
-            return false;
+            var delta = (uint)lDelta;
+            if( _delayedQueue == null )
+            {
+                Debug.Assert( _timer == null );
+                _commandMonitor.Info( "Creating DelayedQueue and Timer." );
+                _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
+                _timer = new Timer( OnTimer, null, _unsignedTimeoutInfinite, _unsignedTimeoutInfinite );
+            }
+            _delayedQueue.Enqueue( cmd, time );
+            if( _delayedQueue.Peek() == cmd )
+            {
+                _commandMonitor.Debug( $"Command '{cmd}' is now the first delayed command in {delta} ms." );
+                StartTimer( time, delta );
+            }
+            return true;
         }
 
         void OnTimer( object? _ )
@@ -528,7 +525,7 @@ namespace CK.DeviceModel
             // that shows that a Write followed by a Read MAY be swapped).
             // To stay on the safe side, we use Interlocked here.
             Interlocked.Exchange( ref _timerFired, 1 );
-            _commandQueue.Writer.TryWrite( _commandAwaker );
+            _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
         }
 
         (BaseDeviceCommand?,bool) TryGetDelayedCommand()
@@ -541,7 +538,7 @@ namespace CK.DeviceModel
             if( Interlocked.CompareExchange( ref _timerFired, 0, 1 ) == 1 )
             {
                 now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
-                var delta = _nextTimerTime - now;
+                long delta = _nextTimerTime - now;
                 if( delta > 0 )
                 {
                     // Timers SHOULD NOT fire before their due date... but they do: Environment.TickCount is used
@@ -599,8 +596,8 @@ namespace CK.DeviceModel
             {
                 if( _delayedQueue.TryPeek( out delayed, out nextDelayedTime ) )
                 {
-                    var delta = nextDelayedTime - now;
-                    // If a delayed command is waiting, we activate the timer that will send a _commandAwaker.
+                    long delta = nextDelayedTime - now;
+                    // If a delayed command is waiting, we activate the timer that will send a CommandAwaker.Instance.
                     if( delta > _tickCountResolution )
                     {
                         Debug.Assert( _delayedQueue.Count > 0 );
@@ -639,7 +636,7 @@ namespace CK.DeviceModel
             if( _failedTimerSet = !_timer.Change( (uint)delta, _unsignedTimeoutInfinite ) )
             {
                 _commandMonitor.Error( $"Failed to Change timer. Sending CommandAwaker to loop." );
-                _commandQueue.Writer.TryWrite( _commandAwaker );
+                _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
             }
         }
 
@@ -651,7 +648,7 @@ namespace CK.DeviceModel
             if( _failedTimerSet = !_timer.Change( _unsignedTimeoutInfinite, _unsignedTimeoutInfinite ) )
             {
                 _commandMonitor.Error( "Failed to Stop timer. Sending CommandAwaker to loop." );
-                _commandQueue.Writer.TryWrite( _commandAwaker );
+                _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
             }
         }
 
@@ -666,7 +663,7 @@ namespace CK.DeviceModel
                     if( !_timer.Change( (uint)delta, _unsignedTimeoutInfinite ) )
                     {
                         _commandMonitor.Error( $"Failed to Change timer (again) to {delta} ms. Sending CommandAwaker to loop." );
-                        _commandQueue.Writer.TryWrite( _commandAwaker );
+                        _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
                     }
                     else
                     {
@@ -712,6 +709,7 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         async Task HandleImmediateObjectsAsync( object? immediateObject )
         {
+            Debug.Assert( immediateObject != CommandAwaker.Instance );
             if( _immediateCommandLimitDirty ) UpdateImmediateCommandLimit();
             int maxCount = _currentImmediateCommandLimit;
             do
@@ -721,6 +719,10 @@ namespace CK.DeviceModel
                     if( immediate is CommandCanceler c )
                     {
                         HandleCancelAllPendingCommands( c );
+                    }
+                    else if( immediate is Reminder reminder )
+                    {
+                        await HandleReminderCommandAsync( reminder, true ).ConfigureAwait( false );
                     }
                     else if( immediate.InternalCompletion.IsCompleted )
                     {
@@ -841,7 +843,7 @@ namespace CK.DeviceModel
                         if( IsRunning )
                         {
                             // Awake the queue for deferred commands.
-                            _commandQueue.Writer.TryWrite( _commandAwaker );
+                            _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
                         }
                     }
                 }
@@ -1087,71 +1089,8 @@ namespace CK.DeviceModel
         void IInternalDevice.OnCommandCompleted( BaseDeviceCommand cmd )
         {
             Debug.Assert( cmd.InternalCompletion.IsCompleted );
-            if( _commandQueueImmediate.Writer.TryWrite( cmd ) ) _commandQueue.Writer.TryWrite( _commandAwaker );
+            if( _commandQueueImmediate.Writer.TryWrite( cmd ) ) _commandQueue.Writer.TryWrite( CommandAwaker.Instance );
         }
-
-        sealed class Reminder : BaseDeviceCommand
-        {
-            public readonly DateTime Time;
-            public readonly object? State;
-            public Reminder( DateTime time, object? state )
-                : base( (string.Empty, null) )
-            {
-                // SendTime is reset when the command is extracted from the _delayedQueue.
-                // Time field preserves it.
-                _sendTime = Time = time;
-                State = state;
-                // A reminder is enqueued in the delayed queue (as soon as it is instantiated) but
-                // this internal command must not be considered as a real long running command.
-                TrySetLongRunningReason( null );
-            }
-            public override Type HostType => throw new NotImplementedException();
-            internal override ICompletionSource InternalCompletion => throw new NotImplementedException();
-            protected internal override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-            public override string ToString() => nameof( Reminder );
-        }
-
-        /// <summary>
-        /// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
-        /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
-        /// eventually be called even if the device is stopped.
-        /// </summary>
-        /// <param name="timeUtc">The time in the future at which <see cref="OnReminderAsync"/> will be called.</param>
-        /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
-        /// <param name="throwIfPast">False to returns false instead of throwing an ArgumentExcetion if the reminder cannot be registered.</param>
-        /// <returns>True on success or false if the reminder cannot be set and <paramref name="throwIfPast"/> is false.</returns>
-        protected bool AddReminder( DateTime timeUtc, object? state, bool throwIfPast = true )
-        {
-            Throw.CheckArgument( timeUtc.Kind == DateTimeKind.Utc );
-            var c = new Reminder( timeUtc, state );
-            if( !EnqueueDelayed( c ) )
-            {
-                if( throwIfPast ) Throw.ArgumentException( nameof( timeUtc ), $"Must be in the future: value '{timeUtc:O}' is before now '{DateTime.UtcNow:O}'." );
-                return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Registers a reminder that must be in the future or, by default, an <see cref="ArgumentException"/> is thrown.
-        /// This can be used indifferently on a stopped or running device: <see cref="OnReminderAsync"/> will always
-        /// eventually be called even if the device is stopped.
-        /// </summary>
-        /// <param name="delay">Positive time span.</param>
-        /// <param name="state">An optional state that will be provided to OnReminderAsync.</param>
-        /// <param name="throwIfPast">False to returns false instead of throwing an ArgumentExcetion if the reminder cannot be registered.</param>
-        /// <returns>True on success or false if the reminder cannot be set and <paramref name="throwIfPast"/> is false.</returns>
-        protected bool AddReminder( TimeSpan delay, object? state, bool throwIfPast = true ) => AddReminder( DateTime.UtcNow.Add( delay ), state, throwIfPast );
-
-        /// <summary>
-        /// Reminder callback triggered by <see cref="AddReminder(DateTime, object?, bool)"/>.
-        /// This does nothing at this level.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="reminderTimeUtc">The exact time configured on the reminder.</param>
-        /// <param name="state">The optional state.</param>
-        /// <returns>The awaitable.</returns>
-        protected virtual Task OnReminderAsync( IActivityMonitor monitor, DateTime reminderTimeUtc, object? state ) => Task.CompletedTask;
 
         /// <summary>
         /// Extension point that is called when <see cref="DoHandleCommandAsync(IActivityMonitor, BaseDeviceCommand)"/> raises an exception.

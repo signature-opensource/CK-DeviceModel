@@ -80,3 +80,16 @@ the `new` masking operator:
 
 > An ActiveDevice has 2 protected loops at its disposal: the `Device.CommandLoop` and the `ActiveDevice.EventLoop`. Care must 
 > be taken to which one a job is sent: they execute concurrently!
+
+
+### Why is there no `virtual bool OnDeviceEventRaising( TEvent e )`?
+
+This seems to be a useful hook: before sending an event to the external world, this could enable
+filtering the event or could impact device state in a centralized manner.
+
+This extension point is not available and this is intended. If common actions should be taken
+before sending an event, we consider that this code must be factorized on the emit side with
+one (or more) centralized method(s). This will be more maintainable than having yet-another centralized
+pattern matching that is likely to be overlooked.
+
+
