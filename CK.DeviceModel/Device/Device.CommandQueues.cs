@@ -18,8 +18,8 @@ namespace CK.DeviceModel
 
         // Unsigned integer for infinite.
         const uint _unsignedTimeoutInfinite = unchecked((uint)Timeout.Infinite);
-        const uint _tickCountResolution = 15;
-        const uint _ourMax = uint.MaxValue - 2*_tickCountResolution;
+        const long _tickCountResolution = 15;
+        const long _ourMax = uint.MaxValue - 2*_tickCountResolution;
 
         Timer? _timer;
         long _nextTimerTime;
@@ -482,44 +482,38 @@ namespace CK.DeviceModel
             Debug.Assert( cmd._sendTime.Kind == DateTimeKind.Utc, "Immediate are not handled here." );
             long time = cmd._sendTime.Ticks / TimeSpan.TicksPerMillisecond;
             long now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
-            if( time > 0 )
+            long lDelta = time - now;
+            // If the command must be handled in tickCountResolution ms or less, handle it now.
+            if( lDelta <= _tickCountResolution ) return false;
+            if( lDelta > _ourMax )
             {
-                long lDelta = time - now;
-                if( lDelta >= _ourMax )
-                {
-                    // Two different behaviors here.
-                    // - Reminders are set by this device, this is local code that has
-                    // no reason to provide us stupid delay like this. The device is buggy, we throw, it must be fixed.
-                    // - Commands come from the external world. There is no point to kill the device: this is not an issue
-                    // of the device itself, we handle the value as we can (longest possible delay) but emit an Error log
-                    // (not a warn) to signal the issue.
-                    if( fromReminder ) Throw.NotSupportedException( $"Invalid reminder delay (more than 49 days)." );
-                    _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is set to the maximal possible delay (approx. 49 days) but this should be investigated." );
-                    lDelta = _ourMax;
-                    // Modify the SendingTimeUtc: at least the command exposes the change...
-                    cmd._sendTime = DateTime.UtcNow.AddMilliseconds( lDelta );
-                }
-                var delta = (uint)lDelta;
-                // If the command must be handled in tickCountResolution ms or less, handle it now.
-                if( delta > _tickCountResolution )
-                {
-                    if( _delayedQueue == null )
-                    {
-                        Debug.Assert( _timer == null );
-                        _commandMonitor.Info( "Creating DelayedQueue and Timer." );
-                        _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
-                        _timer = new Timer( OnTimer, null, _unsignedTimeoutInfinite, _unsignedTimeoutInfinite );
-                    }
-                    _delayedQueue.Enqueue( cmd, time );
-                    if( _delayedQueue.Peek() == cmd )
-                    {
-                        _commandMonitor.Debug( $"Command '{cmd}' is now the first delayed command in {delta} ms." );
-                        StartTimer( time, delta );
-                    }
-                    return true;
-                }
+                // Two different behaviors here.
+                // - Reminders are set by this device, this is local code that has
+                // no reason to provide us stupid delay like this. The device is buggy, we throw, it must be fixed.
+                // - Commands come from the external world. There is no point to kill the device: this is not an issue
+                // of the device itself, we handle the value as we can (longest possible delay) but emit an Error log
+                // (not a warn) to signal the issue.
+                if( fromReminder ) Throw.NotSupportedException( $"Invalid reminder delay (more than 49 days)." );
+                _commandMonitor.Error( $"Command '{cmd}' has a totally stupid SendigTimeUtc in the future ({cmd._sendTime:O}). Its is set to the maximal possible delay (approx. 49 days) but this should be investigated." );
+                lDelta = _ourMax;
+                // Modify the SendingTimeUtc: at least the command exposes the change...
+                cmd._sendTime = new DateTime( now + _ourMax, DateTimeKind.Utc );
             }
-            return false;
+            var delta = (uint)lDelta;
+            if( _delayedQueue == null )
+            {
+                Debug.Assert( _timer == null );
+                _commandMonitor.Info( "Creating DelayedQueue and Timer." );
+                _delayedQueue = new PriorityQueue<BaseDeviceCommand, long>();
+                _timer = new Timer( OnTimer, null, _unsignedTimeoutInfinite, _unsignedTimeoutInfinite );
+            }
+            _delayedQueue.Enqueue( cmd, time );
+            if( _delayedQueue.Peek() == cmd )
+            {
+                _commandMonitor.Debug( $"Command '{cmd}' is now the first delayed command in {delta} ms." );
+                StartTimer( time, delta );
+            }
+            return true;
         }
 
         void OnTimer( object? _ )
@@ -544,7 +538,7 @@ namespace CK.DeviceModel
             if( Interlocked.CompareExchange( ref _timerFired, 0, 1 ) == 1 )
             {
                 now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
-                var delta = _nextTimerTime - now;
+                long delta = _nextTimerTime - now;
                 if( delta > 0 )
                 {
                     // Timers SHOULD NOT fire before their due date... but they do: Environment.TickCount is used
@@ -602,7 +596,7 @@ namespace CK.DeviceModel
             {
                 if( _delayedQueue.TryPeek( out delayed, out nextDelayedTime ) )
                 {
-                    var delta = nextDelayedTime - now;
+                    long delta = nextDelayedTime - now;
                     // If a delayed command is waiting, we activate the timer that will send a CommandAwaker.Instance.
                     if( delta > _tickCountResolution )
                     {
