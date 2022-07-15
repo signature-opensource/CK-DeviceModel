@@ -426,10 +426,12 @@ namespace CK.DeviceModel
             _commandQueueImmediate.Writer.Complete();
             using( _commandMonitor.OpenInfo( $"Ending device loop, flushing command queues by signaling a UnavailableDeviceException." ) )
             {
+                int i = 0;
                 while( _commandQueueImmediate.Reader.TryRead( out immediateObject ) )
                 {
                     if( immediateObject is BaseDeviceCommand immediate )
                     {
+                        _commandMonitor.Trace( $"Command n°{++i}: {immediate}" );
                         if( immediate is Reminder r )
                         {
                             if( r.Pooled ) ReminderPool.ReleaseReminder( r );
