@@ -98,6 +98,8 @@ namespace CK.DeviceModel.Tests
             public string? Trace { get; set; }
 
             protected override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.AlwaysWaitForNextStart;
+
+            protected override string? ToStringSuffix => Trace;
         }
 
         public class DCommandStarter : DCommand
