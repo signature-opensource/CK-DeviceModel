@@ -53,14 +53,14 @@ namespace CK.DeviceModel.Tests
                 : base( r )
             {
                 r.ReadByte();
-                Fail = r.ReadEnum<FailureType>();
+                Fail = (FailureType)r.ReadInt32();
             }
 
             public override void Write( ICKBinaryWriter w )
             {
                 base.Write( w );
                 w.Write( (byte)0 );
-                w.WriteEnum( Fail );
+                w.Write( (int)Fail );
             }
 
             public FailureType Fail { get; set; }

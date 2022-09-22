@@ -34,7 +34,7 @@ namespace CK.DeviceModel
         {
             r.ReadByte(); // Version
             _name = r.ReadString();
-            Status = r.ReadEnum<DeviceConfigurationStatus>();
+            Status = (DeviceConfigurationStatus)r.ReadInt32();
             ControllerKey = r.ReadNullableString();
             BaseImmediateCommandLimit = r.ReadInt32();
         }
@@ -52,7 +52,7 @@ namespace CK.DeviceModel
         {
             w.Write( (byte)0 ); // Version
             w.Write( _name );
-            w.WriteEnum( Status );
+            w.Write( (int)Status );
             w.WriteNullableString( ControllerKey );
             w.Write( BaseImmediateCommandLimit );
         }
