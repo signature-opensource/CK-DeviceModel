@@ -108,6 +108,19 @@ namespace CK.DeviceModel
         public abstract Type HostType { get; }
 
         /// <summary>
+        /// Gets the device to which this command was sent.
+        /// Accessing this property before the command is sent to a device throws an <see cref="InvalidOperationException"/>.
+        /// </summary>
+        protected IDevice Device
+        {
+            get
+            {
+                Throw.CheckState( "This command has not been sent to a device. Only from a sent command can its Device be retrieved.", _device != null );
+                return _device;
+            }
+        }
+
+        /// <summary>
         /// Returns <see cref="DeviceCommandStoppedBehavior.WaitForNextStartWhenAlwaysRunningOrCancel"/> since most of the commands
         /// should not be executed while the device is stopped and this enables always running devices to be resilient to
         /// unattended stops (and subsequent restarts).
