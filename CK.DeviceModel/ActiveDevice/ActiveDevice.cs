@@ -80,6 +80,23 @@ namespace CK.DeviceModel
         /// </summary>
         protected IEventLoop EventLoop => this;
 
+        /// <summary>
+        /// Raises a device event from inside the event loop if the monitor is the one of the
+        /// event loop, otherwise posts the event to the loop.
+        /// </summary>
+        /// <param name="monitor">The monitor.</param>
+        /// <param name="e">The event to send.</param>
+        /// <returns>The awaitable.</returns>
+        protected Task RaiseEventAsync( IActivityMonitor monitor, TEvent e )
+        {
+            if( monitor == _eventMonitor )
+            {
+                return DoRaiseEventAsync( e );
+            }
+            DoPost( e );
+            return Task.CompletedTask;
+        }
+
         void DoPost( object o ) => _events.Writer.TryWrite( o );
         void DoPost( Action<IActivityMonitor> o ) => _events.Writer.TryWrite( o );
         void DoPost( Func<IActivityMonitor, Task> o ) => _events.Writer.TryWrite( o );
@@ -123,13 +140,11 @@ namespace CK.DeviceModel
                             await a( _eventMonitor ).ConfigureAwait( false );
                             break;
                         case TEvent e:
-                            await _deviceEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
-                            await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
-                            await _host.RaiseAllDevicesEventAsync( _eventMonitor, e );
+                            await DoRaiseEventAsync( e ).ConfigureAwait( false );
                             break;
                         case DeviceLifetimeEvent e:
                             await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
-                            await _host.RaiseAllDevicesEventAsync( _eventMonitor, e );
+                            await _host.RaiseAllDevicesEventAsync( _eventMonitor, e ).ConfigureAwait( false );
                             if( e.DeviceStatus.IsDestroyed ) receivedDestroyed = true;
                             break;
                         default:
@@ -147,6 +162,13 @@ namespace CK.DeviceModel
                 }
             }
             _eventMonitor.MonitorEnd();
+        }
+
+        async Task DoRaiseEventAsync( TEvent e )
+        {
+            await _deviceEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
+            await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
+            await _host.RaiseAllDevicesEventAsync( _eventMonitor, e ).ConfigureAwait( false );
         }
     }
 }
