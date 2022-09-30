@@ -66,8 +66,23 @@ to safely communicate with the external world:
 Just like the [CommandLoop](../Device/Device.ICommandLoop.cs), this extends the `CK.Core.IMonitoredWorker` interface
 defined in CK.ActivityMonitor package: see Device's [CommandLoop and Signals](../Device/README.md#CommandLoop-and-Signals).
 
+When already working in the device loop, events can be raised directly, without a useless dispatch through the event loop
+channel. To secure this direct call, a monitor is required: if it's the one of the event loop the event is directly raised
+otherwise `IEventLoop.RaiseEvent( TEvent e )` is called.
+
+```csharp
+/// <summary>
+/// Raises a device event from inside the event loop if the monitor is the one of the
+/// event loop, otherwise posts the event to the loop.
+/// </summary>
+/// <param name="monitor">The monitor.</param>
+/// <param name="e">The event to send.</param>
+/// <returns>The awaitable.</returns>
+protected Task RaiseEventAsync( IActivityMonitor monitor, TEvent e )
+```
+
 *Note:* The `EventLoop` property is protected. Often, it must be exposed to its whole assembly. To expose it simply use
-the `new` masking operator:
+the `new` masking operator (avoid making it public!):
 
 ```csharp
   public sealed class SignatureDevice : ActiveDevice<SignatureDeviceConfiguration,SignatureDeviceEvent>
