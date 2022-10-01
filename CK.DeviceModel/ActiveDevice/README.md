@@ -66,9 +66,33 @@ to safely communicate with the external world:
 Just like the [CommandLoop](../Device/Device.ICommandLoop.cs), this extends the `CK.Core.IMonitoredWorker` interface
 defined in CK.ActivityMonitor package: see Device's [CommandLoop and Signals](../Device/README.md#CommandLoop-and-Signals).
 
-When already working in the device loop, events can be raised directly, without a useless dispatch through the event loop
-channel. To secure this direct call, a monitor is required: if it's the one of the event loop the event is directly raised
-otherwise `IEventLoop.RaiseEvent( TEvent e )` is called.
+Correctly handling concurrency is hard. An `ActiveDevice` has 2 parallel activities: its command and event loops.
+When developing a device, one must always be able to state in which loop the code is being executed. The following helpers
+available on a device (the first one) and an active device (both of them) should be used, typically in `Debug.Assert`:
+
+```csharp
+/// <summary>
+/// Gets whether the current activity is executing in the command loop.
+/// </summary>
+/// <param name="monitor">The monitor.</param>
+/// <returns>True if the monitor is the command loop monitor, false otherwise.</returns>
+protected bool IsInCommandLoop( IActivityMonitor monitor ) => monitor == _commandMonitor;
+
+/// <summary>
+/// Gets whether the current activity is executing in the event loop.
+/// </summary>
+/// <param name="monitor">The monitor.</param>
+/// <returns>True if the monitor is the event loop monitor, false otherwise.</returns>
+protected bool IsInEventLoop( IActivityMonitor monitor ) => monitor == _eventMonitor;
+```
+
+The key is the monitor! (This is the same idea that the `CK.Core.AsyncLock` uses to be able to handle lock recursion and
+to detect bad locking usage.)
+
+An example of this principle: when already working in the device loop, events can be raised directly, without a useless
+dispatch through the event loop channel.
+To secure this direct call, a monitor is required: if it's the one of the event loop the event is directly raised
+otherwise `IEventLoop.RaiseEvent( TEvent e )` is called:
 
 ```csharp
 /// <summary>
@@ -79,6 +103,14 @@ otherwise `IEventLoop.RaiseEvent( TEvent e )` is called.
 /// <param name="e">The event to send.</param>
 /// <returns>The awaitable.</returns>
 protected Task RaiseEventAsync( IActivityMonitor monitor, TEvent e )
+{
+    if( IsInEventLoop( monitor ) )
+    {
+        return DoRaiseEventAsync( e );
+    }
+    DoPost( e );
+    return Task.CompletedTask;
+}
 ```
 
 *Note:* The `EventLoop` property is protected. Often, it must be exposed to its whole assembly. To expose it simply use
