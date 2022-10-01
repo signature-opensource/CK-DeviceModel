@@ -89,13 +89,20 @@ namespace CK.DeviceModel
         /// <returns>The awaitable.</returns>
         protected Task RaiseEventAsync( IActivityMonitor monitor, TEvent e )
         {
-            if( monitor == _eventMonitor )
+            if( IsInEventLoop( monitor ) )
             {
                 return DoRaiseEventAsync( e );
             }
             DoPost( e );
             return Task.CompletedTask;
         }
+
+        /// <summary>
+        /// Gets whether the current activity is executing in the event loop.
+        /// </summary>
+        /// <param name="monitor">The monitor.</param>
+        /// <returns>True if the monitor is the event loop monitor, false otherwise.</returns>
+        protected bool IsInEventLoop( IActivityMonitor monitor ) => monitor == _eventMonitor;
 
         void DoPost( object o ) => _events.Writer.TryWrite( o );
         void DoPost( Action<IActivityMonitor> o ) => _events.Writer.TryWrite( o );
