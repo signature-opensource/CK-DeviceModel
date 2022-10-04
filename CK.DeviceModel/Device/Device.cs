@@ -219,21 +219,19 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public PerfectEvent<DeviceLifetimeEvent> LifetimeEvent => _lifetimeChanged.PerfectEvent;
 
-        Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor,
-                                          bool status = false,
-                                          bool configuration = false,
-                                          bool controllerKey = false )
+        async Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor,
+                                                bool status = false,
+                                                bool configuration = false,
+                                                bool controllerKey = false )
         {
             if( ++_eventSeqNumber == 1 )
             {
                 status = configuration = controllerKey = true;
             }
             var e = new DeviceLifetimeEvent<TConfiguration>( this, _eventSeqNumber, status, configuration, controllerKey );
-            return _lifetimeChanged.SafeRaiseAsync( monitor, e )
-                    .ContinueWith( _ => _host.RaiseAllDevicesLifetimeEventAsync( monitor, e ), TaskScheduler.Default )
-                    .Unwrap()
-                    .ContinueWith( _ => OnSafeRaiseLifetimeEventAsync( monitor, e ), TaskScheduler.Default )
-                    .Unwrap();
+            await _lifetimeChanged.SafeRaiseAsync( monitor, e ).ConfigureAwait( false );
+            await _host.RaiseAllDevicesLifetimeEventAsync( monitor, e ).ConfigureAwait( false );
+            await OnSafeRaiseLifetimeEventAsync( monitor, e ).ConfigureAwait( false );
         }
 
         Task IInternalDevice.EnsureInitialLifetimeEventAsync( IActivityMonitor monitor )

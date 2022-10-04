@@ -98,7 +98,7 @@ namespace CK.DeviceModel.Tests
                 }
             }
 
-            async Task OnDevicesLifetimeEventAsync( IActivityMonitor monitor, IDeviceHost sender, DeviceLifetimeEvent e )
+            async Task OnDevicesLifetimeEventAsync( IActivityMonitor monitor, IDeviceHost sender, DeviceLifetimeEvent e, CancellationToken cancel )
             {
                 using( await _lock.LockAsync( monitor ) )
                 {

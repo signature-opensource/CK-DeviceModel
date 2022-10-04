@@ -33,9 +33,11 @@ namespace CK.DeviceModel
         /// </summary>
         Dictionary<string, T> _devices;
 
-        readonly PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>> _devicesChanged;
+        readonly PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, T>> _devicesChanged;
         readonly PerfectEventSender<IDeviceHost, DeviceLifetimeEvent> _allDevicesLifetimeEvent;
         readonly PerfectEventSender<IDeviceHost, BaseDeviceEvent> _allDevicesEvent;
+
+        readonly PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> _devicesChangedBaseAdapter;
 
         /// <summary>
         /// This lock uses the NoRecursion policy.
@@ -98,9 +100,11 @@ namespace CK.DeviceModel
         DeviceHost( bool privateCall )
         {
             _devices = new Dictionary<string, T>();
-            _devicesChanged = new PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>>();
+            _devicesChanged = new PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, T>>();
             _allDevicesLifetimeEvent = new PerfectEventSender<IDeviceHost, DeviceLifetimeEvent>();
             _allDevicesEvent = new PerfectEventSender<IDeviceHost,BaseDeviceEvent>();
+
+            _devicesChangedBaseAdapter = _devicesChanged.PerfectEvent.Adapt<IReadOnlyDictionary<string, IDevice>>();
 
             // Generates a typed delegate to instantiate the THostConfiguration dynamically used
             // to apply a partial configuration.
@@ -190,8 +194,10 @@ namespace CK.DeviceModel
         /// <returns>A snapshot of the devices.</returns>
         public IReadOnlyDictionary<string, T> GetDevices() => _devices;
 
+        PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> IDeviceHost.DevicesChanged => _devicesChangedBaseAdapter;
+
         /// <inheritdoc />
-        public PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> DevicesChanged => _devicesChanged.PerfectEvent;
+        public PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, T>> DevicesChanged => _devicesChanged.PerfectEvent;
 
         Task IInternalDeviceHost.RaiseDevicesChangedEventAsync( IActivityMonitor monitor ) => RaiseDevicesChangedEventAsync( monitor );
 
@@ -199,7 +205,7 @@ namespace CK.DeviceModel
                                                                             ? Task.CompletedTask
                                                                             : _devicesChanged.SafeRaiseAsync( monitor,
                                                                                                               this,
-                                                                                                              _devices.AsIReadOnlyDictionary<string, T, IDevice>() );
+                                                                                                              _devices );
 
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost, DeviceLifetimeEvent> AllDevicesLifetimeEvent => _allDevicesLifetimeEvent.PerfectEvent;
