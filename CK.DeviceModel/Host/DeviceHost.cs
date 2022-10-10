@@ -33,11 +33,11 @@ namespace CK.DeviceModel
         /// </summary>
         Dictionary<string, T> _devices;
 
+        readonly PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>> _baseDevicesChanged;
         readonly PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, T>> _devicesChanged;
         readonly PerfectEventSender<IDeviceHost, DeviceLifetimeEvent> _allDevicesLifetimeEvent;
         readonly PerfectEventSender<IDeviceHost, BaseDeviceEvent> _allDevicesEvent;
 
-        readonly PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> _devicesChangedBaseAdapter;
 
         /// <summary>
         /// This lock uses the NoRecursion policy.
@@ -45,7 +45,7 @@ namespace CK.DeviceModel
         /// allowed at a time.
         /// Reconfigurations or destruction can concurrently happen when the IDevice methods are used.
         /// </summary>
-        readonly AsyncLock _applyConfigAsynclock;
+        readonly AsyncLock _applyConfigAsyncLock;
 
         // Compile cached lambda.
         readonly Func<THostConfiguration> _hostConfigFactory;
@@ -84,7 +84,7 @@ namespace CK.DeviceModel
         {
             Throw.CheckNotNullOrWhiteSpaceArgument( deviceHostName );
             // The name of the lock is the DeviceHostName.
-            _applyConfigAsynclock = new AsyncLock( LockRecursionPolicy.NoRecursion, deviceHostName );
+            _applyConfigAsyncLock = new AsyncLock( LockRecursionPolicy.NoRecursion, deviceHostName );
         }
 
         /// <summary>
@@ -94,17 +94,23 @@ namespace CK.DeviceModel
         protected DeviceHost()
             : this( true )
         {
-            _applyConfigAsynclock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
+            _applyConfigAsyncLock = new AsyncLock( LockRecursionPolicy.NoRecursion, GetType().Name );
         }
 
         DeviceHost( bool privateCall )
         {
             _devices = new Dictionary<string, T>();
+            _baseDevicesChanged = new PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, IDevice>>();
             _devicesChanged = new PerfectEventSender<IDeviceHost, IReadOnlyDictionary<string, T>>();
             _allDevicesLifetimeEvent = new PerfectEventSender<IDeviceHost, DeviceLifetimeEvent>();
             _allDevicesEvent = new PerfectEventSender<IDeviceHost,BaseDeviceEvent>();
 
-            _devicesChangedBaseAdapter = _devicesChanged.PerfectEvent.Adapt<IReadOnlyDictionary<string, IDevice>>();
+            _devicesChanged.CreateBridge( _baseDevicesChanged, e =>
+            {
+                // CK.Core v16.0.0 has not the AsIReadOnlyDictionary on IReadOnlyDictionary.
+                // This has been fixed in subsequent versions.
+                return ((Dictionary<string, T>)e).AsIReadOnlyDictionary<string, T, IDevice>();
+            } );
 
             // Generates a typed delegate to instantiate the THostConfiguration dynamically used
             // to apply a partial configuration.
@@ -121,11 +127,11 @@ namespace CK.DeviceModel
             _alwayRunningStopped = new List<(IInternalDevice Device, int Count, DateTime NextCall)>();
             // Shut up the CS8618 warning is raised here: Non-nullable field '_applyConfigAsynclock' is uninitialized.
             // (But keep the warning for any other fields.)
-            _applyConfigAsynclock = null!;
+            _applyConfigAsyncLock = null!;
         }
 
         /// <inheritdoc />
-        public string DeviceHostName => _applyConfigAsynclock.Name;
+        public string DeviceHostName => _applyConfigAsyncLock.Name;
 
         /// <inheritdoc />
         public int Count => _devices.Count;
@@ -194,7 +200,7 @@ namespace CK.DeviceModel
         /// <returns>A snapshot of the devices.</returns>
         public IReadOnlyDictionary<string, T> GetDevices() => _devices;
 
-        PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> IDeviceHost.DevicesChanged => _devicesChangedBaseAdapter;
+        PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, IDevice>> IDeviceHost.DevicesChanged => _baseDevicesChanged.PerfectEvent;
 
         /// <inheritdoc />
         public PerfectEvent<IDeviceHost, IReadOnlyDictionary<string, T>> DevicesChanged => _devicesChanged.PerfectEvent;
@@ -347,7 +353,7 @@ namespace CK.DeviceModel
             bool success = true;
             using( monitor.OpenInfo( $"Reconfiguring '{DeviceHostName}'. Applying {safeConfig.Items.Count} device configurations ({(safeConfig.IsPartialConfiguration ? "partial" : "full")} configuration)." ) )
             {
-                await _applyConfigAsynclock.EnterAsync( monitor ).ConfigureAwait( false );
+                await _applyConfigAsyncLock.EnterAsync( monitor ).ConfigureAwait( false );
                 try
                 {
                     HashSet<string>? toDestroy = null;
@@ -468,7 +474,7 @@ namespace CK.DeviceModel
                 }
                 finally
                 {
-                    _applyConfigAsynclock.Leave( monitor );
+                    _applyConfigAsyncLock.Leave( monitor );
                     if( _reconfiguringDevicesChanged )
                     {
                         await RaiseDevicesChangedEventAsync( monitor ).ConfigureAwait( false );
