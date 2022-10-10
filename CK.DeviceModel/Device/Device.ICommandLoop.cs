@@ -60,7 +60,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor.</param>
         /// <returns>True if the monitor is the command loop monitor, false otherwise.</returns>
-        protected bool IsInCommandLoop( IActivityMonitor monitor ) => monitor == _commandMonitor;
+        protected bool IsInCommandLoop( IActivityMonitor monitor ) => monitor.Output == _commandMonitor.Output;
 
         /// <summary>
         /// Optional extension point that must handle <see cref="ICommandLoop.Signal(object?)"/> payloads.

@@ -102,7 +102,7 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="monitor">The monitor.</param>
         /// <returns>True if the monitor is the event loop monitor, false otherwise.</returns>
-        protected bool IsInEventLoop( IActivityMonitor monitor ) => monitor == _eventMonitor;
+        protected bool IsInEventLoop( IActivityMonitor monitor ) => monitor.Output == _eventMonitor.Output;
 
         void DoPost( object o ) => _events.Writer.TryWrite( o );
         void DoPost( Action<IActivityMonitor> o ) => _events.Writer.TryWrite( o );

@@ -585,7 +585,7 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task<bool> StartAsync( IActivityMonitor monitor )
         {
-            if( monitor.Output == _commandMonitor.Output )
+            if( IsInCommandLoop( monitor ) )
             {
                 await HandleStartAsync( null, DeviceStartedReason.SelfStart ).ConfigureAwait( false );
                 return _isRunning;
@@ -679,7 +679,7 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false )
         {
-            if( monitor.Output == _commandMonitor.Output )
+            if( IsInCommandLoop( monitor ) )
             {
                 await HandleStopAsync( null, ignoreAlwaysRunning ? DeviceStoppedReason.SelfStoppedForceCall : DeviceStoppedReason.SelfStoppedCall ).ConfigureAwait( false );
                 return !_isRunning;
@@ -700,6 +700,7 @@ namespace CK.DeviceModel
 
         bool? SyncStateStopCheck( IActivityMonitor monitor, bool ignoreAlwaysRunnig )
         {
+            // We are not necessarily in the CommandLoop here!
             if( !_isRunning )
             {
                 monitor.Warn( $"Stopping an already stopped device '{FullName}'." );
@@ -784,9 +785,9 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task DestroyAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed = true )
         {
-            if( monitor.Output == _commandMonitor.Output )
+            if( IsInCommandLoop( monitor ) )
             {
-                await HandleDestroyAsync( null, true );
+                await HandleDestroyAsync( null, true ).ConfigureAwait( false );
             }
             else
             {
@@ -814,7 +815,7 @@ namespace CK.DeviceModel
             if( _timer != null )
             {
                 _commandMonitor.Trace( "Disposing Timer." );
-                await _timer.DisposeAsync();
+                await _timer.DisposeAsync().ConfigureAwait( false );
                 _timer = null;  
             }
             Exception? error = null;
