@@ -732,27 +732,35 @@ namespace CK.DeviceModel
                 Exception? error = null;
                 if( !r.HasValue )
                 {
-                    // From now on, Stop always succeeds, even if an error occurred.
-                    _isRunning = false;
-                    r = true;
-                    try
+                    if( cmd != null && cmd.CancellationToken.IsCancellationRequested )
                     {
-                        await DoStopAsync( _commandMonitor, reason ).ConfigureAwait( false );
+                        r = false;
+                        _commandMonitor.Trace( $"Stop command has been canceled." );
                     }
-                    catch( Exception ex )
+                    else
                     {
-                        error = ex;
-                        _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
-                    }
-                    if( reason != DeviceStoppedReason.Destroyed
-                        && reason != DeviceStoppedReason.SelfDestroyed
-                        && reason != DeviceStoppedReason.SilentAutoStartAndStopStoppedBehavior )
-                    {
-                        await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
-                    }
-                    if( isAlwaysRunning )
-                    {
-                        _host.DeviceOnAlwaysRunningCheck( this, _commandMonitor, false );
+                        // From now on, Stop always succeeds, even if an error occurred.
+                        _isRunning = false;
+                        r = true;
+                        try
+                        {
+                            await DoStopAsync( _commandMonitor, reason ).ConfigureAwait( false );
+                        }
+                        catch( Exception ex )
+                        {
+                            error = ex;
+                            _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
+                        }
+                        if( reason != DeviceStoppedReason.Destroyed
+                            && reason != DeviceStoppedReason.SelfDestroyed
+                            && reason != DeviceStoppedReason.SilentAutoStartAndStopStoppedBehavior )
+                        {
+                            await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
+                        }
+                        if( isAlwaysRunning )
+                        {
+                            _host.DeviceOnAlwaysRunningCheck( this, _commandMonitor, false );
+                        }
                     }
                 }
                 // Sets Completion last.
