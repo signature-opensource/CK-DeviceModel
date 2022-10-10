@@ -219,21 +219,19 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public PerfectEvent<DeviceLifetimeEvent> LifetimeEvent => _lifetimeChanged.PerfectEvent;
 
-        Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor,
-                                          bool status = false,
-                                          bool configuration = false,
-                                          bool controllerKey = false )
+        async Task SafeRaiseLifetimeEventAsync( IActivityMonitor monitor,
+                                                bool status = false,
+                                                bool configuration = false,
+                                                bool controllerKey = false )
         {
             if( ++_eventSeqNumber == 1 )
             {
                 status = configuration = controllerKey = true;
             }
             var e = new DeviceLifetimeEvent<TConfiguration>( this, _eventSeqNumber, status, configuration, controllerKey );
-            return _lifetimeChanged.SafeRaiseAsync( monitor, e )
-                    .ContinueWith( _ => _host.RaiseAllDevicesLifetimeEventAsync( monitor, e ), TaskScheduler.Default )
-                    .Unwrap()
-                    .ContinueWith( _ => OnSafeRaiseLifetimeEventAsync( monitor, e ), TaskScheduler.Default )
-                    .Unwrap();
+            await _lifetimeChanged.SafeRaiseAsync( monitor, e ).ConfigureAwait( false );
+            await _host.RaiseAllDevicesLifetimeEventAsync( monitor, e ).ConfigureAwait( false );
+            await OnSafeRaiseLifetimeEventAsync( monitor, e ).ConfigureAwait( false );
         }
 
         Task IInternalDevice.EnsureInitialLifetimeEventAsync( IActivityMonitor monitor )
@@ -587,7 +585,7 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task<bool> StartAsync( IActivityMonitor monitor )
         {
-            if( monitor.Output == _commandMonitor.Output )
+            if( IsInCommandLoop( monitor ) )
             {
                 await HandleStartAsync( null, DeviceStartedReason.SelfStart ).ConfigureAwait( false );
                 return _isRunning;
@@ -681,7 +679,7 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task<bool> StopAsync( IActivityMonitor monitor, bool ignoreAlwaysRunning = false )
         {
-            if( monitor.Output == _commandMonitor.Output )
+            if( IsInCommandLoop( monitor ) )
             {
                 await HandleStopAsync( null, ignoreAlwaysRunning ? DeviceStoppedReason.SelfStoppedForceCall : DeviceStoppedReason.SelfStoppedCall ).ConfigureAwait( false );
                 return !_isRunning;
@@ -702,6 +700,7 @@ namespace CK.DeviceModel
 
         bool? SyncStateStopCheck( IActivityMonitor monitor, bool ignoreAlwaysRunnig )
         {
+            // We are not necessarily in the CommandLoop here!
             if( !_isRunning )
             {
                 monitor.Warn( $"Stopping an already stopped device '{FullName}'." );
@@ -733,27 +732,35 @@ namespace CK.DeviceModel
                 Exception? error = null;
                 if( !r.HasValue )
                 {
-                    // From now on, Stop always succeeds, even if an error occurred.
-                    _isRunning = false;
-                    r = true;
-                    try
+                    if( cmd != null && cmd.CancellationToken.IsCancellationRequested )
                     {
-                        await DoStopAsync( _commandMonitor, reason ).ConfigureAwait( false );
+                        r = false;
+                        _commandMonitor.Trace( $"Stop command has been canceled." );
                     }
-                    catch( Exception ex )
+                    else
                     {
-                        error = ex;
-                        _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
-                    }
-                    if( reason != DeviceStoppedReason.Destroyed
-                        && reason != DeviceStoppedReason.SelfDestroyed
-                        && reason != DeviceStoppedReason.SilentAutoStartAndStopStoppedBehavior )
-                    {
-                        await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
-                    }
-                    if( isAlwaysRunning )
-                    {
-                        _host.DeviceOnAlwaysRunningCheck( this, _commandMonitor, false );
+                        // From now on, Stop always succeeds, even if an error occurred.
+                        _isRunning = false;
+                        r = true;
+                        try
+                        {
+                            await DoStopAsync( _commandMonitor, reason ).ConfigureAwait( false );
+                        }
+                        catch( Exception ex )
+                        {
+                            error = ex;
+                            _commandMonitor.Error( $"While stopping {FullName} ({reason}).", ex );
+                        }
+                        if( reason != DeviceStoppedReason.Destroyed
+                            && reason != DeviceStoppedReason.SelfDestroyed
+                            && reason != DeviceStoppedReason.SilentAutoStartAndStopStoppedBehavior )
+                        {
+                            await SetDeviceStatusAsync( _commandMonitor, new DeviceStatus( reason, _host.DaemonStoppedToken.IsCancellationRequested ) ).ConfigureAwait( false );
+                        }
+                        if( isAlwaysRunning )
+                        {
+                            _host.DeviceOnAlwaysRunningCheck( this, _commandMonitor, false );
+                        }
                     }
                 }
                 // Sets Completion last.
@@ -786,9 +793,9 @@ namespace CK.DeviceModel
         /// <inheritdoc />
         public async Task DestroyAsync( IActivityMonitor monitor, bool waitForDeviceDestroyed = true )
         {
-            if( monitor.Output == _commandMonitor.Output )
+            if( IsInCommandLoop( monitor ) )
             {
-                await HandleDestroyAsync( null, true );
+                await HandleDestroyAsync( null, true ).ConfigureAwait( false );
             }
             else
             {
@@ -816,7 +823,7 @@ namespace CK.DeviceModel
             if( _timer != null )
             {
                 _commandMonitor.Trace( "Disposing Timer." );
-                await _timer.DisposeAsync();
+                await _timer.DisposeAsync().ConfigureAwait( false );
                 _timer = null;  
             }
             Exception? error = null;

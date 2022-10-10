@@ -21,22 +21,24 @@ namespace CK.DeviceModel
         }
 
         /// <summary>
-        /// Transforms any error into false result.
+        /// Transforms any error into true result: a stop command always succeeds.
         /// </summary>
         /// <param name="ex">The exception.</param>
         /// <param name="result">The result setter.</param>
         protected override sealed void OnError( Exception ex, ref CompletionSource<bool>.OnError result )
         {
-            result.SetResult( false );
+            result.SetResult( true );
         }
 
         /// <summary>
-        /// Transforms cancellation into false result.
+        /// Transforms any error into !<see cref="IDevice.IsRunning"/> result:
+        /// a stop command normally always succeeds but if it has been canceled before its handling,
+        /// then the Stop may "fail".
         /// </summary>
         /// <param name="result">The result setter.</param>
         protected override sealed void OnCanceled( ref CompletionSource<bool>.OnCanceled result )
         {
-            result.SetResult( false );
+            result.SetResult( !Device.IsRunning );
         }
 
         /// <summary>
