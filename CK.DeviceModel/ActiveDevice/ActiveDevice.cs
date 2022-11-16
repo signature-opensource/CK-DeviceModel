@@ -20,7 +20,7 @@ namespace CK.DeviceModel
     public abstract partial class ActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>,
                                                                         IActiveDevice<TEvent>,
                                                                         ActiveDevice<TConfiguration,TEvent>.IEventLoop
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
         where TEvent : BaseActiveDeviceEvent
     {
         readonly Channel<object> _events;

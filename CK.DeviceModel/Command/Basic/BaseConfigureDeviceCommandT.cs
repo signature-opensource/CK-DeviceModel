@@ -10,7 +10,7 @@ namespace CK.DeviceModel
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
     public abstract class BaseConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
     {
         private protected BaseConfigureDeviceCommand( TConfiguration? configuration, TConfiguration? clonedConfiguration, (string lockedName, string? lockedControllerKey)? locked = null )
             : base( configuration ?? Activator.CreateInstance<TConfiguration>(), locked )

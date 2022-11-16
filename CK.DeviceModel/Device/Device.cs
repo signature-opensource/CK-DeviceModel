@@ -15,7 +15,7 @@ namespace CK.DeviceModel
     /// Abstract base class for a device.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract partial class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration
+    public abstract partial class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration, new()
     {
         // SimpleActiveDevice and ActiveDevice need to call RaiseAllDevicesEvent,
         // they need to access their host.
@@ -46,6 +46,11 @@ namespace CK.DeviceModel
 
         // DeviceHostDaemon access to the actual safe status.
         DeviceConfigurationStatus IInternalDevice.ConfigStatus => _configStatus;
+
+        static Device()
+        {
+            Throw.CheckState( new TConfiguration().CheckValid( new ActivityMonitor( false ) ) );    
+        }
 
         /// <summary>
         /// Factory information (opaque token) that exposes the device's initial configuration.

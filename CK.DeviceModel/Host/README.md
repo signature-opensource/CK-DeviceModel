@@ -59,7 +59,7 @@ For those are curious, this simply results of the way the interface and the base
     public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> : IDeviceHost
         where T : Device<TConfiguration>
         where THostConfiguration : DeviceHostConfiguration<TConfiguration>
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
     { ... }
 ```
 

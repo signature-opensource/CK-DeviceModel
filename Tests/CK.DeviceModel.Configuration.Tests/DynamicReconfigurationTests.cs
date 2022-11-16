@@ -180,6 +180,40 @@ namespace CK.DeviceModel.Configuration.Tests
             public static DynamicConfiguration Create() => new DynamicConfiguration( new ConfigurationBuilder().Add( new DynamicConfigurationSource() ).Build() );
         }
 
+        class InvalidConfig : DeviceConfiguration
+        {
+            protected override bool DoCheckValid( IActivityMonitor monitor ) => false;
+        }
+
+        class InvalidDevice : Device<InvalidConfig>
+        {
+            public InvalidDevice( IActivityMonitor monitor, CreateInfo info ) : base( monitor, info )
+            {
+            }
+
+            protected override Task DoDestroyAsync( IActivityMonitor monitor ) => throw new NotImplementedException();
+
+            protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, InvalidConfig config ) => throw new NotImplementedException();
+
+            protected override Task<bool> DoStartAsync( IActivityMonitor monitor, DeviceStartedReason reason ) => throw new NotImplementedException();
+
+            protected override Task DoStopAsync( IActivityMonitor monitor, DeviceStoppedReason reason ) => throw new NotImplementedException();
+        }
+
+
+        [Test]
+        public void a_new_DeviceConfiguration_MUST_be_valid()
+        {
+            FluentActions.Invoking( TouchInvalidConfiguration ).Should().Throw<TypeInitializationException>(); 
+        }
+
+        [MethodImpl( MethodImplOptions.NoInlining )]
+        static void TouchInvalidConfiguration()
+        {
+            InvalidDevice invalid = new InvalidDevice( default!, default );
+            TestHelper.Monitor.Info( $"The invalid is {invalid}." );
+        }
+
         [Test]
         public async Task empty_configuration_does_not_create_any_device_Async()
         {
