@@ -1,12 +1,11 @@
-﻿
 codecakebuilder:
-  tags:
-    - windows
-  script:
-    - dotnet run --project CodeCakeBuilder -nointeraction
   artifacts:
     paths:
-      - '**\Tests\**\TestResults\*.trx'
-      - '**Tests\**\Logs\**\*'
+    - "'**\\Tests\\**\\TestResults\\*.trx'"
+    - "'**Tests\\**\\Logs\\**\\*'"
     when: always
     expire_in: 6 month
+  tags:
+  - windows
+  script:
+  - dotnet run --project CodeCakeBuilder -nointeraction
