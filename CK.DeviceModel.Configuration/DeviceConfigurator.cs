@@ -167,9 +167,16 @@ namespace CK.DeviceModel
                                             foreach( var deviceConfig in items.GetChildren() )
                                             {
                                                 _changeMonitor.Debug( $"Handling Device item: {deviceConfig.Key}." );
-                                                var configObject = (DeviceConfiguration)deviceConfig.Get( d.GetDeviceConfigurationType() );
-                                                configObject.Name = deviceConfig.Key;
-                                                config.Add( configObject );
+                                                var configObject = (DeviceConfiguration?)deviceConfig.Get( d.GetDeviceConfigurationType() );
+                                                if( configObject == null )
+                                                {
+                                                    _changeMonitor.Warn( $"Unable to bind configuration entry '{deviceConfig.Key}'." );
+                                                }
+                                                else
+                                                {
+                                                    configObject.Name = deviceConfig.Key;
+                                                    config.Add( configObject );
+                                                }
                                             }
                                         }
                                     }
