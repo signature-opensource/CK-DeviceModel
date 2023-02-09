@@ -7,5 +7,11 @@ codecakebuilder:
     expire_in: 6 month
   tags:
   - windows
+  # From: https://gitlab.com/gitlab-org/gitlab/-/issues/350100#note_1249362905
+  # This should force a complete clone of the repository (with all the tags and commit points).
+  variables:  
+    GIT_STRATEGY: clone
+    GIT_CHECKOUT: "false"
+    GIT_DEPTH: "0"
   script:
   - dotnet run --project CodeCakeBuilder -nointeraction
