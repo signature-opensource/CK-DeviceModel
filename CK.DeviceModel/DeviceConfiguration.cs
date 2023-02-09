@@ -15,7 +15,8 @@ namespace CK.DeviceModel
         string _name;
 
         /// <summary>
-        /// Initializes a new device configuration with an empty name and a <see cref="DeviceConfigurationStatus.Disabled"/> status.
+        /// Initializes a new device configuration with an automatic (awful) unique name and
+        /// a <see cref="DeviceConfigurationStatus.Disabled"/> status.
         /// </summary>
         protected DeviceConfiguration()
         {

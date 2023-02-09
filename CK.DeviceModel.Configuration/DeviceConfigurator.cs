@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -92,7 +94,6 @@ namespace CK.DeviceModel
         {
             using( _changeMonitor.OpenInfo( "Building configuration objects for Devices." ) )
             {
-                NoItemsSectionWrapper noItemsSection = new NoItemsSectionWrapper();
                 try
                 {
                     if( !_configuration.Exists() )
@@ -109,74 +110,110 @@ namespace CK.DeviceModel
                     }
                     int idxResult = 0;
                     (IDeviceHost, IDeviceHostConfiguration)[]? toApply = null;
+
+                    Type[] sigMonitorAndSection = new Type[] { typeof( IActivityMonitor ), typeof( IConfigurationSection ) };
+                    Type[] sigSectionType = new Type[] { typeof( IConfigurationSection ) };
+
                     foreach( var c in _configuration.GetChildren() )
                     {
-                        if( c.Key == "Daemon" )
+                        if( c.Key.Equals( "Daemon", StringComparison.OrdinalIgnoreCase ) )
                         {
                             HandleDaemonConfiguration( c );
                             continue;
                         }
-                        var d = _deviceHosts.FirstOrDefault( h => h.DeviceHostName == c.Key );
+                        var d = _deviceHosts.FirstOrDefault( h => h.DeviceHostName.Equals( c.Key, StringComparison.OrdinalIgnoreCase ) );
                         if( d == null )
                         {
                             _changeMonitor.Warn( $"DeviceHost named '{c.Key}' not found. It is ignored. Available hosts are: {_deviceHosts.Select( device => device.DeviceHostName ).Concatenate()}." );
                         }
                         else
                         {
+
                             using( _changeMonitor.OpenInfo( $"Handling DeviceHost '{c.Key}'." ) )
                             {
                                 IDeviceHostConfiguration config;
 
                                 Type tHostConfig = d.GetDeviceHostConfigurationType();
-                                var ctor = tHostConfig.GetConstructor( new Type[] { typeof( IActivityMonitor ), typeof( IConfiguration ) } );
-                                if( ctor != null )
+                                if( !FindSpecificConstructors( sigMonitorAndSection, sigSectionType, tHostConfig, out var ctorHost0, out var ctorHost1, out var ctorHost2) )
                                 {
-                                    _changeMonitor.Debug( $"Found constructor( IActivityMonitor, IConfiguration )." );
-                                    config = (IDeviceHostConfiguration)ctor.Invoke( new object[] { _changeMonitor, c } );
+                                    continue;
+                                }
+                                if( ctorHost2 != null )
+                                {
+                                    config = (IDeviceHostConfiguration)ctorHost2.Invoke( new object[] { _changeMonitor, c } );
+                                }
+                                else if( ctorHost1 != null )
+                                {
+                                    config = (IDeviceHostConfiguration)ctorHost1.Invoke( new object[] { c } );
                                 }
                                 else
                                 {
-                                    ctor = tHostConfig.GetConstructor( new Type[] { typeof( IConfiguration ) } );
-                                    if( ctor != null )
+                                    Debug.Assert( ctorHost0 != null );
+                                    // We use the standard Bind: all the properties than can be bound will be.
+                                    // But we don't want the Items to be bound since we take control of it below (DeviceConfiguration
+                                    // can have dedicated constructors). The CreateSectionWithout is a small helper that does the magic.
+                                    //
+                                    // We MUST use Bind on an existing instance here instead of a simple Get( tHostConfig ) because
+                                    // if "Items" is the ONLY property (that is the more the rule than exception), then Get returns
+                                    // null since it sees a totally empty section! 
+                                    config = (IDeviceHostConfiguration)ctorHost0.Invoke( Array.Empty<object>() );
+                                    c.CreateSectionWithout( nameof( IDeviceHostConfiguration.Items ) ).Bind( config );
+                                }
+                                var ctor = tHostConfig.GetConstructor( sigMonitorAndSection );
+                                if( ctor != null )
+                                {
+                                    _changeMonitor.Debug( $"Found constructor {tHostConfig:C}( IActivityMonitor, IConfigurationSection )." );
+                                }
+                                else
+                                {
+                                    var items = c.GetSection( nameof( IDeviceHostConfiguration.Items ) );
+                                    if( !items.Exists() )
                                     {
-                                        _changeMonitor.Debug( $"Found constructor( IConfiguration )." );
-                                        config = (IDeviceHostConfiguration)ctor.Invoke( new object[] { c } );
+                                        _changeMonitor.Warn( $"No 'Items' section found." );
                                     }
                                     else
                                     {
-                                        ctor = tHostConfig.GetConstructor( Type.EmptyTypes );
-                                        if( ctor != null )
+                                        Type deviceConfigType = d.GetDeviceConfigurationType();
+                                        if( !FindSpecificConstructors( sigMonitorAndSection,
+                                                                       sigSectionType,
+                                                                       deviceConfigType,
+                                                                       out ConstructorInfo? ctor0,
+                                                                       out ConstructorInfo? ctor1,
+                                                                       out ConstructorInfo? ctor2 ) )
                                         {
-                                            _changeMonitor.Debug( $"Using default constructor and configuration binding." );
-                                            config = (IDeviceHostConfiguration)ctor.Invoke( Array.Empty<object>() );
-                                            noItemsSection.InnerSection = c;
-                                            noItemsSection.Bind( config );
-                                        }
-                                        else
-                                        {
-                                            _changeMonitor.Error( $"Failed to locate a valid constructor on '{tHostConfig.FullName}' type." );
                                             continue;
                                         }
-                                        var items = c.GetSection( nameof( IDeviceHostConfiguration.Items ) );
-                                        if( !items.Exists() )
+                                        foreach( var deviceConfig in items.GetChildren() )
                                         {
-                                            _changeMonitor.Warn( $"No 'Items' section found." );
-                                        }
-                                        else
-                                        {
-                                            foreach( var deviceConfig in items.GetChildren() )
+                                            DeviceConfiguration? configObject = null;
+                                            _changeMonitor.Debug( $"Handling Device item: {deviceConfig.Key}." );
+                                            try
                                             {
-                                                _changeMonitor.Debug( $"Handling Device item: {deviceConfig.Key}." );
-                                                var configObject = (DeviceConfiguration?)deviceConfig.Get( d.GetDeviceConfigurationType() );
-                                                if( configObject == null )
+                                                if( ctor2 != null )
                                                 {
-                                                    _changeMonitor.Warn( $"Unable to bind configuration entry '{deviceConfig.Key}'." );
+                                                    configObject = (DeviceConfiguration?)ctor2.Invoke( new object[] { _changeMonitor, deviceConfig } );
+                                                }
+                                                else if( ctor1 != null )
+                                                {
+                                                    configObject = (DeviceConfiguration?)ctor1.Invoke( new object[] { deviceConfig } );
                                                 }
                                                 else
                                                 {
-                                                    configObject.Name = deviceConfig.Key;
-                                                    config.Add( configObject );
+                                                    configObject = (DeviceConfiguration?)deviceConfig.Get( deviceConfigType );
                                                 }
+                                            }
+                                            catch( Exception ex )
+                                            {
+                                                _changeMonitor.Error( $"While instantiating Device configuration for '{deviceConfig.Path}' and type '{deviceConfigType:C}'.", ex );
+                                            }
+                                            if( configObject == null )
+                                            {
+                                                _changeMonitor.Warn( $"Unable to bind configuration entry '{deviceConfig.Key}'." );
+                                            }
+                                            else
+                                            {
+                                                configObject.Name = deviceConfig.Key;
+                                                config.Add( configObject );
                                             }
                                         }
                                     }
@@ -201,6 +238,34 @@ namespace CK.DeviceModel
                     _changeMonitor.Error( ex );
                 }
             }
+        }
+
+        bool FindSpecificConstructors( Type[] sigMonitorAndSection,
+                                       Type[] sigSectionType,
+                                       Type configType,
+                                       out ConstructorInfo? ctor0,
+                                       out ConstructorInfo? ctor1,
+                                       out ConstructorInfo? ctor2 )
+        {
+            ctor0 = ctor1 = ctor2 = null;
+            if( (ctor2 = configType.GetConstructor( sigMonitorAndSection )) != null )
+            {
+                _changeMonitor.Debug( $"Found constructor {configType:C}( IActivityMonitor, IConfigurationSection )." );
+            }
+            else if( (ctor1 = configType.GetConstructor( sigSectionType )) != null )
+            {
+                _changeMonitor.Debug( $"Found constructor {configType:C}( IConfigurationSection )." );
+            }
+            else if( (ctor0 = configType.GetConstructor( Type.EmptyTypes )) != null )
+            {
+                _changeMonitor.Debug( $"Using default {configType:C} constructor and configuration binding." );
+            }
+            else
+            {
+                _changeMonitor.Error( $"Failed to locate a valid constructor on '{configType:C}' type." );
+                return false;
+            }
+            return true;
         }
 
         void HandleDaemonConfiguration( IConfigurationSection daemonSection )
@@ -228,66 +293,6 @@ namespace CK.DeviceModel
             }
         }
 
-        class NoItemsSectionWrapper : IConfigurationSection
-        {
-            class Empty : IConfigurationSection
-            {
-                readonly IConfiguration _c;
-
-                public Empty( IConfigurationSection c, string key )
-                {
-                    Path = ConfigurationPath.Combine( c.Path, key );
-                    Key = key;
-                    _c = c;
-                }
-
-                public string? this[string key] { get => null; set => throw new NotSupportedException(); }
-
-                public string Key { get; }
-
-                public string Path { get; }
-
-                public string? Value { get => null; set => throw new NotSupportedException(); }
-
-                public IEnumerable<IConfigurationSection> GetChildren() => Array.Empty<IConfigurationSection>();
-
-                public IChangeToken GetReloadToken() => _c.GetReloadToken();
-
-                public IConfigurationSection GetSection( string key ) => new Empty( this, key );
-            }
-
-            static readonly string _skippedLeaf = ConfigurationPath.KeyDelimiter + nameof(IDeviceHostConfiguration.Items );
-
-            public IConfigurationSection InnerSection = null!;
-
-            public string Key => InnerSection.Key;
-
-            public string Path => InnerSection.Path;
-
-            public string? Value
-            {
-                get => InnerSection.Value;
-                set => throw new NotSupportedException();
-            }
-
-            public string? this[string key]
-            {
-                get => key == nameof(IDeviceHostConfiguration.Items) ? null : InnerSection[key];
-                set => throw new NotSupportedException();
-            }
-
-            public IEnumerable<IConfigurationSection> GetChildren()
-            {
-                return InnerSection.GetChildren().Where( c => !c.Path.EndsWith( _skippedLeaf ) );
-            }
-
-            public IChangeToken GetReloadToken() => InnerSection.GetReloadToken();
-
-            public IConfigurationSection GetSection( string key )
-            {
-                return key != nameof( IDeviceHostConfiguration.Items ) ? InnerSection.GetSection( key ) : new Empty( this, key );
-            }
-        }
 
         Task IHostedService.StopAsync( CancellationToken cancellationToken )
         {
@@ -300,5 +305,5 @@ namespace CK.DeviceModel
             _run.Cancel();
             _changeSubscription?.Dispose();
         }
-    }
+    }        
 }
