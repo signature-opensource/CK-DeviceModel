@@ -16,11 +16,6 @@ namespace CK.DeviceModel
         readonly Queue<BaseDeviceCommand> _deferredCommands;
         PriorityQueue<BaseDeviceCommand, long>? _delayedQueue;
 
-        // Unsigned integer for infinite.
-        const uint _unsignedTimeoutInfinite = unchecked((uint)Timeout.Infinite);
-        const long _tickCountResolution = 15;
-        const long _ourMax = uint.MaxValue - 2*_tickCountResolution;
-
         Timer? _timer;
         long _nextTimerTime;
         int _timerFired;
@@ -764,9 +759,15 @@ namespace CK.DeviceModel
                                 action = "asynchronous command loop function";
                                 await asyncA( _commandMonitor ).ConfigureAwait( false );
                                 break;
+                            case ActivityMonitorExternalLogData log:
+                                action = "IActivityLogger on command loop";
+                                var d = new ActivityMonitorLogData( log );
+                                _commandMonitor.UnfilteredLog( ref d );
+                                log.Release();
+                                break;
                             default:
                                 action = "command loop Signal call";
-                                await OnCommandSignalAsync( _commandMonitor, immediateObject );
+                                await OnCommandSignalAsync( _commandMonitor, immediateObject ).ConfigureAwait( false );
                                 break;
                         }
                     }
@@ -774,7 +775,7 @@ namespace CK.DeviceModel
                     {
                         using( _commandMonitor.OpenFatal( $"Unhandled error while executing immediate {action}. Stopping the device '{FullName}'.", ex ) )
                         {
-                            await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall );
+                            await HandleStopAsync( null, DeviceStoppedReason.SelfStoppedForceCall ).ConfigureAwait( false );
                         }
                     }
                 }

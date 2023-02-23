@@ -2,6 +2,7 @@ using CK.Core;
 using CK.PerfectEvent;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -23,17 +24,20 @@ namespace CK.DeviceModel
         where TConfiguration : DeviceConfiguration, new()
         where TEvent : BaseActiveDeviceEvent
     {
-        readonly Channel<object> _events;
+        readonly Channel<object?> _events;
         readonly ActivityMonitor _eventMonitor;
         readonly PerfectEventSender<TEvent> _deviceEvent;
         readonly PerfectEventSender<BaseDeviceEvent> _allEvent;
+        readonly DateTimeStampProvider _stampProvider;
 
         /// <inheritdoc />
         public ActiveDevice( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
         {
-            _events = Channel.CreateUnbounded<object>( new UnboundedChannelOptions() { SingleReader = true } );
-            _eventMonitor = new ActivityMonitor( $"Event loop for device {FullName}." );
+            _events = Channel.CreateUnbounded<object?>( new UnboundedChannelOptions() { SingleReader = true } );
+            _stampProvider = new DateTimeStampProvider();
+            _eventMonitor = new ActivityMonitor( $"Event loop for device {FullName}.", _stampProvider );
+            Debug.Assert( _eventMonitor.SafeStampProvider != null, "The monitor must have a thread safe stamp provider." );
             _eventMonitor.AutoTags += IDeviceHost.DeviceModel;
 
             _deviceEvent = new PerfectEventSender<TEvent>();
@@ -71,10 +75,10 @@ namespace CK.DeviceModel
         public void DebugPostEvent( TEvent e ) => DoPost( e );
 
         /// <summary>
-        /// Gets the event loop API that implementation can use to safely execute 
+        /// Gets the event loop API that implementation can use to execute 
         /// actions, send logs to the event loop or call <see cref="IEventLoop.RaiseEvent(TEvent)"/>.
         /// <para>
-        /// Always check that the executed action doesn't use any of the <see cref="Device{TConfiguration}.CommandLoop"/>
+        /// Please, always check that the executed action doesn't use any of the <see cref="Device{TConfiguration}.CommandLoop"/>
         /// resources since these 2 loops execute concurrently.
         /// </para>
         /// </summary>
@@ -97,6 +101,16 @@ namespace CK.DeviceModel
             return Task.CompletedTask;
         }
 
+        void DeviceModel.IEventLoop.DangerousExecute( Action<IActivityMonitor> action ) => DoPost( action );
+
+        void DeviceModel.IEventLoop.DangerousExecute( Func<IActivityMonitor, Task> action ) => DoPost( action );
+
+        void DeviceModel.IEventLoop.Signal( object? payload )
+        {
+            Throw.CheckArgument( payload is not BaseDeviceCommand && payload is not BaseDeviceEvent );
+            DoPost( payload );
+        }
+
         /// <summary>
         /// Gets whether the current activity is executing in the event loop.
         /// </summary>
@@ -104,9 +118,7 @@ namespace CK.DeviceModel
         /// <returns>True if the monitor is the event loop monitor, false otherwise.</returns>
         protected bool IsInEventLoop( IActivityMonitor monitor ) => monitor.Output == _eventMonitor.Output;
 
-        void DoPost( object o ) => _events.Writer.TryWrite( o );
-        void DoPost( Action<IActivityMonitor> o ) => _events.Writer.TryWrite( o );
-        void DoPost( Func<IActivityMonitor, Task> o ) => _events.Writer.TryWrite( o );
+        void DoPost( object? o ) => _events.Writer.TryWrite( o );
 
         TEvent IEventLoop.RaiseEvent( TEvent e )
         {
@@ -114,15 +126,19 @@ namespace CK.DeviceModel
             return e;
         }
 
-        void IMonitoredWorker.Execute( Action<IActivityMonitor> action ) => DoPost( action );
-        void IMonitoredWorker.Execute( Func<IActivityMonitor,Task> action ) => DoPost( action );
-        void IMonitoredWorker.LogError( string msg ) => DoPost( m => m.Error( msg ) );
-        void IMonitoredWorker.LogError( string msg, Exception ex ) => DoPost( m => m.Error( msg, ex ) );
-        void IMonitoredWorker.LogWarn( string msg ) => DoPost( m => m.Warn( msg ) );
-        void IMonitoredWorker.LogWarn( string msg, Exception ex ) => DoPost( m => m.Warn( msg, ex ) );
-        void IMonitoredWorker.LogInfo( string msg ) => DoPost( m => m.Info( msg ) );
-        void IMonitoredWorker.LogTrace( string msg ) => DoPost( m => m.Trace( msg ) );
-        void IMonitoredWorker.LogDebug( string msg ) => DoPost( m => m.Debug( msg ) );
+
+        LogLevelFilter IActivityLogger.ActualFilter => _eventMonitor.ActualFilter.Line;
+
+        CKTrait IActivityLogger.AutoTags => _eventMonitor.AutoTags;
+
+        void IActivityLogger.UnfilteredLog( ref ActivityMonitorLogData data )
+        {
+            ActivityMonitorExternalLogData o = data.AcquireExternalData( _stampProvider );
+            if( !_events.Writer.TryWrite( o ) )
+            {
+                o.Release();
+            }
+        }
 
         async Task RunEventLoopAsync()
         {
@@ -149,13 +165,18 @@ namespace CK.DeviceModel
                         case TEvent e:
                             await DoRaiseEventAsync( e ).ConfigureAwait( false );
                             break;
+                        case ActivityMonitorExternalLogData log:
+                            var d = new ActivityMonitorLogData( log );
+                            _eventMonitor.UnfilteredLog( ref d );
+                            log.Release();
+                            break;
                         case DeviceLifetimeEvent e:
                             await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
                             await _host.RaiseAllDevicesEventAsync( _eventMonitor, e ).ConfigureAwait( false );
                             if( e.DeviceStatus.IsDestroyed ) receivedDestroyed = true;
                             break;
                         default:
-                            _eventMonitor.Error( $"Unknown event type '{ev.GetType()}'." );
+                            await OnEventSignalAsync( _eventMonitor, ev );
                             break;
                     }
                 }
@@ -168,14 +189,43 @@ namespace CK.DeviceModel
                     }
                 }
             }
+            // Securing the race condition for the acquired log data.
+            // See:  https://github.com/Invenietis/CK-ActivityMonitor/blob/develop/Tests/CK.ActivityMonitor.Tests/DataPool/ThreadSafeLogger.cs
+            while( r.TryRead( out ev ) )
+            {
+                if( ev is ActivityMonitorExternalLogData log )
+                {
+                    log.Release();
+                }
+            }
             _eventMonitor.MonitorEnd();
         }
 
+        /// <summary>
+        /// Called directly by RaiseEventAsync IIF we are in the event loop, otherwise called
+        /// by the event loop.
+        /// </summary>
+        /// <param name="e">The event to raise.</param>
+        /// <returns>The awaitable.</returns>
         async Task DoRaiseEventAsync( TEvent e )
         {
             await _deviceEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
             await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
             await _host.RaiseAllDevicesEventAsync( _eventMonitor, e ).ConfigureAwait( false );
         }
+
+        /// <summary>
+        /// Optional extension point that must handle <see cref="IEventLoop.Signal(object?)"/> payloads.
+        /// This does nothing at this level.
+        /// <para>
+        /// Any exceptions raised by this method will be logged and ignored.
+        /// </para>
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="payload">The signal payload.</param>
+        /// <returns>The awaitable.</returns>
+        protected virtual Task OnEventSignalAsync( IActivityMonitor monitor, object? payload ) => Task.CompletedTask;
+
+
     }
 }

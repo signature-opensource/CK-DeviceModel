@@ -13,11 +13,11 @@ namespace CK.DeviceModel
         // invokes a lock).
         // Reminders in our async world on the tread pool have no thread affinity and won't be
         // needed really often (regarding the global job that must be done).
-        // However, a shared pool seems a good idea and the single linked list is rather acquire/release
+        // However, a shared pool seems a good idea and the single linked list used to acquire/release
         // is rather efficient: let's use a simple lock here (it won't be held for a long time). 
         // To avoid out-of-control expansion of the pool, rather than centrally managed this, each device
-        // is alloted a MaxPooledReminderPerDevice (that may be configurable... but come on!): each device
-        // tracks its own count and cannot ask for more than MaxPooledReminderPerDevice pooled Reminders.
+        // is alloted a MaxPooledReminderPerDevice (that may be configurable... but come on! it is set to 100):
+        // each device tracks its own count and cannot ask for more than MaxPooledReminderPerDevice pooled Reminders.
         // This avoids a "bad device" to negatively impact the system (only the device that uses too much
         // reminders will "suffer").
         // The pool and the Reminder command are implemented below (outside of this generic type).
