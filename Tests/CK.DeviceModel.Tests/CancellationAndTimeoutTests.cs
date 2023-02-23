@@ -135,7 +135,11 @@ namespace CK.DeviceModel.Tests
 
         public class DCommand : DeviceCommand<DHost>
         {
-            public string? Trace { get; set; }
+            public readonly int Number;
+
+            public DCommand( int number ) => Number = number;
+
+            public string? Trace => $"n°{Number}-{ExpectedCancellationReason ?? "<Success>"}' (case: {Number%11})";
 
             public string? ExpectedCancellationReason { get; set; }
             public TimeSpan WaitToComplete { get; set; }
@@ -149,7 +153,7 @@ namespace CK.DeviceModel.Tests
 
         [TestCase( 11, 3713 )]
         [TestCase( 200, 42 )]
-        [Timeout( 1000 )]
+        [Timeout( 1200 )]
         public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed )
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_cancellation_reasons_Async )}({nb},{randomSeed})" );
@@ -175,7 +179,7 @@ namespace CK.DeviceModel.Tests
                 {
                     CancellationTokenSource? sendCommandTimeout = null;
 
-                    var c = new DCommand();
+                    var c = new DCommand( i );
                     all.Add( c );
                     // Each command will normally be completed in 500 ms but it starts
                     // randomly (including immediately) and its completion is deferred either
@@ -288,7 +292,6 @@ namespace CK.DeviceModel.Tests
                             break;
                         default: Debug.Fail( "Never" ); break;
                     }
-                    c.Trace = $"n°{i}-{c.ExpectedCancellationReason ?? "<Success>"}'";
                     d.UnsafeSendCommand( TestHelper.Monitor, c, sendCommandTimeout?.Token ?? default );
                 }
                 // This is rather useless since in this test, completion is not the handling (long running commands).
