@@ -79,8 +79,8 @@ namespace CK.DeviceModel.Tests
                 {
                     if( cmd.ExpectedCancellationReason == BaseDeviceCommand.CommandTimeoutReason )
                     {
-                        monitor.Trace( $"GetCommandTimeoutAsync set to 40 ms for {command}" );
-                        return ValueTask.FromResult( 40 );
+                        monitor.Trace( $"GetCommandTimeoutAsync set to 30 ms for {command}" );
+                        return ValueTask.FromResult( 30 );
                     }
                 }
                 return ValueTask.FromResult( 0 );
