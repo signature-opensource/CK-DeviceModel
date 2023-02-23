@@ -113,17 +113,17 @@ namespace CK.DeviceModel.Tests
             D? d = h["D"];
             Debug.Assert( d != null );
 
-            var c = new AddManyRemindersCommand() { Count = D.MaxPooledReminderPerDevice + 10 };
+            var c = new AddManyRemindersCommand() { Count = D.ReminderMaxPooledPerDevice + 10 };
             d.SendCommand( TestHelper.Monitor, c, checkDeviceName: false );
             await c.Completion.Task;
 
-            D.ReminderPoolTotalCount.Should().Be( D.MaxPooledReminderPerDevice );
-            D.ReminderPoolInUseCount.Should().Be( D.MaxPooledReminderPerDevice );
+            D.ReminderPoolTotalCount.Should().Be( D.ReminderMaxPooledPerDevice );
+            D.ReminderPoolInUseCount.Should().Be( D.ReminderMaxPooledPerDevice );
 
             await d.DestroyAsync( TestHelper.Monitor, true );
             TestHelper.Monitor.Info( "await d.DestroyAsync done." );
 
-            D.ReminderPoolTotalCount.Should().Be( D.MaxPooledReminderPerDevice );
+            D.ReminderPoolTotalCount.Should().Be( D.ReminderMaxPooledPerDevice );
             D.ReminderPoolInUseCount.Should().Be( 0 );
         }
 

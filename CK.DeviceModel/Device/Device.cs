@@ -13,16 +13,6 @@ using System.IO;
 
 namespace CK.DeviceModel
 {
-    public class BaseDevice
-    {
-        // Unsigned integer for infinite.
-        internal const uint _unsignedTimeoutInfinite = unchecked((uint)Timeout.Infinite);
-        // Tick resolution (used by Timer): 15 milliseconds.
-        internal const long _tickCountResolution = 15;
-        // Maximal TimeSpan in ticks.
-        internal const long _ourMax = uint.MaxValue - 2 * _tickCountResolution;
-
-    }
 
 
     /// <summary>
