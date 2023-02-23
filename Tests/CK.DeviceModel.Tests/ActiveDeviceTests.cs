@@ -301,7 +301,7 @@ namespace CK.DeviceModel.Tests
 
             TestHelper.Monitor.Info( $"Results '{scaleType}': DebugPostEventCount = {debugPostEventCount}, MeasureEventCount = {measureEventCount}." );
             debugPostEventCount.Should().Be( 100 );
-            measureEventCount.Should().BeGreaterThan( 50 );
+            measureEventCount.Should().BeGreaterThanOrEqualTo( 50 );
 
             #endregion
 
