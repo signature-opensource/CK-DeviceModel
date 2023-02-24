@@ -6,7 +6,7 @@ using System.Text;
 namespace CK.DeviceModel
 {
     internal class InternalConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
     {
         public InternalConfigureDeviceCommand( Type hostType, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration, (string lockedName, string? controllerKey)? locked = null )
             : base( (TConfiguration?)configuration, (TConfiguration?)clonedConfiguration, locked )

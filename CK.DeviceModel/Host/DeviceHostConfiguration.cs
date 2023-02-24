@@ -16,7 +16,7 @@ namespace CK.DeviceModel
     /// </para>
     /// </summary>
     /// <typeparam name="TConfiguration"></typeparam>
-    public class DeviceHostConfiguration<TConfiguration> : IDeviceHostConfiguration where TConfiguration : DeviceConfiguration
+    public class DeviceHostConfiguration<TConfiguration> : IDeviceHostConfiguration where TConfiguration : DeviceConfiguration, new()
     {
         /// <summary>
         /// Initializes a new empty partial host configuration:

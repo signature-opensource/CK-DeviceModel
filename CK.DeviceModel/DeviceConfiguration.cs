@@ -15,11 +15,12 @@ namespace CK.DeviceModel
         string _name;
 
         /// <summary>
-        /// Initializes a new device configuration with an empty name and a <see cref="DeviceConfigurationStatus.Disabled"/> status.
+        /// Initializes a new device configuration with an automatic (awful) unique name and
+        /// a <see cref="DeviceConfigurationStatus.Disabled"/> status.
         /// </summary>
         protected DeviceConfiguration()
         {
-            _name = String.Empty;
+            _name = Util.GetRandomBase64UrlString( 11 );
             BaseImmediateCommandLimit = 10;
         }
 
@@ -60,6 +61,9 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets or sets the name of the device.
         /// This is a unique key for a device in its host.
+        /// <para>
+        /// Defaults to a random string (see <see cref="Util.GetRandomBase64UrlString(int)"/>).
+        /// </para>
         /// </summary>
         public string Name
         {
@@ -113,7 +117,7 @@ namespace CK.DeviceModel
         /// <returns>True if this configuration is valid, false otherwise.</returns>
         public bool CheckValid( IActivityMonitor monitor )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+            Throw.CheckNotNullArgument( monitor );
             bool success = true;
             if( String.IsNullOrWhiteSpace( Name ) )
             {

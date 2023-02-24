@@ -13,40 +13,24 @@ namespace CK.DeviceModel
         // invokes a lock).
         // Reminders in our async world on the tread pool have no thread affinity and won't be
         // needed really often (regarding the global job that must be done).
-        // However, a shared pool seems a good idea and the single linked list is rather acquire/release
+        // However, a shared pool seems a good idea and the single linked list used to acquire/release
         // is rather efficient: let's use a simple lock here (it won't be held for a long time). 
         // To avoid out-of-control expansion of the pool, rather than centrally managed this, each device
-        // is alloted a MaxPooledReminderPerDevice (that may be configurable... but come on!): each device
-        // tracks its own count and cannot ask for more than MaxPooledReminderPerDevice pooled Reminders.
+        // is alloted a MaxPooledReminderPerDevice (that may be configurable... but come on! it is set to 100):
+        // each device tracks its own count and cannot ask for more than MaxPooledReminderPerDevice pooled Reminders.
         // This avoids a "bad device" to negatively impact the system (only the device that uses too much
         // reminders will "suffer").
         // The pool and the Reminder command are implemented below (outside of this generic type).
-
-        /// <summary>
-        /// Gets the maximum number of pooled reminder that a given device can use.
-        /// When a device needs more reminders (at the same time), those reminders are not pooled.
-        /// </summary>
-        public static int MaxPooledReminderPerDevice => ReminderPool._maxPooledReminderPerDevice;
-
-        /// <summary>
-        /// Gets the current number of pooled reminder that are being used (out of the pool).
-        /// </summary>
-        public static int ReminderPoolInUseCount => ReminderPool._inUsePooledReminder;
-
-        /// <summary>
-        /// Gets the total number of pooled reminders.
-        /// </summary>
-        public static int ReminderPoolTotalCount => ReminderPool._totalPooledReminder;
 
         int _inUseReminderCount;
 
         Reminder AcquireReminder( DateTime time, object? state )
         {
-            if( _inUseReminderCount++ < MaxPooledReminderPerDevice )
+            if( _inUseReminderCount++ < ReminderMaxPooledPerDevice )
             {
                 return ReminderPool.AcquireReminder( time, state );
             }
-            _commandMonitor.Warn( $"The device '{FullName}' uses {_inUseReminderCount} reminders. MaxPooledReminderPerDevice is {MaxPooledReminderPerDevice}. The new Reminder will not be pooled." );
+            _commandMonitor.Warn( $"The device '{FullName}' uses {_inUseReminderCount} reminders. MaxPooledReminderPerDevice is {ReminderMaxPooledPerDevice}. The new Reminder will not be pooled." );
             return new Reminder( time, state, pooled: false );
         }
 

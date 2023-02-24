@@ -10,8 +10,10 @@ namespace CK.DeviceModel
     {
         /// <summary>
         /// Models the event loop API available inside an ActiveDevice.
+        /// Extends the non generic <see cref="DeviceModel.IEventLoop"/> with <typeparamref name="TEvent"/>
+        /// typed RaiseEvent.
         /// </summary>
-        public interface IEventLoop : IMonitoredWorker
+        public interface IEventLoop : DeviceModel.IEventLoop
         {
             /// <summary>
             /// Sends a device event into <see cref="DeviceEvent"/> and <see cref="AllEvent"/>.

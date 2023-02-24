@@ -24,7 +24,7 @@ namespace CK.DeviceModel
     public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> : IDeviceHost, IInternalDeviceHost
         where T : Device<TConfiguration>
         where THostConfiguration : DeviceHostConfiguration<TConfiguration>
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
     {
         /// <summary>
         /// This is the whole state of this Host. It is updated atomically (by setting a

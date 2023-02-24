@@ -11,7 +11,7 @@ namespace CK.DeviceModel
 {
     public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> where T : Device<TConfiguration>
         where THostConfiguration : DeviceHostConfiguration<TConfiguration>
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
     {
         /// <summary>
         /// This contains the devices for which a call to the <see cref="IDeviceAlwaysRunningPolicy.RetryStartAsync(IActivityMonitor, IDeviceHost, IDevice, int)"/>

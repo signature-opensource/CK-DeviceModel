@@ -13,7 +13,7 @@ namespace CK.DeviceModel
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
     public sealed class ConfigureDeviceCommand<THost, TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
         where THost : IDeviceHost
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
     {
         /// <summary>
         /// Initializes a new configure command with an empty configuration object.

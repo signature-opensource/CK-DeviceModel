@@ -5,7 +5,7 @@ using System.Text;
 namespace CK.DeviceModel
 {
     /// <summary>
-    /// Defines whether devices mus be destroyed when <see cref="DeviceHostDaemon"/> stops.
+    /// Defines whether devices must be destroyed when <see cref="DeviceHostDaemon"/> stops.
     /// </summary>
     public enum OnStoppedDaemonBehavior
     {

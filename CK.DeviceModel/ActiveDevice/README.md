@@ -46,25 +46,52 @@ can be done with the `AllEvent`.
 
 ## The ActiveDevice.IEventLoop interface
 
-Specialized device's code use the `protected IDeviceLoop EventLoop { get; }` property
+Device's code can use the `protected IDeviceLoop EventLoop { get; }` property
 to safely communicate with the external world: 
 
 ```csharp
     /// <summary>
     /// Models the event loop API available inside an ActiveDevice.
     /// </summary>
-    public interface IEventLoop : IMonitoredWorker
+    public interface IEventLoop : IActivityLogger
     {
+        /// <summary>
+        /// Sends an immediate signal into the event loop that will be handled by <see cref="ActiveDevice.OnEventSignalAsync(IActivityMonitor, object?)"/>.
+        /// An <see cref="ArgumentException"/> is thrown if the <paramref name="payload"/> is a <see cref="BaseDeviceCommand"/>
+        /// or <see cref="BaseDeviceEvent"/>.
+        /// </summary>
+        /// <param name="payload">The payload to send. It must not be a command nor an event.</param>
+        void Signal( object? payload );
+
         /// <summary>
         /// Sends a device event into <see cref="DeviceEvent"/>.
         /// </summary>
         /// <returns>The event.</returns>
         TEvent RaiseEvent( TEvent e );
+
+        /// <summary>
+        /// Executes a lambda function on the event loop. This is dangerous because
+        /// of the closure lambda: fields may be written concurrently.
+        /// It is safer to use the <see cref="Signal(object?)"/> with an explicit payload
+        /// (a record class should typically be used) to better express the "command" pattern.
+        /// </summary>
+        /// <param name="action">The action that will be executed in the command loop context.</param>
+        void DangerousExecute( Action<IActivityMonitor> action );
+
+        /// <summary>
+        /// Executes an asynchronous lambda function on the event loop. This is dangerous because
+        /// of the closure lambda: fields may be written concurrently.
+        /// It is safer to use the <see cref="Signal(object?)"/> with an explicit payload
+        /// (a record class should typically be used) to better express the "command" pattern.
+        /// </summary>
+        /// <param name="action">The asynchronous action that will be executed in the command loop context.</param>
+        void DangerousExecute( Func<IActivityMonitor, Task> action );
     }
 ```
+__Note:__ This interface is actually split into a non generic base and the generic one but this is an implementation detail.
 
-Just like the [CommandLoop](../Device/Device.ICommandLoop.cs), this extends the `CK.Core.IMonitoredWorker` interface
-defined in CK.ActivityMonitor package: see Device's [CommandLoop and Signals](../Device/README.md#CommandLoop-and-Signals).
+Just like the [CommandLoop](../Device/Device.ICommandLoop.cs), this extends the `CK.Core.IActivityLogger` interface
+defined in CK.ActivityMonitor package: this is described in more details in the [Device's CommandLoop and Signals](../Device/README.md#CommandLoop-and-Signals).
 
 Correctly handling concurrency is hard. An `ActiveDevice` has 2 parallel activities: its command and event loops.
 When developing a device, one must always be able to state in which loop the code is being executed. The following helpers

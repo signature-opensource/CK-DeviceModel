@@ -8,14 +8,18 @@ using System.Threading.Tasks;
 using CK.Core;
 using CK.PerfectEvent;
 using System.Threading.Channels;
+using System.ComponentModel;
+using System.IO;
 
 namespace CK.DeviceModel
 {
+
+
     /// <summary>
     /// Abstract base class for a device.
     /// </summary>
     /// <typeparam name="TConfiguration">The type of the configuration.</typeparam>
-    public abstract partial class Device<TConfiguration> : IDevice, IInternalDevice where TConfiguration : DeviceConfiguration
+    public abstract partial class Device<TConfiguration> : BaseDevice, IDevice, IInternalDevice where TConfiguration : DeviceConfiguration, new()
     {
         // SimpleActiveDevice and ActiveDevice need to call RaiseAllDevicesEvent,
         // they need to access their host.
@@ -31,7 +35,7 @@ namespace CK.DeviceModel
         readonly Task _commandRunLoop;
 
         // For safety, ConfigurationStatus is copied: we don't trust the ExternalConfiguration.
-        // This is internal so that the DeviceHostDaemon can use
+        // This is internal so that the DeviceHostDaemon can use it.
         internal DeviceConfigurationStatus _configStatus;
         string? _controllerKey;
         int _eventSeqNumber;
@@ -46,6 +50,11 @@ namespace CK.DeviceModel
 
         // DeviceHostDaemon access to the actual safe status.
         DeviceConfigurationStatus IInternalDevice.ConfigStatus => _configStatus;
+
+        static Device()
+        {
+            Throw.CheckState( new TConfiguration().CheckValid( new ActivityMonitor( false ) ) );
+        }
 
         /// <summary>
         /// Factory information (opaque token) that exposes the device's initial configuration.
@@ -105,11 +114,11 @@ namespace CK.DeviceModel
             _controllerKeyFromConfiguration = _controllerKey != null;
             _lifetimeChanged = new PerfectEventSender<DeviceLifetimeEvent>();
 
-            _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}." );
+            _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}.", new DateTimeStampProvider() );
             _commandMonitor.AutoTags = IDeviceHost.DeviceModel;
             _commandQueue = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
             _commandQueueImmediate = Channel.CreateUnbounded<object?>( new UnboundedChannelOptions() { SingleReader = true } );
-            _commandLoop = new LoopImpl( _commandQueueImmediate.Writer );
+            _commandLoop = new LoopImpl( _commandMonitor, _commandQueue.Writer, _commandQueueImmediate.Writer );
             _deferredCommands = new Queue<BaseDeviceCommand>();
             _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
             _immediateCommandLimitDirty = true;
@@ -270,11 +279,11 @@ namespace CK.DeviceModel
 
             public void OnSyncCommandHandled( IActivityMonitor monitor )
             {
-                // Device and SimpleActiveDevice are not IMonitoredWorker.
-                if( _device is IMonitoredWorker activeDevice )
+                // Device and SimpleActiveDevice are not IActivityLogger.
+                if( _device is IEventLoop activeDevice )
                 {
                     // For active devices, we post the completion to the event loop.
-                    activeDevice.Execute( DoComplete );
+                    activeDevice.DangerousExecute( DoComplete );
                 }
                 else
                 {

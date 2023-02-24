@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.PerfectEvent;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -23,7 +24,7 @@ namespace CK.DeviceModel
     /// Each active device should be associated to a specialized <see cref="ActiveDeviceEvent{TDevice}"/>
     /// </typeparam>
     public abstract partial class SimpleActiveDevice<TConfiguration,TEvent> : Device<TConfiguration>, IActiveDevice<TEvent>
-        where TConfiguration : DeviceConfiguration
+        where TConfiguration : DeviceConfiguration, new()
         where TEvent : BaseActiveDeviceEvent
     {
         readonly PerfectEventSender<TEvent> _deviceEvent;

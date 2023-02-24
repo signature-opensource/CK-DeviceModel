@@ -64,24 +64,24 @@ namespace CK.DeviceModel.Tests
             {
                 // This is how to log Error/Warning/Info/Trace/Debug messages
                 // outside of the command loop.
-                EventLoop.LogWarn( $"Received a negative value (config.StopOnNegativeValue: {config.StopOnNegativeValue})." );
+                EventLoop.Warn( $"Received a negative value (config.StopOnNegativeValue: {config.StopOnNegativeValue})." );
                 if( config.StopOnNegativeValue )
                 {
-                    // Execute has 2 overloads: one with a synchronous Action<IActivityMonitor> and
+                    // DangerousExecute has 2 overloads: one with a synchronous Action<IActivityMonitor> and
                     // one for asynchronous Func<IActivityMonitor,Task>.
                     // Here we need to call the asynchronous StopAsync method.
-                    EventLoop.LogTrace( "StopOnNegativeValue is true: stopping the device." );
-                    EventLoop.Execute( m => StopAsync( m, ignoreAlwaysRunning: true ) );
+                    EventLoop.Trace( "StopOnNegativeValue is true: stopping the device." );
+                    EventLoop.DangerousExecute( m => StopAsync( m, ignoreAlwaysRunning: true ) );
                     if( config.AllowUnattendedRestartAfterStopOnNegativeValue )
                     {
                         // This is awful and should never be done is real code!
                         // This is just for tests, to avoid subsequent stops.
                         config.StopOnNegativeValue = false;
-                        EventLoop.LogTrace( $"Task.Run() in {10 * config.PhysicalRate} ms will restart the device." );
+                        EventLoop.Trace( $"Task.Run() in {10 * config.PhysicalRate} ms will restart the device." );
                         _ = Task.Run( async () =>
                         {
                             await Task.Delay( 10 * config.PhysicalRate );
-                            EventLoop.Execute( m => StartAsync( m ) );
+                            EventLoop.DangerousExecute( m => StartAsync( m ) );
                         } );
                     }
                 }
@@ -90,13 +90,13 @@ namespace CK.DeviceModel.Tests
 
             _currentSum += value;
             ++_stepCount;
-            EventLoop.LogDebug( $"Measure received: {value}, Sum: {_currentSum}, Step: {_stepCount} (MeasureStep = {CurrentConfiguration.MeasureStep})." );
+            EventLoop.Debug( $"Measure received: {value}, Sum: {_currentSum}, Step: {_stepCount} (MeasureStep = {CurrentConfiguration.MeasureStep})." );
             if( _stepCount >= CurrentConfiguration.MeasureStep )
             {
                 var text = config.MeasurePattern ?? "{0}";
                 var m = (double)_currentSum / _stepCount;
                 var ev = new ScaleMeasureEvent( this, m, string.Format( text, m ) );
-                EventLoop.LogDebug( $"Raised ScaleMeasureEvent: {ev.Measure}." );
+                EventLoop.Debug( $"Raised ScaleMeasureEvent: {ev.Measure}." );
                 EventLoop.RaiseEvent( ev );
                 _stepCount = 0;
             }
@@ -114,8 +114,28 @@ namespace CK.DeviceModel.Tests
         {
             switch( command )
             {
-                case ScaleResetCommand _:
+                case ScaleResetCommand r:
                     Reset();
+                    r.Completion.SetResult();
+                    return Task.CompletedTask;
+                case ScaleTestSendLogsFromCommandAndEventLoopCommand l:
+                    var fromC = Task.Run( () =>
+                    {
+                        for( int i = 0; i < 10; ++i )
+                        {
+                            Thread.Sleep( 20 );
+                            CommandLoop.Info( $"Log from CommandLoop n°{i}." );
+                        }
+                    } );
+                    var fromE = Task.Run( () =>
+                    {
+                        for( int i = 0; i < 10; ++i )
+                        {
+                            Thread.Sleep( 20 );
+                            EventLoop.Info( $"Log from EventLoop n°{i}." );
+                        }
+                    } );
+                    _ = Task.WhenAll( fromE, fromC ).ContinueWith( _ => l.Completion.SetResult(), TaskScheduler.Default );
                     return Task.CompletedTask;
                 default:
                     return base.DoHandleCommandAsync( monitor, command );
