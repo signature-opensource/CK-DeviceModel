@@ -5,7 +5,5 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CK.DeviceModel\CK.DeviceModel.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
-    <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
   </ItemGroup>
 </Project>

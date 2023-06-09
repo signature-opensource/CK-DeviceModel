@@ -94,7 +94,7 @@ namespace CK.DeviceModel.Configuration.Tests
             var host = new ConveyorDeviceHost();
             var hosts = new IDeviceHost[] { host };
             var daemon = new DeviceHostDaemon( hosts, new DefaultDeviceAlwaysRunningPolicy() );
-            var configurator = new DeviceConfigurator( daemon, config, hosts );
+            var configurator = new DeviceConfigurator( daemon, config );
             await ((IHostedService)configurator).StartAsync( default );
 
             var device = host.Find( "TheBeast" );
@@ -145,7 +145,7 @@ namespace CK.DeviceModel.Configuration.Tests
         {
             var hosts = new IDeviceHost[] { host };
             var daemon = new DeviceHostDaemon( hosts, new DefaultDeviceAlwaysRunningPolicy() );
-            var configurator = new DeviceConfigurator( daemon, config.Root, hosts );
+            var configurator = new DeviceConfigurator( daemon, config.Root );
             await ((IHostedService)configurator).StartAsync( default );
 
             var device = host.Find( "TheBeast" );
