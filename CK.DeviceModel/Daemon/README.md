@@ -6,10 +6,11 @@ It has 4 responsibilities:
 - It instantiates all the host when itself is instantiated: all available hosts are injected as a `IEnumerable<IDeviceHost>` 
 ([IDeviceHost](../Host/IDeviceHost.cs) is marked with `[IsMultiple]`) and since it concretizes the enumerable, all hosts are instantiated.
 - It manages the "AlwaysRunning" configuration status of the devices.
-- [FUTURE]It collects the health status of all the devices.
+- It can reconfigure a device or a host from a `IConfigurationSection`.
 - It can optionally destroy all the devices when stopped (instead of let them die with the process) by 
 setting the `DaemonHostDevice.StoppedBehavior` property to [OnStoppedDaemonBehavior](OnStoppedDaemonBehavior.cs)`.ClearAllHosts`
 or `ClearAllHostsAndWaitForDevicesDestroyed`.
+
 
 ## The AlwaysRunning and IDeviceAlwaysRunningPolicy
 

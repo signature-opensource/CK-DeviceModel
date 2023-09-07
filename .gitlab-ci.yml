@@ -5,9 +5,6 @@ codecakebuilder:
     - "'**Tests\\**\\Logs\\**\\*'"
     when: always
     expire_in: 6 month
-  # From: https://gitlab.com/gitlab-org/gitlab/-/issues/350100#note_1249362905
-  # but without GIT_CHECKOUT: "false" (empty directory).
-  # This should force a complete clone of the repository (with all the tags and commit points).
   variables:
     GIT_STRATEGY: clone
     GIT_DEPTH: "0"
