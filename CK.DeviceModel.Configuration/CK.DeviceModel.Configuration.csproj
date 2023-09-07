@@ -6,4 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CK.DeviceModel\CK.DeviceModel.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="Microsoft.VisualStudio.Threading.Analyzers" Version="17.7.30" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+  </ItemGroup>
 </Project>
