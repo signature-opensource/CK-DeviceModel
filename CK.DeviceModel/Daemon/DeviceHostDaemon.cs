@@ -128,8 +128,6 @@ namespace CK.DeviceModel
             {
                 Type tHostConfig = deviceHost.GetDeviceHostConfigurationType();
                 if( !FindSpecificConstructors( monitor,
-                                               _sigMonitorAndSection,
-                                               _sigSectionType,
                                                tHostConfig,
                                                out var ctorHost0,
                                                out var ctorHost1,
@@ -171,8 +169,6 @@ namespace CK.DeviceModel
                 {
                     Type deviceConfigType = deviceHost.GetDeviceConfigurationType();
                     if( !FindSpecificConstructors( monitor,
-                                                   _sigMonitorAndSection,
-                                                   _sigSectionType,
                                                    deviceConfigType,
                                                    out ConstructorInfo? ctor0,
                                                    out ConstructorInfo? ctor1,
@@ -218,36 +214,34 @@ namespace CK.DeviceModel
             }
             return (deviceHost, config);
 
-            static bool FindSpecificConstructors( IActivityMonitor monitor,
-                                      Type[] sigMonitorAndSection,
-                                      Type[] sigSectionType,
-                                      Type configType,
-                                      out ConstructorInfo? defaultCtor,
-                                      out ConstructorInfo? sectionOnly,
-                                      out ConstructorInfo? monitorAndSection )
+
+        }
+
+        internal static bool FindSpecificConstructors( IActivityMonitor monitor,
+                                                       Type configType,
+                                                       out ConstructorInfo? defaultCtor,
+                                                       out ConstructorInfo? sectionOnly,
+                                                       out ConstructorInfo? monitorAndSection )
+        {
+            defaultCtor = sectionOnly = null;
+            if( (monitorAndSection = configType.GetConstructor( _sigMonitorAndSection )) != null )
             {
-                defaultCtor = sectionOnly = null;
-                if( (monitorAndSection = configType.GetConstructor( sigMonitorAndSection )) != null )
-                {
-                    monitor.Debug( $"Found constructor {configType:C}( IActivityMonitor, IConfigurationSection )." );
-                }
-                else if( (sectionOnly = configType.GetConstructor( sigSectionType )) != null )
-                {
-                    monitor.Debug( $"Found constructor {configType:C}( IConfigurationSection )." );
-                }
-                else if( (defaultCtor = configType.GetConstructor( Type.EmptyTypes )) != null )
-                {
-                    monitor.Debug( $"Using default {configType:C} constructor and configuration binding." );
-                }
-                else
-                {
-                    monitor.Error( $"Failed to locate a valid constructor on '{configType:C}' type." );
-                    return false;
-                }
-                return true;
+                monitor.Debug( $"Found constructor {configType:C}( IActivityMonitor, IConfigurationSection )." );
             }
-
-
+            else if( (sectionOnly = configType.GetConstructor( _sigSectionType )) != null )
+            {
+                monitor.Debug( $"Found constructor {configType:C}( IConfigurationSection )." );
+            }
+            else if( (defaultCtor = configType.GetConstructor( Type.EmptyTypes )) != null )
+            {
+                monitor.Debug( $"Using default {configType:C} constructor and configuration binding." );
+            }
+            else
+            {
+                monitor.Error( $"Failed to locate a valid constructor on '{configType:C}' type." );
+                return false;
+            }
+            return true;
         }
 
 

@@ -1,5 +1,7 @@
 using CK.Core;
+using Microsoft.Extensions.Configuration;
 using System;
+using System.Reflection;
 
 namespace CK.DeviceModel
 {
@@ -68,7 +70,11 @@ namespace CK.DeviceModel
         public string Name
         {
             get => _name;
-            set => _name = value ?? throw new ArgumentNullException( nameof( Name ) );
+            set
+            {
+                Throw.CheckNotNullArgument( value );
+                _name = value;
+            }
         }
 
         /// <summary>
@@ -143,6 +149,77 @@ namespace CK.DeviceModel
         /// <param name="monitor">The monitor to log error, warnings or other.</param>
         /// <returns>True if this configuration is valid, false otherwise.</returns>
         protected virtual bool DoCheckValid( IActivityMonitor monitor ) => true;
+
+
+        /// <summary>
+        /// Creates a configuration object from a JSON string configuration.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="deviceConfigurationType">The device configuration type.</param>
+        /// <param name="jsonConfiguration">The device configuration in JSON format.</param>
+        /// <returns>The configuration or null on error (if the configuration cannot be created).</returns>
+        public static DeviceConfiguration? CreateFromJson( IActivityMonitor monitor, Type deviceConfigurationType, string deviceName, string jsonConfiguration )
+        {
+            var c = new MutableConfigurationSection( deviceName );
+            c.AddJson( jsonConfiguration );
+            return CreateFromConfiguration( monitor, deviceConfigurationType, c );
+        }
+
+
+        /// <summary>
+        /// Creates a configuration object from a <see cref="IConfigurationSection"/>.
+        /// The <see cref="IConfigurationSection.Key"/> is the device name.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="deviceConfigurationType">The device configuration type.</param>
+        /// <param name="c">The configuration section.</param>
+        /// <returns>The configuration or null on error (if the configuration cannot be created).</returns>
+        public static DeviceConfiguration? CreateFromConfiguration( IActivityMonitor monitor, Type deviceConfigurationType, IConfigurationSection c )
+        {
+            Throw.CheckNotNullArgument( monitor );
+            Throw.CheckNotNullArgument( deviceConfigurationType );
+            Throw.CheckNotNullArgument( c );
+            Throw.CheckArgument( typeof( DeviceConfiguration ).IsAssignableFrom( deviceConfigurationType ) );
+
+            if( !DeviceHostDaemon.FindSpecificConstructors( monitor,
+                                                            deviceConfigurationType,
+                                                            out ConstructorInfo? ctor0,
+                                                            out ConstructorInfo? ctor1,
+                                                            out ConstructorInfo? ctor2 ) )
+            {
+                // No constructor found. This is a serious error.
+                return null;
+            }
+            DeviceConfiguration? configObject = null;
+            try
+            {
+                if( ctor2 != null )
+                {
+                    configObject = (DeviceConfiguration?)ctor2.Invoke( new object[] { monitor, c } );
+                }
+                else if( ctor1 != null )
+                {
+                    configObject = (DeviceConfiguration?)ctor1.Invoke( new object[] { c } );
+                }
+                else
+                {
+                    configObject = (DeviceConfiguration?)c.Get( deviceConfigurationType );
+                }
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While instantiating Device configuration for '{c.Path}' and type '{deviceConfigurationType:C}'.", ex );
+            }
+            if( configObject == null )
+            {
+                monitor.Warn( $"Unable to bind configuration entry '{c.Key}'." );
+            }
+            else
+            {
+                configObject.Name = c.Key;
+            }
+            return configObject;
+        }
 
     }
 }
