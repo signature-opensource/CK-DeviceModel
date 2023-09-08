@@ -328,6 +328,9 @@ namespace CK.Core
                                 index++;
                             }
                             break;
+                        case JsonTokenType.Null:
+                            t.Value = null;
+                            break;
                         default:
                             Throw.InvalidDataException( $"Unexpected token '{r.TokenType}'." );
                             break;
