@@ -176,10 +176,9 @@ namespace CK.DeviceModel
         DeviceConfiguration IDevice.ExternalConfiguration => _externalConfiguration;
 
         /// <summary>
-        /// Gets a clone of the actual current configuration.
-        /// This is NOT the actual configuration object reference that the device has received and
-        /// is using: configuration objects are cloned in order to isolate the running device of any change
-        /// in this publicly exposed configuration.
+        /// Gets the current configuration.
+        /// This is NOT the actual configuration object that the device is using: configuration objects are cloned in
+        /// order to isolate the running device of any change in this publicly exposed configuration.
         /// <para>
         /// Even if changing this object is harmless, it should obviously not be changed.
         /// </para>
@@ -279,7 +278,7 @@ namespace CK.DeviceModel
 
             public void OnSyncCommandHandled( IActivityMonitor monitor )
             {
-                // Device and SimpleActiveDevice are not IActivityLogger.
+                // Device and SimpleActiveDevice are not IEventLoop.
                 if( _device is IEventLoop activeDevice )
                 {
                     // For active devices, we post the completion to the event loop.
@@ -347,15 +346,22 @@ namespace CK.DeviceModel
             {
                 return DeviceApplyConfigurationResult.InvalidConfiguration;
             }
-            return await InternalReconfigureAsync( monitor, configuration, configuration.DeepClone(), token ).ConfigureAwait( false );
+            var clonedConfig = configuration.DeepClone();
+            // The cloned configuration must also be valid. We must call CheckValid since side efects can occur
+            // that can initialize internal fields.
+            if( !clonedConfig.CheckValid( monitor ) )
+            {
+                Throw.CKException( $"Clone of the valid configuration is NOT valid." );
+            }
+            return await InternalReconfigureAsync( monitor, configuration, clonedConfig, token ).ConfigureAwait( false );
         }
 
         internal Task<DeviceApplyConfigurationResult> InternalReconfigureAsync( IActivityMonitor monitor,
-                                                                                TConfiguration config,
-                                                                                TConfiguration clonedconfig,
+                                                                                TConfiguration externalConfig,
+                                                                                TConfiguration clonedConfig,
                                                                                 CancellationToken token )
         {
-            var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, config, clonedconfig );
+            var cmd = (BaseConfigureDeviceCommand<TConfiguration>?)_host?.CreateLockedConfigureCommand( Name, _controllerKey, externalConfig, clonedConfig );
             if( cmd == null || !UnsafeSendCommand( monitor, cmd, token ) )
             {
                 return Task.FromResult( DeviceApplyConfigurationResult.DeviceDestroyed );
@@ -366,7 +372,8 @@ namespace CK.DeviceModel
         async Task HandleReconfigureAsync( BaseConfigureDeviceCommand<TConfiguration> cmd )
         {
             Debug.Assert( cmd.ClonedConfig != null );
-            TConfiguration config = cmd.ClonedConfig;
+            TConfiguration clonedConfig = cmd.ClonedConfig;
+            TConfiguration externalConfig = cmd.ExternalConfiguration;
 
             // Configuration's ControllerKey and Status are applied even if the DoReconfigureAsync fails.
             // When the configuration's ControllerKey changes we could apply it only after a successful DoReconfigureAsync.
@@ -381,19 +388,19 @@ namespace CK.DeviceModel
 
             // Always applying BaseImmediateCommandLimit is easier to understand (as its documentation describes it).
             // We use the same pattern as for ControllerKey and Status.
-            bool baseImmediateCommandLimitChanged = _baseImmediateCommandLimit != config.BaseImmediateCommandLimit;
+            bool baseImmediateCommandLimitChanged = _baseImmediateCommandLimit != clonedConfig.BaseImmediateCommandLimit;
             if( baseImmediateCommandLimitChanged )
             {
-                _baseImmediateCommandLimit = config.BaseImmediateCommandLimit;
+                _baseImmediateCommandLimit = clonedConfig.BaseImmediateCommandLimit;
                 _immediateCommandLimitDirty = true;
             }
             
-            bool configStatusChanged = _configStatus != config.Status;
+            bool configStatusChanged = _configStatus != clonedConfig.Status;
             bool stopDone = false;
             if( configStatusChanged )
             {
                 // Handles ConfigStatus Disabled while we are running: stops the device (there can be no error here).
-                if( _isRunning && config.Status == DeviceConfigurationStatus.Disabled )
+                if( _isRunning && clonedConfig.Status == DeviceConfigurationStatus.Disabled )
                 {
                     // The _configStatus is set to DeviceConfigurationStatus.Disabled by HostStopAsync that also 
                     // raised the StatusChanged: if nothing else has changed, we have no more event to raise.
@@ -404,13 +411,13 @@ namespace CK.DeviceModel
                 }
                 else
                 {
-                    _configStatus = config.Status;
+                    _configStatus = clonedConfig.Status;
                 }
             }
 
             bool controllerKeyChanged = false;
             #region Handles a change of the configured ControllerKey (there can be no error here).
-            var configKey = String.IsNullOrEmpty( config.ControllerKey ) ? null : config.ControllerKey;
+            var configKey = String.IsNullOrEmpty( clonedConfig.ControllerKey ) ? null : clonedConfig.ControllerKey;
             if( configKey == null && _controllerKeyFromConfiguration )
             {
                 // Reset of the ControllerKey (previously from the configuration).
@@ -435,7 +442,7 @@ namespace CK.DeviceModel
             DeviceReconfiguredResult reconfigResult;
             try
             {
-                reconfigResult = await DoReconfigureAsync( _commandMonitor, config ).ConfigureAwait( false );
+                reconfigResult = await DoReconfigureAsync( _commandMonitor, clonedConfig ).ConfigureAwait( false );
             }
             catch( Exception ex )
             {
@@ -457,19 +464,20 @@ namespace CK.DeviceModel
                 && (configStatusChanged || controllerKeyChanged || baseImmediateCommandLimitChanged) )
             {
                 Debug.Assert( !configActuallyChanged );
-                config = _currentConfiguration;
+                clonedConfig = _currentConfiguration;
+                externalConfig = _externalConfiguration;
                 configActuallyChanged = true;
             }
 
-            if( controllerKeyChanged ) config.ControllerKey = _controllerKey;
-            if( configStatusChanged ) config.Status = _configStatus;
-            if( baseImmediateCommandLimitChanged ) config.BaseImmediateCommandLimit = _baseImmediateCommandLimit;
+            if( controllerKeyChanged ) clonedConfig.ControllerKey = _controllerKey;
+            if( configStatusChanged ) clonedConfig.Status = _configStatus;
+            if( baseImmediateCommandLimitChanged ) clonedConfig.BaseImmediateCommandLimit = _baseImmediateCommandLimit;
 
             // Updates the configuration objects if changed.
             if( configActuallyChanged )
             {
-                _currentConfiguration = config;
-                _externalConfiguration = config.DeepClone();
+                _currentConfiguration = clonedConfig;
+                _externalConfiguration = externalConfig;
             }
 
             // On success, or if nothing has been done, check for AlwaysRunning and tries to start the device if it is stopped.
@@ -479,6 +487,7 @@ namespace CK.DeviceModel
                 && !_isRunning
                 && _configStatus == DeviceConfigurationStatus.AlwaysRunning )
             {
+
                 await HandleStartAsync( null, DeviceStartedReason.StartedByAlwaysRunningConfiguration ).ConfigureAwait( false );
                 if( !_isRunning )
                 {
@@ -544,9 +553,9 @@ namespace CK.DeviceModel
         /// </para>
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="config">The configuration to apply.</param>
+        /// <param name="clonedConfig">The configuration to apply: this is the future protected <see cref="CurrentConfiguration"/>.</param>
         /// <returns>The reconfiguration result.</returns>
-        protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration config );
+        protected abstract Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor, TConfiguration clonedConfig );
 
         #region SetControllerKey
         /// <inheritdoc />

@@ -8,8 +8,8 @@ namespace CK.DeviceModel
     internal class InternalConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand<TConfiguration>
         where TConfiguration : DeviceConfiguration, new()
     {
-        public InternalConfigureDeviceCommand( Type hostType, DeviceConfiguration? configuration, DeviceConfiguration? clonedConfiguration, (string lockedName, string? controllerKey)? locked = null )
-            : base( (TConfiguration?)configuration, (TConfiguration?)clonedConfiguration, locked )
+        public InternalConfigureDeviceCommand( Type hostType, DeviceConfiguration? externalConfiguration, DeviceConfiguration? clonedConfiguration, (string lockedName, string? controllerKey)? locked = null )
+            : base( (TConfiguration?)externalConfiguration, (TConfiguration?)clonedConfiguration, locked )
         {
             HostType = hostType;
         }

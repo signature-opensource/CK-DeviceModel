@@ -16,7 +16,7 @@ namespace CK.DeviceModel
             : base( locked )
         {
             Throw.CheckNotNullArgument( configuration );
-            Configuration = configuration;
+            ExternalConfiguration = configuration;
             ImmediateSending = true;
             ShouldCallDeviceOnCommandCompleted = false;
         }
@@ -56,18 +56,12 @@ namespace CK.DeviceModel
 
         /// <summary>
         /// Gets the configuration to apply.
+        /// <para>
+        /// This MUST not be changed once the command is sent (<see cref="BaseDeviceCommand.IsLocked"/> is true)
+        /// otherwise kitten will die.
+        /// </para>
         /// </summary>
-        public DeviceConfiguration Configuration { get; }
-
-        /// <summary>
-        /// Calls <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> on the <see cref="Configuration"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>True if this configuration is valid, false otherwise.</returns>
-        protected override sealed bool DoCheckValidity( IActivityMonitor monitor )
-        {
-            return Configuration.CheckValid( monitor );
-        }
+        public DeviceConfiguration ExternalConfiguration { get; }
 
     }
 }

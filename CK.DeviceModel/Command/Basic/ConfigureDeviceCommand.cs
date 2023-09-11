@@ -16,7 +16,7 @@ namespace CK.DeviceModel
         where TConfiguration : DeviceConfiguration, new()
     {
         /// <summary>
-        /// Initializes a new configure command with an empty configuration object.
+        /// Initializes a new configure command with an empty <see cref="BaseConfigureDeviceCommand{TConfiguration}.ExternalConfiguration"/> object.
         /// </summary>
         public ConfigureDeviceCommand()
             : this( null )
@@ -26,9 +26,9 @@ namespace CK.DeviceModel
         /// <summary>
         /// Initializes a configure command with an existing configuration or an empty configuration object.
         /// </summary>
-        /// <param name="configuration">The existing configuration or null to instantiate a new empty configuration object.</param>
-        public ConfigureDeviceCommand( TConfiguration? configuration )
-            : base( configuration, null )
+        /// <param name="externalConfiguration">The existing configuration or null to instantiate a new empty <see cref="BaseConfigureDeviceCommand{TConfiguration}.ExternalConfiguration"/> object.</param>
+        public ConfigureDeviceCommand( TConfiguration? externalConfiguration )
+            : base( externalConfiguration, null )
         {
         }
 

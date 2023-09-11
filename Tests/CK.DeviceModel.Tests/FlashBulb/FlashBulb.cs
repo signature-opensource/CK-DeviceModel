@@ -34,6 +34,11 @@ namespace CK.DeviceModel.Tests
         protected override Task<DeviceReconfiguredResult> DoReconfigureAsync( IActivityMonitor monitor,
                                                                               FlashBulbConfiguration config )
         {
+            if( ((IFlashBulbConfiguration)config).ComputedValid is null )
+            {
+                Throw.CKException( "CheckValid has been called." );
+            }
+
             bool colorChanged = config.FlashColor != CurrentConfiguration.FlashColor;
             bool configHasChanged = colorChanged || config.FlashRate != CurrentConfiguration.FlashRate;
 

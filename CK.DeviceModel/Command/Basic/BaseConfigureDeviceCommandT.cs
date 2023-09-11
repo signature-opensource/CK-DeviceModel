@@ -12,12 +12,12 @@ namespace CK.DeviceModel
     public abstract class BaseConfigureDeviceCommand<TConfiguration> : BaseConfigureDeviceCommand
         where TConfiguration : DeviceConfiguration, new()
     {
-        private protected BaseConfigureDeviceCommand( TConfiguration? configuration, TConfiguration? clonedConfiguration, (string lockedName, string? lockedControllerKey)? locked = null )
-            : base( configuration ?? Activator.CreateInstance<TConfiguration>(), locked )
+        private protected BaseConfigureDeviceCommand( TConfiguration? externalConfiguration, TConfiguration? clonedConfiguration, (string lockedName, string? lockedControllerKey)? locked = null )
+            : base( externalConfiguration ?? Activator.CreateInstance<TConfiguration>(), locked )
         {
             Debug.Assert( IsLocked == (locked != null) );
-            Debug.Assert( !IsLocked || (configuration != null), "IsLocked => configuration provided." );
-            if( IsLocked ) ClonedConfig = clonedConfiguration ?? Configuration.DeepClone();
+            Debug.Assert( !IsLocked || (clonedConfiguration != null), "IsLocked => configuration provided." );
+            ClonedConfig = clonedConfiguration;
         }
 
         internal TConfiguration? ClonedConfig { get; private set; }
@@ -25,19 +25,26 @@ namespace CK.DeviceModel
         /// <summary>
         /// Gets the configuration to apply.
         /// </summary>
-        public new TConfiguration Configuration => (TConfiguration)base.Configuration;
+        public new TConfiguration ExternalConfiguration => (TConfiguration)base.ExternalConfiguration;
 
         /// <summary>
-        /// Overridden to snapshot the Configuration object into an internal property.
+        /// Calls <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> on the <see cref="ExternalConfiguration"/>.
         /// </summary>
-        public override void Lock()
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True if the <see cref="ExternalConfiguration"/> is valid, false otherwise.</returns>
+        protected override sealed bool DoCheckValidity( IActivityMonitor monitor )
         {
-            if( !IsLocked )
+            // When the command is locked, the command must have been validated...
+            if( IsLocked ) return true;
+            if( !ExternalConfiguration.CheckValid( monitor ) ) return false;
+            ClonedConfig = ExternalConfiguration.DeepClone();
+            if( !ClonedConfig.CheckValid( monitor ) )
             {
-                ClonedConfig = Configuration.DeepClone();
-                base.Lock();
+                Throw.CKException( "Cloned configuration CheckValid failed but the external has been validated. Something really weird happens." );
             }
+            return true;
         }
+
 
     }
 }

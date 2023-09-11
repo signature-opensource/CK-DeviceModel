@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace CK.AppIdentity.Tests
+namespace CK.Core.Tests.TEMPCKCORE
 {
     [TestFixture]
     public class MutableAndImmutableConfigurationSectionTests
