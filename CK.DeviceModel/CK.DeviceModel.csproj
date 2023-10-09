@@ -4,8 +4,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="18.0.0" />
-    <PackageReference Include="CK.PerfectEvent" Version="19.0.0" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="19.0.0" />
+    <PackageReference Include="CK.PerfectEvent" Version="20.0.0" />
     <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
