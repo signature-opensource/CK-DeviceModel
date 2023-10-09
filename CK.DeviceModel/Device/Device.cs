@@ -53,7 +53,7 @@ namespace CK.DeviceModel
 
         static Device()
         {
-            Throw.CheckState( new TConfiguration().CheckValid( new ActivityMonitor( false ) ) );
+            Throw.CheckState( new TConfiguration().CheckValid( new ActivityMonitor( ActivityMonitorOptions.SkipAutoConfiguration ) ) );
         }
 
         /// <summary>
@@ -114,11 +114,13 @@ namespace CK.DeviceModel
             _controllerKeyFromConfiguration = _controllerKey != null;
             _lifetimeChanged = new PerfectEventSender<DeviceLifetimeEvent>();
 
-            _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}.", new DateTimeStampProvider() );
-            _commandMonitor.AutoTags = IDeviceHost.DeviceModel;
+            _commandMonitor = new ActivityMonitor( $"Command loop for device {FullName}." )
+            {
+                AutoTags = IDeviceHost.DeviceModel
+            };
             _commandQueue = Channel.CreateUnbounded<BaseDeviceCommand>( new UnboundedChannelOptions() { SingleReader = true } );
             _commandQueueImmediate = Channel.CreateUnbounded<object?>( new UnboundedChannelOptions() { SingleReader = true } );
-            _commandLoop = new LoopImpl( _commandMonitor, _commandQueue.Writer, _commandQueueImmediate.Writer );
+            _commandLoop = new LoopImpl( _commandMonitor.ParallelLogger, _commandQueue.Writer, _commandQueueImmediate.Writer );
             _deferredCommands = new Queue<BaseDeviceCommand>();
             _baseImmediateCommandLimit = info.Configuration.BaseImmediateCommandLimit;
             _immediateCommandLimitDirty = true;

@@ -28,17 +28,16 @@ namespace CK.DeviceModel
         readonly ActivityMonitor _eventMonitor;
         readonly PerfectEventSender<TEvent> _deviceEvent;
         readonly PerfectEventSender<BaseDeviceEvent> _allEvent;
-        readonly DateTimeStampProvider _stampProvider;
 
         /// <inheritdoc />
         public ActiveDevice( IActivityMonitor monitor, CreateInfo info )
             : base( monitor, info )
         {
             _events = Channel.CreateUnbounded<object?>( new UnboundedChannelOptions() { SingleReader = true } );
-            _stampProvider = new DateTimeStampProvider();
-            _eventMonitor = new ActivityMonitor( $"Event loop for device {FullName}.", _stampProvider );
-            Debug.Assert( _eventMonitor.SafeStampProvider != null, "The monitor must have a thread safe stamp provider." );
-            _eventMonitor.AutoTags += IDeviceHost.DeviceModel;
+            _eventMonitor = new ActivityMonitor( $"Event loop for device {FullName}." )
+            {
+                AutoTags = IDeviceHost.DeviceModel
+            };
 
             _deviceEvent = new PerfectEventSender<TEvent>();
             _allEvent = new PerfectEventSender<BaseDeviceEvent>();
@@ -111,6 +110,8 @@ namespace CK.DeviceModel
             DoPost( payload );
         }
 
+        IParallelLogger DeviceModel.IEventLoop.Logger => _eventMonitor.ParallelLogger;
+
         /// <summary>
         /// Gets whether the current activity is executing in the event loop.
         /// </summary>
@@ -124,20 +125,6 @@ namespace CK.DeviceModel
         {
             DoPost( e );
             return e;
-        }
-
-
-        LogLevelFilter IActivityLogger.ActualFilter => _eventMonitor.ActualFilter.Line;
-
-        CKTrait IActivityLogger.AutoTags => _eventMonitor.AutoTags;
-
-        void IActivityLogger.UnfilteredLog( ref ActivityMonitorLogData data )
-        {
-            ActivityMonitorExternalLogData o = data.AcquireExternalData( _stampProvider );
-            if( !_events.Writer.TryWrite( o ) )
-            {
-                o.Release();
-            }
         }
 
         async Task RunEventLoopAsync()
@@ -164,11 +151,6 @@ namespace CK.DeviceModel
                             break;
                         case TEvent e:
                             await DoRaiseEventAsync( e ).ConfigureAwait( false );
-                            break;
-                        case ActivityMonitorExternalLogData log:
-                            var d = new ActivityMonitorLogData( log );
-                            _eventMonitor.UnfilteredLog( ref d );
-                            log.Release();
                             break;
                         case DeviceLifetimeEvent e:
                             await _allEvent.SafeRaiseAsync( _eventMonitor, e ).ConfigureAwait( false );
