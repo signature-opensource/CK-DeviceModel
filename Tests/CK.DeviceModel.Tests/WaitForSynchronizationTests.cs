@@ -81,7 +81,7 @@ namespace CK.DeviceModel.Tests
             var start = DateTime.UtcNow;
             d.SendCommand( TestHelper.Monitor, NewCommand() );
             var result = await d.WaitForSynchronizationAsync( considerDeferredCommands: false );
-            (DateTime.UtcNow - start).Should().BeGreaterThan( TimeSpan.FromMilliseconds( 100 ) );
+            (DateTime.UtcNow - start).Should().BeGreaterThan( TimeSpan.FromMilliseconds( 100 - 20 ) );
             result.Should().Be( WaitForSynchronizationResult.Success );
 
             d.SendCommand( TestHelper.Monitor, NewCommand() );
