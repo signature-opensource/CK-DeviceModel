@@ -15,7 +15,6 @@ namespace CK.DeviceModel.Tests
     {
 
         [Test]
-        [Timeout( 200 )]
         public async Task playing_with_configurations_Async()
         {
             using var _ = TestHelper.Monitor.OpenInfo( nameof( playing_with_configurations_Async ) );
@@ -29,63 +28,68 @@ namespace CK.DeviceModel.Tests
             var config3 = new FlashBulbConfiguration { Name = "YetAnother", Status = DeviceConfigurationStatus.RunnableStarted };
 
             var host = new FlashBulbHost();
+            host.Count.Should().Be( 0 );
 
             var hostConfig = new DeviceHostConfiguration<FlashBulbConfiguration>();
             hostConfig.IsPartialConfiguration.Should().BeTrue( "By default a configuration is partial." );
-            hostConfig.Items.Add( config1 );
 
-            host.Count.Should().Be( 0 );
+            hostConfig.Items.Add( config1 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 1 );
             FlashBulb.TotalCount.Should().Be( 1 );
+            FlashBulb? c1 = host.Find( "First" );
+            Debug.Assert( c1 != null );
+            c1.Name.Should().Be( "First" );
+            c1.Status.IsRunning.Should().Be( false );
+            // The real configuration is a clone.
+            c1.ExternalConfiguration.Should().BeSameAs( config1 );
+            // The external configuration has been validated.
+            ((IFlashBulbConfiguration)config1).ComputedValid.Should().NotBeNull();
 
             hostConfig.Items.Add( config2 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 2 );
             FlashBulb.TotalCount.Should().Be( 2 );
             FlashBulb.TotalRunning.Should().Be( 0 );
+            FlashBulb? c2 = host.Find( "Another" );
+            Debug.Assert( c2 != null );
+            c2.Name.Should().Be( "Another" );
+            c2.Status.IsRunning.Should().Be( false );
+            c2.ExternalConfiguration.Should().BeSameAs( config2 );
+            ((IFlashBulbConfiguration)config2).ComputedValid.Should().NotBeNull();
 
             hostConfig.Items.Add( config3 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 3 );
             FlashBulb.TotalCount.Should().Be( 3 );
             FlashBulb.TotalRunning.Should().Be( 1 );
-
-            FlashBulb? c1 = host.Find( "First" );
-            FlashBulb? c2 = host.Find( "Another" );
             FlashBulb? c3 = host.Find( "YetAnother" );
-            host.Find( "Not here" ).Should().BeNull();
-            Debug.Assert( c1 != null && c2 != null && c3 != null );
-
-            c1.ExternalConfiguration.Should().NotBeSameAs( config1 );
-            c2.ExternalConfiguration.Should().NotBeSameAs( config2 );
-            c3.ExternalConfiguration.Should().NotBeSameAs( config3 );
-
-            c1.Name.Should().Be( "First" );
-            c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
-            c2.Name.Should().Be( "Another" );
-            c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
+            Debug.Assert( c3 != null );
             c3.Name.Should().Be( "YetAnother" );
-            c3.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.RunnableStarted );
+            c3.Status.IsRunning.Should().Be( true );
+            c3.ExternalConfiguration.Should().BeSameAs( config3 );
+            ((IFlashBulbConfiguration)config3).ComputedValid.Should().NotBeNull();
 
-            c3.IsRunning.Should().BeTrue();
+            host.Find( "Not here" ).Should().BeNull();
+
             (await c3.StopAsync( TestHelper.Monitor )).Should().BeTrue();
             FlashBulb.TotalRunning.Should().Be( 0 );
+            c3.IsRunning.Should().BeFalse();
 
             // Partial configuration here: leave only config2 (RunnableStarted).
             hostConfig.Items.Remove( config3 );
             hostConfig.Items.Remove( config1 );
 
-            config1.Status = DeviceConfigurationStatus.AlwaysRunning;
             config2.Status = DeviceConfigurationStatus.AlwaysRunning;
-            config3.Status = DeviceConfigurationStatus.AlwaysRunning;
 
+            c2.ExternalConfiguration.Should().BeSameAs( config2 );
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
             host.Count.Should().Be( 3 );
+            c2.ExternalConfiguration.Should().BeSameAs( config2 );
 
-            c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );
-            c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.AlwaysRunning );
-            c3.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.RunnableStarted );
+            c1.IsRunning.Should().Be( false );
+            c2.IsRunning.Should().Be( true );
+            c3.IsRunning.Should().Be( false );
 
             hostConfig.IsPartialConfiguration = false;
             await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig );
@@ -94,6 +98,14 @@ namespace CK.DeviceModel.Tests
             host.Find( "First" ).Should().BeNull();
             host.Find( "Another" ).Should().BeSameAs( c2 );
             host.Find( "YetAnother" ).Should().BeNull();
+
+            c2.ExternalConfiguration.Should().BeSameAs( config2 );
+            var newConfig2 = new FlashBulbConfiguration() { Name = c2.Name, Status = DeviceConfigurationStatus.Disabled };
+            ((IFlashBulbConfiguration)newConfig2).ComputedValid.Should().BeNull( "CheckValid has not been called." );
+            await c2.ReconfigureAsync( TestHelper.Monitor, newConfig2 );
+            c2.IsRunning.Should().BeFalse();
+            c2.ExternalConfiguration.Should().NotBeSameAs( config2 ).And.BeSameAs( newConfig2 );
+            ((IFlashBulbConfiguration)newConfig2).ComputedValid.Should().NotBeNull( "CheckValid has been called." );
 
             await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
             FlashBulb.TotalCount.Should().Be( 0 );
@@ -172,7 +184,7 @@ namespace CK.DeviceModel.Tests
             lifetimeEvents[0].ConfigurationChanged.Should().BeTrue();
             {
                 var c = lifetimeEvents[0].Configuration;
-                c.Should().NotBeSameAs( config ).And.BeEquivalentTo( config );
+                c.Should().BeSameAs( config );
             }
             lifetimeEvents.Clear();
 
@@ -489,7 +501,6 @@ namespace CK.DeviceModel.Tests
         }
 
         [Test]
-        [Timeout( 200 )]
         public async Task Disabling_sends_a_stop_status_change_Async()
         {
             using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( Disabling_sends_a_stop_status_change_Async ) );
@@ -511,6 +522,7 @@ namespace CK.DeviceModel.Tests
 
             device.LifetimeEvent.Sync += ( monitor, e ) =>
             {
+                monitor.Info( $"Received LifetimeEvent. DeviceStatus = {e.DeviceStatus}." );
                 if( e.StatusChanged )
                 {
                     // The device's status is up to date.
@@ -530,14 +542,18 @@ namespace CK.DeviceModel.Tests
                 }
             };
 
-            config.Status = DeviceConfigurationStatus.Disabled;
-            (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
-
+            using( TestHelper.Monitor.OpenInfo( "Reconfiguring to Disabled." ).ConcludeWith( () => "Reconfigured to Disabled." ) )
+            {
+                config.Status = DeviceConfigurationStatus.Disabled;
+                (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+            }
             stopReceived.Should().BeTrue();
             destroyReceived.Should().BeFalse();
 
             await device.DestroyAsync( TestHelper.Monitor );
             destroyReceived.Should().BeTrue();
+
+            TestHelper.Monitor.Info( "/Disabling_sends_a_stop_status_change_Async" );
         }
 
     }

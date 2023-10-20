@@ -15,8 +15,8 @@ namespace CK.DeviceModel
     {
         BaseConfigureDeviceCommand CreateLockedConfigureCommand( string name,
                                                                  string? controllerKey,
-                                                                 DeviceConfiguration? configuration,
-                                                                 DeviceConfiguration? clonedConfiguration );
+                                                                 DeviceConfiguration? externalConfiguration,
+                                                                 DeviceConfiguration? clonedConfig );
 
         BaseStartDeviceCommand CreateStartCommand( string name );
 

@@ -2,9 +2,18 @@ using CK.Core;
 
 namespace CK.DeviceModel.Tests
 {
-
-    public class FlashBulbConfiguration : DeviceConfiguration
+    /// <summary>
+    /// This interface is functional only once CheckValid has been called.
+    /// </summary>
+    public interface IFlashBulbConfiguration
     {
+        string ComputedValid { get; }
+    }
+
+    public class FlashBulbConfiguration : DeviceConfiguration, IFlashBulbConfiguration
+    {
+        string? _computedValid;
+
         /// <summary>
         /// A default public constructor is required.
         /// </summary>
@@ -15,6 +24,8 @@ namespace CK.DeviceModel.Tests
         public int FlashColor { get; set; }
 
         public int FlashRate { get; set; } = 1;
+
+        string IFlashBulbConfiguration.ComputedValid => _computedValid!;
 
         protected override bool DoCheckValid( IActivityMonitor monitor )
         {
@@ -28,6 +39,10 @@ namespace CK.DeviceModel.Tests
             {
                 monitor.Error( $"FlashRate must be positive." );
                 isValid = false;
+            }
+            if( isValid )
+            {
+                _computedValid = $"{FlashColor}-{FlashRate}";
             }
             return isValid;
         }

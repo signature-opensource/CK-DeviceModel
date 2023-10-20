@@ -759,12 +759,6 @@ namespace CK.DeviceModel
                                 action = "asynchronous command loop function";
                                 await asyncA( _commandMonitor ).ConfigureAwait( false );
                                 break;
-                            case ActivityMonitorExternalLogData log:
-                                action = "IActivityLogger on command loop";
-                                var d = new ActivityMonitorLogData( log );
-                                _commandMonitor.UnfilteredLog( ref d );
-                                log.Release();
-                                break;
                             default:
                                 action = "command loop Signal call";
                                 await OnCommandSignalAsync( _commandMonitor, immediateObject ).ConfigureAwait( false );

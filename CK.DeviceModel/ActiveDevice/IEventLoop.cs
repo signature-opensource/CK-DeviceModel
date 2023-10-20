@@ -7,8 +7,13 @@ namespace CK.DeviceModel
     /// <summary>
     /// Non generic event loop specialized by <see cref="ActiveDevice{TConfiguration, TEvent}.IEventLoop"/>.
     /// </summary>
-    public interface IEventLoop : IActivityLogger
+    public interface IEventLoop
     {
+        /// <summary>
+        /// Gets the thread safe logger bound to this monitor's loop.
+        /// </summary>
+        IParallelLogger Logger { get; }
+
         /// <summary>
         /// Sends an immediate signal into the event loop that will be handled by <see cref="ActiveDevice.OnEventSignalAsync(IActivityMonitor, object?)"/>.
         /// An <see cref="ArgumentException"/> is thrown if the <paramref name="payload"/> is a <see cref="BaseDeviceCommand"/>

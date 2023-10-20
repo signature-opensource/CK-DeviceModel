@@ -12,10 +12,10 @@ namespace CK.DeviceModel
     public interface IDeviceHostConfiguration : ICKSimpleBinarySerializable
     {
         /// <summary>
-        /// Gets whether this is a partial configuration.
+        /// Gets or sets whether this is a partial configuration.
         /// Defaults to true.
         /// </summary>
-        bool IsPartialConfiguration { get; }
+        bool IsPartialConfiguration { get; set; }
 
         /// <summary>
         /// Gets the devices' configuration.
@@ -28,5 +28,15 @@ namespace CK.DeviceModel
         /// </summary>
         /// <param name="c">The device configuration.</param>
         void Add( DeviceConfiguration c );
+
+        /// <summary>
+        /// Checks the validity of this configuration: all <see cref="DeviceConfiguration.Name"/> must be non empty or white space, be
+        /// unique among the different configurations, and optionally, at least one configuration must exist.
+        /// This calls <see cref="DeviceConfiguration.CheckValid(IActivityMonitor)"/> for each configuration.
+        /// </summary>
+        /// <param name="monitor">The monitor that will be used to emit warnings or errors.</param>
+        /// <param name="allowEmptyConfiguration">False to consider an empty configuration as an error.</param>
+        /// <returns>Whether this configuration is valid.</returns>
+        bool CheckValidity( IActivityMonitor monitor, bool allowEmptyConfiguration );
     }
 }

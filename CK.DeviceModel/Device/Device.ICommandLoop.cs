@@ -21,8 +21,13 @@ namespace CK.DeviceModel
         /// <summary>
         /// The command loop exposed by <see cref="CommandLoop"/>.
         /// </summary>
-        protected interface ICommandLoop : IActivityLogger
+        protected interface ICommandLoop
         {
+            /// <summary>
+            /// Gets the thread safe logger bound to this monitor's loop.
+            /// </summary>
+            IParallelLogger Logger { get; }
+
             /// <summary>
             /// Sends an immediate signal into the command loop that will be handled by <see cref="OnCommandSignalAsync(IActivityMonitor, object?)"/>.
             /// An <see cref="ArgumentException"/> is thrown if the <paramref name="payload"/> is a <see cref="BaseDeviceCommand"/>.
@@ -49,25 +54,20 @@ namespace CK.DeviceModel
             void DangerousExecute( Func<IActivityMonitor, Task> action );
         }
 
-        /// <summary>
-        /// See the sample: https://github.com/Invenietis/CK-ActivityMonitor/blob/develop/Tests/CK.ActivityMonitor.Tests/DataPool/ThreadSafeLogger.cs
-        /// for the IActivityLogger implementation.
-        /// </summary>
         sealed class LoopImpl : ICommandLoop
         {
-            readonly IActivityLogger _commandMonitor;
+            readonly IParallelLogger _commandLogger;
             readonly ChannelWriter<BaseDeviceCommand> _queue;
             readonly ChannelWriter<object?> _immediate;
-            readonly DateTimeStampProvider _sequenceStamp;
 
-            public LoopImpl( IActivityMonitor commandMonitor, ChannelWriter<BaseDeviceCommand> queue, ChannelWriter<object?> immediate )
+            public LoopImpl( IParallelLogger commandLogger, ChannelWriter<BaseDeviceCommand> queue, ChannelWriter<object?> immediate )
             {
-                Debug.Assert( commandMonitor.SafeStampProvider != null );
-                _commandMonitor = commandMonitor;
+                _commandLogger = commandLogger;
                 _queue = queue;
-                _sequenceStamp = commandMonitor.SafeStampProvider;
                 _immediate = immediate;
             }
+
+            IParallelLogger ICommandLoop.Logger => _commandLogger;
 
             void ICommandLoop.DangerousExecute( Action<IActivityMonitor> action ) => DoPost( action );
 
@@ -82,19 +82,6 @@ namespace CK.DeviceModel
             }
             void DoPost( Action<IActivityMonitor> o ) => _immediate.TryWrite( o );
             void DoPost( Func<IActivityMonitor, Task> o ) => _immediate.TryWrite( o );
-
-            CKTrait IActivityLogger.AutoTags => _commandMonitor.AutoTags;
-
-            LogLevelFilter IActivityLogger.ActualFilter => _commandMonitor.ActualFilter;
-
-            void IActivityLogger.UnfilteredLog( ref ActivityMonitorLogData data )
-            {
-                var e = data.AcquireExternalData( _sequenceStamp );
-                if( !_immediate.TryWrite( e ) || !_queue.TryWrite( CommandAwaker.Instance ) )
-                {
-                    e.Release();
-                }
-            }
         }
 
         /// <summary>

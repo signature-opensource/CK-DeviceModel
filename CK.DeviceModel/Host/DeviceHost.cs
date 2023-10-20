@@ -142,10 +142,10 @@ namespace CK.DeviceModel
 
         BaseConfigureDeviceCommand IInternalDeviceHost.CreateLockedConfigureCommand( string name,
                                                                                      string? controllerKey,
-                                                                                     DeviceConfiguration? configuration,
-                                                                                     DeviceConfiguration? clonedConfiguration )
+                                                                                     DeviceConfiguration? externalConfiguration,
+                                                                                     DeviceConfiguration? clonedConfig )
         {
-            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), configuration, clonedConfiguration, (name, controllerKey) );
+            return new InternalConfigureDeviceCommand<TConfiguration>( GetType(), externalConfiguration, clonedConfig, (name, controllerKey) );
         }
 
         BaseStartDeviceCommand IInternalDeviceHost.CreateStartCommand( string name ) => new InternalStartDeviceCommand( GetType(), name );
@@ -244,12 +244,12 @@ namespace CK.DeviceModel
             /// <summary>
             /// Error constructor: only the initial configuration is provided.
             /// </summary>
-            /// <param name="initialConfiguration">The configuration.</param>
-            internal ConfigurationResult( THostConfiguration initialConfiguration )
+            /// <param name="badConfiguration">The configuration.</param>
+            internal ConfigurationResult( THostConfiguration badConfiguration )
             {
                 Success = false;
-                HostConfiguration = initialConfiguration;
-                var r = new DeviceApplyConfigurationResult[initialConfiguration.Items.Count];
+                HostConfiguration = badConfiguration;
+                var r = new DeviceApplyConfigurationResult[badConfiguration.Items.Count];
                 Array.Fill( r, DeviceApplyConfigurationResult.InvalidConfiguration );
                 Results = r;
                 _destroyedNames = null;
@@ -373,7 +373,7 @@ namespace CK.DeviceModel
                             {
                                 using( monitor.OpenTrace( $"Creating new device '{c.Name}'." ) )
                                 {
-                                    var d = SafeCreateDevice( monitor, c, safeConfig.Items[configIdx] );
+                                    var d = SafeCreateDevice( monitor, c, externalConfig: configuration.Items[configIdx] );
                                     Debug.Assert( d == null || d.Name == c.Name );
                                     if( d == null )
                                     {
@@ -537,6 +537,11 @@ namespace CK.DeviceModel
             }
             try
             {
+                if( !externalConfig.CheckValid( monitor ) )
+                {
+                    monitor.Error( $"External configuration CheckValid failed but its clone has been validated. Something really weird happens." );
+                    return null;
+                }
                 var device = CreateDevice( monitor, config, externalConfig );
                 if( device != null && device.Name != config.Name )
                 {

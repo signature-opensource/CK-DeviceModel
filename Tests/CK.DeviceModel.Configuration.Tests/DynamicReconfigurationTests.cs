@@ -7,7 +7,9 @@ using Microsoft.Extensions.Hosting;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -21,22 +23,68 @@ namespace CK.DeviceModel.Configuration.Tests
     [TestFixture]
     public class DynamicReconfigurationTests
     {
+
+        [TypeConverter(typeof(Converter))]
+        public readonly struct FakeNormalizedPath 
+        {
+            sealed class Converter : TypeConverter
+            {
+                public override bool CanConvertFrom( ITypeDescriptorContext? context, Type sourceType )
+                {
+                    return sourceType == typeof( string );
+                }
+
+                public override bool CanConvertTo( ITypeDescriptorContext? context, Type? destinationType )
+                {
+                    return destinationType == typeof( string );
+                }
+
+                public override object? ConvertFrom( ITypeDescriptorContext? context, CultureInfo? culture, object value )
+                {
+                    return value is string s ? new FakeNormalizedPath( s ) : default;
+                }
+
+                public override object? ConvertTo( ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType )
+                {
+                    return value is FakeNormalizedPath p ? p.ToString() : string.Empty;
+                }
+            }
+
+            readonly string _v;
+
+            public FakeNormalizedPath( string p )  => _v = p;
+
+            public static implicit operator string( FakeNormalizedPath p ) => p._v ?? string.Empty;
+
+            public static implicit operator FakeNormalizedPath( string p ) => new FakeNormalizedPath( p );
+
+            public override string ToString() => _v ?? string.Empty;
+        }
+
         public class CameraDeviceConfiguration : DeviceConfiguration
         {
             public CameraDeviceConfiguration()
             {
             }
 
+            public FakeNormalizedPath Topic { get; set; }
+
+            public int Power { get; set; }
+
             public CameraDeviceConfiguration( ICKBinaryReader r )
                 : base( r )
             {
                 r.ReadByte(); // version
+                Topic = r.ReadString();
+                Power = r.ReadInt32();
             }
 
             public override void Write( ICKBinaryWriter w )
             {
                 base.Write( w );
                 w.Write( (byte)0 );
+                w.Write( Topic );
+                w.Write( Power );
             }
         }
 
@@ -208,6 +256,8 @@ namespace CK.DeviceModel.Configuration.Tests
             config.Provider.Set( "CK-DeviceModel:CameraDeviceHost:Items:C1:Status", "Runnable" );
             config.Provider.Set( "CK-DeviceModel:CameraDeviceHost:Items:C2:Status", "Runnable" );
             config.Provider.Set( "CK-DeviceModel:LightControllerDeviceHost:Items:L1:Status", "Disabled" );
+            config.Provider.Set( "CK-DeviceModel:CameraDeviceHost:Items:C1:Topic", "IAm.Camera1" );
+            config.Provider.Set( "CK-DeviceModel:CameraDeviceHost:Items:C1:Power", "3712" );
             await RunHostAsync( config, services =>
             {
                 Debug.Assert( CameraDeviceHost.TestInstance != null );
@@ -221,6 +271,10 @@ namespace CK.DeviceModel.Configuration.Tests
                 var c2 = CameraDeviceHost.TestInstance.Find( "C2" );
                 var l1 = LightControllerDeviceHost.Instance.Find( "L1" );
                 Debug.Assert( c1 != null && c2 != null && l1 != null );
+
+                c1.ExternalConfiguration.Power.Should().Be( 3712 );
+                c1.ExternalConfiguration.Topic.ToString().Should().Be( "IAm.Camera1" );
+
                 c1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
                 c2.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Runnable );
                 l1.ExternalConfiguration.Status.Should().Be( DeviceConfigurationStatus.Disabled );

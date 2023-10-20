@@ -21,8 +21,8 @@
   <!--</BasicDefinitions>-->
   <!--<StandardProperties>-->
   <PropertyGroup>
-    <RepositoryUrl>https://gitlab.com/signature-code/CK-DeviceModel</RepositoryUrl>
-    <ProductName>SC</ProductName>
+    <RepositoryUrl>https://github.com/signature-opensource/CK-DeviceModel</RepositoryUrl>
+    <ProductName>CK</ProductName>
     <Company>Signature Code</Company>
     <Authors>Signature Code</Authors>
     <Copyright>Copyright Signature-Code 2007-$([System.DateTime]::UtcNow.ToString("yyyy"))</Copyright>
@@ -54,7 +54,7 @@
   <!--</GenerateDocumentation>-->
   <!--<Analyzers>: This analyzer provides very welcome guidelines about async and threading issues.-->
   <ItemGroup Condition=" '$(MSBuildProjectName)' != 'CodeCakeBuilder' ">
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.5.22" PrivateAssets="All" IncludeAssets="runtime;build;native;contentfiles;analyzers" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.7.30" PrivateAssets="All" IncludeAssets="runtime;build;native;contentfiles;analyzers" />
   </ItemGroup>
   <!--</Analyzers>-->
   <!--<ReproducibleBuilds>-->
