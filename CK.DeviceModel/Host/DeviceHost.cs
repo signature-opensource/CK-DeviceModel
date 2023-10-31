@@ -21,7 +21,7 @@ namespace CK.DeviceModel
     /// <typeparam name="THostConfiguration">The configuration type for this host.</typeparam>
     /// <typeparam name="TConfiguration">The Device's configuration type.</typeparam>
     [CKTypeDefiner]
-    public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> : IDeviceHost, IInternalDeviceHost
+    public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> : IDeviceHost, IInternalDeviceHost, ISingletonAutoService
         where T : Device<TConfiguration>
         where THostConfiguration : DeviceHostConfiguration<TConfiguration>
         where TConfiguration : DeviceConfiguration, new()
