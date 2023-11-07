@@ -12,7 +12,7 @@ namespace CK.DeviceModel
     /// Defines non-generic device host properties.
     /// </summary>
     [IsMultiple]
-    public interface IDeviceHost
+    public interface IDeviceHost : ISingletonAutoService
     {
         /// <summary>
         /// Log tag set on the command and any event loop monitors.
