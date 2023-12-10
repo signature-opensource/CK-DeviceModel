@@ -4,8 +4,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Configuration" Version="0.2.1--0052-develop" />
-    <PackageReference Include="CK.PerfectEvent" Version="20.0.2--0011-develop" />
+    <PackageReference Include="CK.Configuration" Version="0.3.0" />
+    <PackageReference Include="CK.PerfectEvent" Version="21.0.0" />
     <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
