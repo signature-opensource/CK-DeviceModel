@@ -69,6 +69,11 @@ namespace CK.DeviceModel
             /// </summary>
             public readonly TConfiguration Configuration;
 
+            /// <summary>
+            /// Gets the host of this device.
+            /// </summary>
+            public IDeviceHost Host => _host;
+
             internal readonly IInternalDeviceHost _host;
             internal readonly TConfiguration _externalConfig;
 
