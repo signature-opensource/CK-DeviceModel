@@ -3,8 +3,8 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Configuration" Version="0.0.0--04z8lm0-develop" />
-    <PackageReference Include="CK.PerfectEvent" Version="0.0.0--04z8lm0-develop" />
+    <PackageReference Include="CK.Configuration" Version="0.0.0--04z92fm-develop" />
+    <PackageReference Include="CK.PerfectEvent" Version="0.0.0--04z92fm-develop" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
   </ItemGroup>
