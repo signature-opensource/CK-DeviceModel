@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Testing.Monitoring" Version="0.0.0--04z92fk-develop" />
+    <PackageReference Include="CK.Testing.Monitoring" Version="0.0.0--04zc9l5-develop" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="NUnit" Version="4.1.0" />
