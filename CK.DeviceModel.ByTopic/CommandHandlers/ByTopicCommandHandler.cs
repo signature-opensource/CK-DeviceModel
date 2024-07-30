@@ -22,46 +22,74 @@ namespace CK.DeviceModel.ByTopic.CommandHandlers
         IEnumerable<ITopicTargetAwareDeviceHost> ForDeviceFullName( string? deviceFullName )
         {
             if( string.IsNullOrWhiteSpace( deviceFullName ) ) return _hosts;
-            return _hosts.Where(x=> x.DeviceFullName.StartsWith(deviceFullName));
+            return _hosts.Where( x => x.DeviceFullName.StartsWith( deviceFullName ) );
         }
 
         [CommandHandler]
-        public async Task HandleTurnOnLocationCommandAsync( IActivityMonitor monitor, ITurnOnLocationCommand cmd )
+        public async Task<ISwitchLocationCommandResult> HandleTurnOnLocationCommandAsync( IActivityMonitor monitor, ITurnOnLocationCommand cmd )
         {
             var targets = ForDeviceFullName( cmd.DeviceFullName );
+            var resultByDeviceName = new Dictionary<string, bool>();
             foreach( var host in targets )
             {
-                await host.HandleAsync( monitor, cmd ).ConfigureAwait( false );
+                var result = await host.HandleAsync( monitor, cmd ).ConfigureAwait( false );
+                resultByDeviceName.TryAdd( host.DeviceFullName, result );
             }
+
+            return cmd.CreateResult( r =>
+             {
+                 r.Topic = cmd.Topic;
+                 r.ResultByDeviceName = resultByDeviceName;
+             } );
         }
 
         [CommandHandler]
-        public async Task HandleTurnOnMultipleLocationsCommandAsync( IActivityMonitor monitor, ITurnOnMultipleLocationsCommand commands )
+        public async Task<ISwitchMultipleLocationsCommandResult> HandleTurnOnMultipleLocationsCommandAsync( IActivityMonitor monitor, ITurnOnMultipleLocationsCommand cmd )
         {
-            foreach( var c in commands.Locations )
+            var turnOnLocationCommandResults = new List<ISwitchLocationCommandResult>();
+            foreach( var c in cmd.Locations )
             {
-                await HandleTurnOnLocationCommandAsync( monitor, c );
+                turnOnLocationCommandResults.Add( await HandleTurnOnLocationCommandAsync( monitor, c ));
             }
+
+            return cmd.CreateResult( r =>
+            {
+                r.Results.AddRange(turnOnLocationCommandResults);
+            } );
         }
 
 
         [CommandHandler]
-        public async Task HandleTurnOffLocationCommandAsync( IActivityMonitor monitor, ITurnOffLocationCommand cmd )
+        public async Task<ISwitchLocationCommandResult> HandleTurnOffLocationCommandAsync( IActivityMonitor monitor, ITurnOffLocationCommand cmd )
         {
             var targets = ForDeviceFullName( cmd.DeviceFullName );
+            var resultByDeviceName = new Dictionary<string, bool>();
             foreach( var host in targets )
             {
-                await host.HandleAsync( monitor, cmd ).ConfigureAwait( false );
+                var result = await host.HandleAsync( monitor, cmd ).ConfigureAwait( false );
+                resultByDeviceName.TryAdd( host.DeviceFullName, result );
             }
+
+            return cmd.CreateResult( r =>
+            {
+                r.Topic = cmd.Topic;
+                r.ResultByDeviceName = resultByDeviceName;
+            } );
         }
 
         [CommandHandler]
-        public async Task HandleTurnOffMultipleLocationsCommandAsync( IActivityMonitor monitor, ITurnOffMultipleLocationsCommand commands )
+        public async Task<ISwitchMultipleLocationsCommandResult> HandleTurnOffMultipleLocationsCommandAsync( IActivityMonitor monitor, ITurnOffMultipleLocationsCommand cmd )
         {
-            foreach( var c in commands.Locations )
+            var turnOffLocationCommandResults = new List<ISwitchLocationCommandResult>();
+            foreach( var c in cmd.Locations )
             {
-                await HandleTurnOffLocationCommandAsync( monitor, c );
+                turnOffLocationCommandResults.Add( await HandleTurnOffLocationCommandAsync( monitor, c ) );
             }
+
+            return cmd.CreateResult( r =>
+            {
+                r.Results.AddRange(turnOffLocationCommandResults);
+            } );
         }
 
     }

@@ -4,7 +4,7 @@ using System;
 
 namespace CK.DeviceModel.ByTopic.Commands
 {
-    public interface ITurnOnLocationCommand : ICommand, ICommandPartDeviceTopicTarget
+    public interface ITurnOnLocationCommand : ICommand<ISwitchLocationCommandResult>, ICommandPartDeviceTopicTarget
     {
         ColorLocation Color { get; set; }
         bool IsBlinking { get; set; }

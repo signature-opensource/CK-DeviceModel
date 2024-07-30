@@ -10,18 +10,35 @@ using System.Threading.Tasks;
 
 namespace CK.DeviceModel.ByTopic.Tests.Hosts
 {
-    public class FakeLEDStripHosts : IAutoService,ITopicTargetAwareDeviceHost
+    public class FakeLEDStripHosts : IAutoService, ITopicTargetAwareDeviceHost
     {
         public string DeviceFullName { get; set; }
 
+        public List<string> Topics { get; set; }
+
         public FakeLEDStripHosts()
         {
-            DeviceFullName = $"FakeLEDStripHosts/{Guid.NewGuid()}";
+            DeviceFullName = nameof( FakeLEDStripHosts );
+            Topics = new List<string>()
+            {
+                "Test",
+                "Test-1",
+                "Test-FakeLEDStrip",
+            };
         }
 
         public async ValueTask<bool> HandleAsync( IActivityMonitor monitor, ICommandPartDeviceTopicTarget cmd )
         {
+            if( !Topics.Contains( cmd.Topic ) )
+            {
+                return false;
+            }
+
             if( cmd is ITurnOffLocationCommand )
+            {
+                return true;
+            }
+            else if( cmd is ITurnOnLocationCommand )
             {
                 return true;
             }

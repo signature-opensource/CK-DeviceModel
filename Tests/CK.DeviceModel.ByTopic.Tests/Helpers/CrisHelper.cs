@@ -22,6 +22,13 @@ namespace CK.DeviceModel.ByTopic.Tests.Helpers
                 command
             );
 
+            var executedCommand = await ec.ExecutedCommand;
+
+            if( executedCommand.Result is ICrisResultError err )
+            {
+                throw new CKException( $"Command failed with {err.Errors.Count} messages: {string.Join( "; ", err.Errors.Select( um => um.Message ) )}" );
+            }
+
             return await ec.WithResult<TResult>().Result;
         }
 

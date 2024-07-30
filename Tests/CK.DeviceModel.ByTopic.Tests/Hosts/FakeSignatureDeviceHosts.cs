@@ -14,14 +14,31 @@ namespace CK.DeviceModel.ByTopic.Tests.Hosts
     {
         public string DeviceFullName { get; set; }
 
+        public List<string> Topics { get; set; }
+
         public FakeSignatureDeviceHosts()
         {
-            DeviceFullName = $"FakeSignatureDeviceHosts/{Guid.NewGuid()}";
+            DeviceFullName = nameof( FakeSignatureDeviceHosts );
+            Topics = new List<string>()
+            {
+                "Test",
+                "Test-1",
+                "Test-FakeSignatureDevice",
+            };
         }
 
         public async ValueTask<bool> HandleAsync( IActivityMonitor monitor, ICommandPartDeviceTopicTarget cmd )
         {
+            if( !Topics.Contains( cmd.Topic ) )
+            {
+                return false;
+            }
+
             if( cmd is ITurnOffLocationCommand )
+            {
+                return true;
+            }
+            else if( cmd is ITurnOnLocationCommand )
             {
                 return true;
             }

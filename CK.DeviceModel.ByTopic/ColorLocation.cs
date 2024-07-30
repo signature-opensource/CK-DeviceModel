@@ -11,6 +11,9 @@ namespace CK.DeviceModel.ByTopic
         White,
         Red,
         Green,
-        Blue
+        Blue,
+        Yellow,
+        Magenta,
+        Cyan
     }
 }
