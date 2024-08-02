@@ -12,13 +12,13 @@ namespace CK.DeviceModel.ByTopic.Tests.Hosts
 {
     public class FakeLEDStripHosts : IAutoService, ITopicTargetAwareDeviceHost
     {
-        public string DeviceFullName { get; set; }
+        public string DeviceHostName { get; set; }
 
         public List<string> Topics { get; set; }
 
         public FakeLEDStripHosts()
         {
-            DeviceFullName = nameof( FakeLEDStripHosts );
+            DeviceHostName = nameof( FakeLEDStripHosts );
             Topics = new List<string>()
             {
                 "Test",

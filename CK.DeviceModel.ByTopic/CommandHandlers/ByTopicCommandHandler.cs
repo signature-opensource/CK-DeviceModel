@@ -22,7 +22,9 @@ namespace CK.DeviceModel.ByTopic.CommandHandlers
         IEnumerable<ITopicTargetAwareDeviceHost> ForDeviceFullName( string? deviceFullName )
         {
             if( string.IsNullOrWhiteSpace( deviceFullName ) ) return _hosts;
-            return _hosts.Where( x => x.DeviceFullName.StartsWith( deviceFullName ) );
+
+            var deviceHostName = deviceFullName.Split( "/" )[0];
+            return _hosts.Where( x => x.DeviceHostName.StartsWith( deviceHostName ) );
         }
 
         [CommandHandler]
@@ -33,7 +35,7 @@ namespace CK.DeviceModel.ByTopic.CommandHandlers
             foreach( var host in targets )
             {
                 var result = await host.HandleAsync( monitor, cmd ).ConfigureAwait( false );
-                resultByDeviceName.TryAdd( host.DeviceFullName, result );
+                resultByDeviceName.TryAdd( host.DeviceHostName, result );
             }
 
             return cmd.CreateResult( r =>
@@ -67,7 +69,7 @@ namespace CK.DeviceModel.ByTopic.CommandHandlers
             foreach( var host in targets )
             {
                 var result = await host.HandleAsync( monitor, cmd ).ConfigureAwait( false );
-                resultByDeviceName.TryAdd( host.DeviceFullName, result );
+                resultByDeviceName.TryAdd( host.DeviceHostName, result );
             }
 
             return cmd.CreateResult( r =>

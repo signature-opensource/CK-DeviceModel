@@ -9,10 +9,10 @@ namespace CK.DeviceModel.ByTopic.IO.Host
     {
 
         /// <summary>
-        /// A device full name is "DeviceHostTypeName/DeviceName".
-        /// This can be all possible devices. Example: "LEDStripHost" (all devices of type LEDStrip) or "LEDStripHost/Wall0"
+        /// A device host name is "DeviceHostTypeName".
+        /// This can be all possible devices host. Example: "LEDStripHost" or "SignatureDeviceHost"
         /// </summary>
-        string DeviceFullName { get; set; }
+        string DeviceHostName { get; set; }
 
         /// <summary>
         /// 
