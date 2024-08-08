@@ -108,7 +108,7 @@ namespace CK.DeviceModel.ByTopic.Tests
                 var turnOnCmd = pocoDirectory.Create<ITurnOnLocationCommand>( r =>
                 {
                     r.Topic = tc.topic;
-                    r.Color = ColorLocation.Red;
+                    r.Colors.Add(ColorLocation.Red);
                 } );
                 var result = await CrisHelper.SendCrisCommandWithResultAsync<ITurnOnLocationCommand, ISwitchLocationCommandResult>( turnOnCmd, TestHelper.Monitor, cbe );
 
@@ -184,7 +184,7 @@ namespace CK.DeviceModel.ByTopic.Tests
                     list.Add( pocoDirectory.Create<ITurnOnLocationCommand>( r =>
                     {
                         r.Topic = item.Key;
-                        r.Color = ColorLocation.Red;
+                        r.Colors.Add( ColorLocation.Red );
                     } ) );
                 }
 
@@ -308,7 +308,7 @@ namespace CK.DeviceModel.ByTopic.Tests
                 var turnOnCmd = pocoDirectory.Create<ITurnOnLocationCommand>( r =>
                 {
                     r.Topic = topic;
-                    r.Color = ColorLocation.Red;
+                    r.Colors.Add( ColorLocation.Red );
                     r.DeviceFullName = deviceFullName;
                 } );
                 var result = await CrisHelper.SendCrisCommandWithResultAsync<ITurnOnLocationCommand, ISwitchLocationCommandResult>( turnOnCmd, TestHelper.Monitor, cbe );
