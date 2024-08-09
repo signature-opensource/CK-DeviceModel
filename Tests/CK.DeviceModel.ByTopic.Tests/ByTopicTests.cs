@@ -32,6 +32,7 @@ namespace CK.DeviceModel.ByTopic.Tests
                                                   typeof( FakeLEDStripHosts ),
                                                   typeof( FakeSignatureDeviceHosts ),
                                                   typeof( ISwitchLocationCommandResult ),
+                                                  typeof( ITopicColor ),
                                                   typeof( ISwitchMultipleLocationsCommandResult ),
                                                   typeof( ITurnOffLocationCommand ),
                                                   typeof( ITurnOnLocationCommand ),
@@ -108,7 +109,7 @@ namespace CK.DeviceModel.ByTopic.Tests
                 var turnOnCmd = pocoDirectory.Create<ITurnOnLocationCommand>( r =>
                 {
                     r.Topic = tc.topic;
-                    r.Colors.Add(ColorLocation.Red);
+                    r.Colors.Add(pocoDirectory.Create<ITopicColor>(tc => { tc.Color = ColorLocation.Red; }) );
                 } );
                 var result = await CrisHelper.SendCrisCommandWithResultAsync<ITurnOnLocationCommand, ISwitchLocationCommandResult>( turnOnCmd, TestHelper.Monitor, cbe );
 
@@ -184,7 +185,7 @@ namespace CK.DeviceModel.ByTopic.Tests
                     list.Add( pocoDirectory.Create<ITurnOnLocationCommand>( r =>
                     {
                         r.Topic = item.Key;
-                        r.Colors.Add( ColorLocation.Red );
+                        r.Colors.Add( pocoDirectory.Create<ITopicColor>( tc => { tc.Color = ColorLocation.Red; } ) );
                     } ) );
                 }
 
@@ -308,7 +309,7 @@ namespace CK.DeviceModel.ByTopic.Tests
                 var turnOnCmd = pocoDirectory.Create<ITurnOnLocationCommand>( r =>
                 {
                     r.Topic = topic;
-                    r.Colors.Add( ColorLocation.Red );
+                    r.Colors.Add( pocoDirectory.Create<ITopicColor>(tc => { tc.Color = ColorLocation.Red; }) );
                     r.DeviceFullName = deviceFullName;
                 } );
                 var result = await CrisHelper.SendCrisCommandWithResultAsync<ITurnOnLocationCommand, ISwitchLocationCommandResult>( turnOnCmd, TestHelper.Monitor, cbe );
