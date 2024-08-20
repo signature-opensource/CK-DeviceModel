@@ -2,11 +2,15 @@ using CK.Cris;
 
 namespace CK.DeviceModel.ByTopic.IO.Commands
 {
-    public interface ICommandPartDeviceTopicTarget : ICommandPart
+    /// <summary>
+    /// Command part that targets anything that is bound to a topic mangaed by any kind of device host,
+    /// a specific device host or a specific device.
+    /// </summary>
+    public interface ICommandDeviceTopicTarget : ICommandPart
     {
         /// <summary>
-        /// Gets or sets a the topic.
-        /// An empty topic applies to all locations.
+        /// Gets or sets the topic.
+        /// An empty topic targets all items.
         /// <para>
         /// A topic is a '/' separated strings. A leading '/' is ignored.
         /// </para>

@@ -16,7 +16,7 @@ namespace CK.DeviceModel.ByTopic.IO
 
 
         [IncomingValidator]
-        public void Normalize( UserMessageCollector collector, ICommandPartDeviceTopicTarget cmd )
+        public void Normalize( UserMessageCollector collector, ICommandDeviceTopicTarget cmd )
         {
             if( cmd.DeviceFullName != null && !_deviceFullName.IsMatch( cmd.DeviceFullName ) )
             {

@@ -27,7 +27,7 @@ namespace CK.DeviceModel.ByTopic.Tests.Hosts
             };
         }
 
-        public async ValueTask<bool> HandleAsync( IActivityMonitor monitor, ICommandPartDeviceTopicTarget cmd )
+        public async ValueTask<bool> HandleAsync( IActivityMonitor monitor, ICommandDeviceTopicTarget cmd )
         {
             if( !Topics.Contains( cmd.Topic ) )
             {

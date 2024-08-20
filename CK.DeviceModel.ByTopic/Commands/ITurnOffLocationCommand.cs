@@ -4,7 +4,7 @@ using System;
 
 namespace CK.DeviceModel.ByTopic.Commands
 {
-    public interface ITurnOffLocationCommand : ICommand<ISwitchLocationCommandResult>, ICommandPartDeviceTopicTarget
+    public interface ITurnOffLocationCommand : ICommand<ISwitchLocationCommandResult>, ICommandDeviceTopicTarget
     {
     }
 }

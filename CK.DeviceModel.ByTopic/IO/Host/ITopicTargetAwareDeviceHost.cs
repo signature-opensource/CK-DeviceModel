@@ -23,6 +23,6 @@ namespace CK.DeviceModel.ByTopic.IO.Host
         /// Returns true if the command has been handled, false if the command is not handled by this device.
         /// This throws on error.
         /// </returns>
-        ValueTask<bool> HandleAsync( IActivityMonitor monitor, ICommandPartDeviceTopicTarget cmd );
+        ValueTask<bool> HandleAsync( IActivityMonitor monitor, ICommandDeviceTopicTarget cmd );
     }
 }
