@@ -1,11 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="CK.Cris" Version="0.32.1" />
+    <PackageReference Include="CK.Cris" Version="0.32.2--0001-develop" />
   </ItemGroup>
-
 </Project>
