@@ -3,6 +3,6 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Cris" Version="0.32.2--0001-develop" />
+    <PackageReference Include="CK.Cris" Version="0.32.2" />
   </ItemGroup>
 </Project>

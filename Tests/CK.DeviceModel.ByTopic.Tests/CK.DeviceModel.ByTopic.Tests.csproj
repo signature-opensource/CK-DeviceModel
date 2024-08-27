@@ -4,11 +4,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Cris.BackgroundExecutor" Version="0.32.2--0001-develop" />
-    <PackageReference Include="CK.Cris.Executor.Engine" Version="0.32.2--0001-develop" />
-    <PackageReference Include="CK.Testing.StObjEngine" Version="26.0.2--0001-develop" />
-    <PackageReference Include="CK.Testing.SetupableSetup" Version="26.0.2--0001-develop" />
-    <PackageReference Include="CK.Testing.Monitoring" Version="10.0.1--0004-develop" />
+    <PackageReference Include="CK.Cris.BackgroundExecutor" Version="0.32.2" />
+    <PackageReference Include="CK.Cris.Executor.Engine" Version="0.32.2" />
+    <PackageReference Include="CK.Testing.StObjEngine" Version="26.0.2" />
+    <PackageReference Include="CK.Testing.SetupableSetup" Version="26.0.2" />
+    <PackageReference Include="CK.Testing.Monitoring" Version="10.0.1" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
     <PackageReference Include="NUnit" Version="4.1.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
