@@ -292,7 +292,7 @@ namespace CK.DeviceModel
                         if( w > 2 )
                         {
                             _daemonMonitor.CloseGroup( $"Waiting for {w} ms or a signal." );
-                            await signalTask.WaitAsync( w ).ConfigureAwait( false );
+                            await signalTask.WaitForTaskCompletionAsync( w ).ConfigureAwait( false );
                         }
                         else
                         {
@@ -335,7 +335,7 @@ namespace CK.DeviceModel
                 Debug.Assert( _runLoop != null );
                 _stoppedTokenSource.Cancel();
                 Signal();
-                await _runLoop.WaitAsync( Timeout.Infinite, cancellationToken );
+                await _runLoop.WaitForTaskCompletionAsync( Timeout.Infinite, cancellationToken );
             }
         }
     }
