@@ -1,31 +1,29 @@
 using System.Threading;
 
-namespace CK.DeviceModel
+namespace CK.DeviceModel;
+
+/// <summary>
+/// Possible <see cref="IDevice.WaitForSynchronizationAsync"/> result.
+/// </summary>
+public enum WaitForSynchronizationResult
 {
     /// <summary>
-    /// Possible <see cref="IDevice.WaitForSynchronizationAsync"/> result.
+    /// Previously sent commands have been handled.
     /// </summary>
-    public enum WaitForSynchronizationResult
-    {
-        /// <summary>
-        /// Previously sent commands have been handled.
-        /// </summary>
-        Success,
+    Success,
 
-        /// <summary>
-        /// The cancellation token has been signaled.
-        /// </summary>
-        Canceled,
+    /// <summary>
+    /// The cancellation token has been signaled.
+    /// </summary>
+    Canceled,
 
-        /// <summary>
-        /// The timeout provided expired.
-        /// </summary>
-        Timeout,
+    /// <summary>
+    /// The timeout provided expired.
+    /// </summary>
+    Timeout,
 
-        /// <summary>
-        /// The device is destroyed.
-        /// </summary>
-        DeviceDestroyed
-    }
-
+    /// <summary>
+    /// The device is destroyed.
+    /// </summary>
+    DeviceDestroyed
 }

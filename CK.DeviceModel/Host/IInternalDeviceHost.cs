@@ -5,44 +5,43 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CK.DeviceModel
+namespace CK.DeviceModel;
+
+/// <summary>
+/// Internal interface that define non-generic host behaviors: Devices and DeviceHostDaemon
+/// call these methods.
+/// </summary>
+interface IInternalDeviceHost : IDeviceHost
 {
+    BaseConfigureDeviceCommand CreateLockedConfigureCommand( string name,
+                                                             string? controllerKey,
+                                                             DeviceConfiguration? externalConfiguration,
+                                                             DeviceConfiguration? clonedConfig );
+
+    BaseStartDeviceCommand CreateStartCommand( string name );
+
+    BaseStopDeviceCommand CreateStopCommand( string name, bool ignoreAlwaysRunning );
+
+    BaseDestroyDeviceCommand CreateDestroyCommand( string name );
+
+    BaseSetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
+
     /// <summary>
-    /// Internal interface that define non-generic host behaviors: Devices and DeviceHostDaemon
-    /// call these methods.
+    /// Called synchronously (interact with the reconfiguring sync lock).
     /// </summary>
-    interface IInternalDeviceHost : IDeviceHost
-    {
-        BaseConfigureDeviceCommand CreateLockedConfigureCommand( string name,
-                                                                 string? controllerKey,
-                                                                 DeviceConfiguration? externalConfiguration,
-                                                                 DeviceConfiguration? clonedConfig );
+    bool OnDeviceDoDestroy( IActivityMonitor monitor, IDevice device );
 
-        BaseStartDeviceCommand CreateStartCommand( string name );
+    void DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor, bool fromStart );
 
-        BaseStopDeviceCommand CreateStopCommand( string name, bool ignoreAlwaysRunning );
+    Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor );
 
-        BaseDestroyDeviceCommand CreateDestroyCommand( string name );
+    Task RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e );
 
-        BaseSetControllerKeyDeviceCommand CreateSetControllerKeyDeviceCommand( string name, string? current, string? newControllerKey );
+    Task RaiseAllDevicesEventAsync( IActivityMonitor monitor, BaseDeviceEvent e );
 
-        /// <summary>
-        /// Called synchronously (interact with the reconfiguring sync lock).
-        /// </summary>
-        bool OnDeviceDoDestroy( IActivityMonitor monitor, IDevice device );
+    void SetDaemon( DeviceHostDaemon daemon );
 
-        void DeviceOnAlwaysRunningCheck( IInternalDevice d, IActivityMonitor monitor, bool fromStart );
+    ValueTask<long> DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, DateTime now );
 
-        Task RaiseDevicesChangedEventAsync( IActivityMonitor monitor );
-
-        Task RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e );
-
-        Task RaiseAllDevicesEventAsync( IActivityMonitor monitor, BaseDeviceEvent e );
-
-        void SetDaemon( DeviceHostDaemon daemon );
-
-        ValueTask<long> DaemonCheckAlwaysRunningAsync( IActivityMonitor monitor, IDeviceAlwaysRunningPolicy global, DateTime now );
-
-        CancellationToken DaemonStoppedToken { get; }
-    }
+    CancellationToken DaemonStoppedToken { get; }
 }

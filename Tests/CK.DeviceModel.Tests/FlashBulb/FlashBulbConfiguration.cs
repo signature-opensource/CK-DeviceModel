@@ -1,80 +1,78 @@
 using CK.Core;
 
-namespace CK.DeviceModel.Tests
+namespace CK.DeviceModel.Tests;
+
+/// <summary>
+/// This interface is functional only once CheckValid has been called.
+/// </summary>
+public interface IFlashBulbConfiguration
 {
+    string ComputedValid { get; }
+}
+
+public class FlashBulbConfiguration : DeviceConfiguration, IFlashBulbConfiguration
+{
+    string? _computedValid;
+
     /// <summary>
-    /// This interface is functional only once CheckValid has been called.
+    /// A default public constructor is required.
     /// </summary>
-    public interface IFlashBulbConfiguration
+    public FlashBulbConfiguration()
     {
-        string ComputedValid { get; }
     }
 
-    public class FlashBulbConfiguration : DeviceConfiguration, IFlashBulbConfiguration
+    public int FlashColor { get; set; }
+
+    public int FlashRate { get; set; } = 1;
+
+    string IFlashBulbConfiguration.ComputedValid => _computedValid!;
+
+    protected override bool DoCheckValid( IActivityMonitor monitor )
     {
-        string? _computedValid;
-
-        /// <summary>
-        /// A default public constructor is required.
-        /// </summary>
-        public FlashBulbConfiguration()
+        bool isValid = true;
+        if( FlashColor < 0 || FlashColor > 3712 )
         {
+            monitor.Error( $"FlashColor must be between 0 and 3712." );
+            isValid = false;
         }
-
-        public int FlashColor { get; set; }
-
-        public int FlashRate { get; set; } = 1;
-
-        string IFlashBulbConfiguration.ComputedValid => _computedValid!;
-
-        protected override bool DoCheckValid( IActivityMonitor monitor )
+        if( FlashRate <= 0 )
         {
-            bool isValid = true;
-            if( FlashColor < 0 || FlashColor > 3712 )
-            {
-                monitor.Error( $"FlashColor must be between 0 and 3712." );
-                isValid = false;
-            }
-            if( FlashRate <= 0 )
-            {
-                monitor.Error( $"FlashRate must be positive." );
-                isValid = false;
-            }
-            if( isValid )
-            {
-                _computedValid = $"{FlashColor}-{FlashRate}";
-            }
-            return isValid;
+            monitor.Error( $"FlashRate must be positive." );
+            isValid = false;
         }
-
-        /// <summary>
-        /// Deserialization constructor.
-        /// Every specialized configuration MUST define its own deserialization
-        /// constructor (that must call its base) and override the <see cref="Write(ICKBinaryWriter)"/>
-        /// method (that must start to call its base Write method).
-        /// </summary>
-        /// <param name="r">The reader.</param>
-        public FlashBulbConfiguration( ICKBinaryReader r )
-            : base( r )
+        if( isValid )
         {
-            r.ReadByte(); // version
-            FlashColor = r.ReadInt32();
-            FlashRate = r.ReadInt32();
+            _computedValid = $"{FlashColor}-{FlashRate}";
         }
-
-        /// <summary>
-        /// Symmetric of the deserialization constructor.
-        /// Every Write MUST call base.Write and write a version number.
-        /// </summary>
-        /// <param name="w">The writer.</param>
-        public override void Write( ICKBinaryWriter w )
-        {
-            base.Write( w );
-            w.Write( (byte)0 );
-            w.Write( FlashColor );
-            w.Write( FlashRate );
-        }
+        return isValid;
     }
 
+    /// <summary>
+    /// Deserialization constructor.
+    /// Every specialized configuration MUST define its own deserialization
+    /// constructor (that must call its base) and override the <see cref="Write(ICKBinaryWriter)"/>
+    /// method (that must start to call its base Write method).
+    /// </summary>
+    /// <param name="r">The reader.</param>
+    public FlashBulbConfiguration( ICKBinaryReader r )
+        : base( r )
+    {
+        r.ReadByte(); // version
+        FlashColor = r.ReadInt32();
+        FlashRate = r.ReadInt32();
+    }
+
+    /// <summary>
+    /// Symmetric of the deserialization constructor.
+    /// Every Write MUST call base.Write and write a version number.
+    /// </summary>
+    /// <param name="w">The writer.</param>
+    public override void Write( ICKBinaryWriter w )
+    {
+        base.Write( w );
+        w.Write( (byte)0 );
+        w.Write( FlashColor );
+        w.Write( FlashRate );
+    }
 }
 

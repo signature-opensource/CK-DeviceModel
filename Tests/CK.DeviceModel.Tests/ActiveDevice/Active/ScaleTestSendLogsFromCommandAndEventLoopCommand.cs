@@ -1,7 +1,6 @@
-﻿namespace CK.DeviceModel.Tests
+namespace CK.DeviceModel.Tests;
+
+public class ScaleTestSendLogsFromCommandAndEventLoopCommand : DeviceCommand<ScaleHost>
 {
-    public class ScaleTestSendLogsFromCommandAndEventLoopCommand : DeviceCommand<ScaleHost>
-    {
-        protected override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
-    }
+    protected override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
 }

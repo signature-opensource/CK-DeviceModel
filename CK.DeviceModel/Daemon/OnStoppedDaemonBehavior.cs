@@ -2,27 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CK.DeviceModel
+namespace CK.DeviceModel;
+
+/// <summary>
+/// Defines whether devices must be destroyed when <see cref="DeviceHostDaemon"/> stops.
+/// </summary>
+public enum OnStoppedDaemonBehavior
 {
     /// <summary>
-    /// Defines whether devices must be destroyed when <see cref="DeviceHostDaemon"/> stops.
+    /// Nothing is done. Devices will die with the process.
     /// </summary>
-    public enum OnStoppedDaemonBehavior
-    {
-        /// <summary>
-        /// Nothing is done. Devices will die with the process.
-        /// </summary>
-        None,
+    None,
 
-        /// <summary>
-        /// Asks all <see cref="IDeviceHost"/> to destroy their devices.
-        /// </summary>
-        ClearAllHosts,
+    /// <summary>
+    /// Asks all <see cref="IDeviceHost"/> to destroy their devices.
+    /// </summary>
+    ClearAllHosts,
 
-        /// <summary>
-        /// Asks all <see cref="IDeviceHost"/> to destroy their devices and wait for
-        /// them to be destroyed.
-        /// </summary>
-        ClearAllHostsAndWaitForDevicesDestroyed,
-    }
+    /// <summary>
+    /// Asks all <see cref="IDeviceHost"/> to destroy their devices and wait for
+    /// them to be destroyed.
+    /// </summary>
+    ClearAllHostsAndWaitForDevicesDestroyed,
 }

@@ -3,13 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CK.DeviceModel.Tests
+namespace CK.DeviceModel.Tests;
+
+public class ScaleHost : DeviceHost<Scale, DeviceHostConfiguration<CommonScaleConfiguration>, CommonScaleConfiguration>
 {
-    public class ScaleHost : DeviceHost<Scale,DeviceHostConfiguration<CommonScaleConfiguration>,CommonScaleConfiguration>
+    protected override Type? FindDeviceTypeByConvention( IActivityMonitor monitor, Type typeConfiguration )
     {
-        protected override Type? FindDeviceTypeByConvention( IActivityMonitor monitor, Type typeConfiguration )
-        {
-            return typeof(Scale);
-        }
+        return typeof( Scale );
     }
 }

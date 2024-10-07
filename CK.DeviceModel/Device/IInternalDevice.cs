@@ -4,14 +4,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CK.DeviceModel
+namespace CK.DeviceModel;
+
+interface IInternalDevice : IDevice
 {
-    interface IInternalDevice : IDevice
-    {
-        DeviceConfigurationStatus ConfigStatus { get; }
+    DeviceConfigurationStatus ConfigStatus { get; }
 
-        void OnCommandCompleted( BaseDeviceCommand cmd );
+    void OnCommandCompleted( BaseDeviceCommand cmd );
 
-        Task EnsureInitialLifetimeEventAsync( IActivityMonitor monitor );
-    }
+    Task EnsureInitialLifetimeEventAsync( IActivityMonitor monitor );
 }
