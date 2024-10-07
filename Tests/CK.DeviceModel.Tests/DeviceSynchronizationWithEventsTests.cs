@@ -145,7 +145,8 @@ public class DeviceSynchronizationWithEventsTests
         public async Task StopAsync()
         {
             Debug.Assert( _task != null );
-            await _cancel.CancelAsync();
+            await _cancel.CancelAsync().ConfigureAwait( false );
+            await _task.ConfigureAwait( false );
         }
 
         public void Start( int randomSeed )
@@ -219,7 +220,7 @@ public class DeviceSynchronizationWithEventsTests
             clients[i] = new Client( host, $"Client{i}" );
         }
         // Clients are not synchronized between them.
-        await Task.WhenAll( clients.Select( c => c.InitializeAsync( monitor ) ).ToArray() );
+        await Task.WhenAll( clients.Select( c => c.InitializeAsync( monitor ) ) );
 
         if( !startShakeBeforeClients ) shaker.Start( seed );
 
