@@ -114,8 +114,8 @@ public class AutoStartCommandAndDestroyTests
     }
 
     [Test]
-    [Timeout( 500 )]
-    public async Task auto_starting_device_and_keep_running_eventually_execute_deferred_commands_Async()
+    [CancelAfter( 500 )]
+    public async Task auto_starting_device_and_keep_running_eventually_execute_deferred_commands_Async( CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( auto_starting_device_and_keep_running_eventually_execute_deferred_commands_Async ) );
 
@@ -134,12 +134,12 @@ public class AutoStartCommandAndDestroyTests
 
         foreach( var c in commands )
         {
-            h.SendCommand( TestHelper.Monitor, c );
+            h.SendCommand( TestHelper.Monitor, c, token: cancellation );
         }
-        h.SendCommand( TestHelper.Monitor, new DCommandStarter( keepDeviceRunning: true ) { DeviceName = "First", Trace = "STARTER!" } );
+        h.SendCommand( TestHelper.Monitor, new DCommandStarter( keepDeviceRunning: true ) { DeviceName = "First", Trace = "STARTER!" }, token: cancellation );
 
         // Sending Destroy as a regular command (not an immediate one).
-        h.SendCommand( TestHelper.Monitor, destroy );
+        h.SendCommand( TestHelper.Monitor, destroy, token: cancellation );
 
         await commands[0].Completion.Task;
         statusChanged.Should().BeTrue( "Since the first deferred command is executed, the device has started." );
@@ -161,8 +161,8 @@ public class AutoStartCommandAndDestroyTests
 
     [TestCase( "ExecuteDeferred" )]
     [TestCase( "DoNotExecuteDeferred" )]
-    [Timeout( 500 )]
-    public async Task auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async( string mode )
+    [CancelAfter( 500 )]
+    public async Task auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async( string mode, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async ) );
 
@@ -185,18 +185,18 @@ public class AutoStartCommandAndDestroyTests
 
         foreach( var c in commands )
         {
-            h.SendCommand( TestHelper.Monitor, c );
+            h.SendCommand( TestHelper.Monitor, c, token: cancellation );
         }
 
         // Sends the auto start command and wait for its completion.
-        h.SendCommand( TestHelper.Monitor, starter );
+        h.SendCommand( TestHelper.Monitor, starter, token: cancellation );
         await starter.Completion.Task;
 
         // To let the implicit Stop command do its work (HandleCommandAutoStartAsync is called after the
         // DoHandleCommandAsync of the real command), we use the WaitForSynchronizationAsync.
         // Since the device is Stopped and there are deferred commands we must ignore them otherwise
         // we'll be waiting for the device to restart.
-        (await d.WaitForSynchronizationAsync( considerDeferredCommands: false )).Should().Be( WaitForSynchronizationResult.Success );
+        (await d.WaitForSynchronizationAsync( considerDeferredCommands: false, cancel: cancellation )).Should().Be( WaitForSynchronizationResult.Success );
         statusChanged.Should().BeFalse( "No visible status change despite the fact that the device has start/stop." );
         d.Status.ToString().Should().Be( initialStatus );
 
@@ -204,7 +204,7 @@ public class AutoStartCommandAndDestroyTests
         if( executeDeferred )
         {
             // We want to monitor the end of the currently deferred commands.
-            var afterDeferred = d.WaitForSynchronizationAsync( considerDeferredCommands: true );
+            var afterDeferred = d.WaitForSynchronizationAsync( considerDeferredCommands: true, cancel: cancellation );
             await d.StartAsync( TestHelper.Monitor );
             (await afterDeferred).Should().Be( WaitForSynchronizationResult.Success );
             foreach( var c in commands )
@@ -222,10 +222,11 @@ public class AutoStartCommandAndDestroyTests
             }
         }
         // Destroying the device.
-        h.SendCommand( TestHelper.Monitor, destroy );
+        h.SendCommand( TestHelper.Monitor, destroy, token: cancellation );
         // Using WaitForSynchronizationAsync here may lead to Success or IsDetroyed.
-        (await d.WaitForSynchronizationAsync( considerDeferredCommands: false )).Should().Match( r => r == WaitForSynchronizationResult.Success
-                                                                                                      || r == WaitForSynchronizationResult.DeviceDestroyed );
+        (await d.WaitForSynchronizationAsync( considerDeferredCommands: false, cancel: cancellation ))
+            .Should().Match( r => r == WaitForSynchronizationResult.Success
+                                  || r == WaitForSynchronizationResult.DeviceDestroyed );
         destroy.Completion.Task.IsCompleted.Should().BeTrue();
 
         if( executeDeferred )
@@ -262,8 +263,8 @@ public class AutoStartCommandAndDestroyTests
 
     [TestCase( "Deferred" )]
     [TestCase( "StartFirst" )]
-    [Timeout( 500 )]
-    public async Task destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async( string mode )
+    [CancelAfter( 500 )]
+    public async Task destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async( string mode, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async )}(\"{mode}\")" );
 
@@ -277,7 +278,7 @@ public class AutoStartCommandAndDestroyTests
         if( mode == "StartFirst" ) (await d.StartAsync( TestHelper.Monitor )).Should().BeTrue();
         foreach( var c in commands )
         {
-            h.SendCommand( TestHelper.Monitor, c );
+            h.SendCommand( TestHelper.Monitor, c, token: cancellation );
         }
         if( mode != "StartFirst" ) (await d.StartAsync( TestHelper.Monitor )).Should().BeTrue();
 

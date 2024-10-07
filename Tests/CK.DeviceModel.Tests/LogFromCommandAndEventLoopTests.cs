@@ -25,7 +25,7 @@ public class LogFromCommandAndEventLoopTests
         var folder = TestHelper.LogFolder.AppendPart( "LogFromCommandAndEventLoop" );
         TestHelper.CleanupFolder( folder, ensureFolderAvailable: true );
 
-        using( var g = new GrandOutput( new GrandOutputConfiguration() { TrackUnhandledExceptions = true, Handlers = { new TextFileConfiguration() { Path = folder } } } ) )
+        await using( var g = new GrandOutput( new GrandOutputConfiguration() { TrackUnhandledExceptions = true, Handlers = { new TextFileConfiguration() { Path = folder } } } ) )
         {
             Action<IActivityMonitor> autoConfig = m => g.EnsureGrandOutputClient( m );
             ActivityMonitor.AutoConfiguration += autoConfig;

@@ -165,8 +165,8 @@ public class DeviceHostDaemonStressTests
     [TestCase( 20, 42, true )]
     [TestCase( 40, 587, true )]
     [TestCase( 60, 0, true )]
-    [Timeout( 3500 )]
-    public async Task stress_test_Async( int nbDevice, int randomSeed, bool useDirectReconfiguration )
+    [CancelAfter( 3500 )]
+    public async Task stress_test_Async( int nbDevice, int randomSeed, bool useDirectReconfiguration, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( stress_test_Async )}({nbDevice},{randomSeed},{useDirectReconfiguration})" );
 
@@ -207,7 +207,7 @@ public class DeviceHostDaemonStressTests
                                  .ToArray();
         for( int i = 0; i < nbDevice; i++ )
         {
-            devices[i].UnsafeSendCommand( TestHelper.Monitor, commands[i] );
+            devices[i].UnsafeSendCommand( TestHelper.Monitor, commands[i], cancellation );
         }
         var deferred = new List<DCommand>();
         using( TestHelper.Monitor.OpenInfo( "Waiting for commands completion that can be completed." ) )
@@ -236,7 +236,7 @@ public class DeviceHostDaemonStressTests
             TestHelper.Monitor.CloseGroup( $"{deferred.Count} commands deferred." );
         }
         // Let the daemon try to restart the failed devices (keeping the start error).
-        await Task.Delay( 200 );
+        await Task.Delay( 200, cancellation );
 
         using( TestHelper.Monitor.OpenInfo( "Reconfiguring the devices so that they all can now start without errors." ) )
         {
@@ -250,7 +250,7 @@ public class DeviceHostDaemonStressTests
                 int w = 100 + nbDevice * 10;
                 TestHelper.Monitor.Info( $"Wait for the direct reconfiguration to be applied for {w} ms." );
                 // (There is no real way to do otherwise.)
-                await Task.Delay( w );
+                await Task.Delay( w, cancellation );
             }
             else
             {
@@ -269,7 +269,7 @@ public class DeviceHostDaemonStressTests
             (await c.Completion).Should().Be( CommandResult.Failure );
         }
         TestHelper.Monitor.Info( $"Let the daemon try to restart the stopped devices during 200 ms." );
-        await Task.Delay( 200 );
+        await Task.Delay( 200, cancellation );
 
         using( TestHelper.Monitor.OpenInfo( "Reconfiguring the devices so that they all can now handle commands." ) )
         {
@@ -281,7 +281,7 @@ public class DeviceHostDaemonStressTests
                 }
                 int w = 100 + nbDevice * 10;
                 TestHelper.Monitor.Info( $"Wait for the direct reconfiguration to be applied for {w} ms." );
-                await Task.Delay( w );
+                await Task.Delay( w, cancellation );
             }
             else
             {
@@ -308,7 +308,7 @@ public class DeviceHostDaemonStressTests
                     .ToArray();
             for( int i = 0; i < nbDevice; i++ )
             {
-                devices[i].UnsafeSendCommand( TestHelper.Monitor, commands[i] );
+                devices[i].UnsafeSendCommand( TestHelper.Monitor, commands[i], cancellation );
             }
         }
 
