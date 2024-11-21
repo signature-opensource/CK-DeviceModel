@@ -3,22 +3,21 @@ using System.Collections.Generic;
 using System.Text;
 using CK.Core;
 
-namespace CK.DeviceModel
+namespace CK.DeviceModel;
+
+/// <summary>
+/// Abstract base class for commands without any result that a device can handle.
+/// </summary>
+public abstract class DeviceCommand<THost> : DeviceCommandNoResult where THost : IDeviceHost
 {
     /// <summary>
-    /// Abstract base class for commands without any result that a device can handle.
+    /// Initializes a new <see cref="DeviceCommand{THost}"/>.
     /// </summary>
-    public abstract class DeviceCommand<THost> : DeviceCommandNoResult where THost : IDeviceHost
+    protected DeviceCommand()
     {
-        /// <summary>
-        /// Initializes a new <see cref="DeviceCommand{THost}"/>.
-        /// </summary>
-        protected DeviceCommand()
-        {
-        }
-
-        /// <inheritdoc />
-        public sealed override Type HostType => typeof(THost);
-
     }
+
+    /// <inheritdoc />
+    public sealed override Type HostType => typeof( THost );
+
 }

@@ -1,7 +1,6 @@
-﻿namespace CK.DeviceModel.Tests
+namespace CK.DeviceModel.Tests;
+
+public interface ICommonScaleMeasureEvent
 {
-    public interface ICommonScaleMeasureEvent
-    {
-        double Measure { get; }
-    }
+    double Measure { get; }
 }
