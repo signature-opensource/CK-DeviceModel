@@ -18,8 +18,8 @@ namespace CK.DeviceModel.Tests;
 public class SendingTimeUtcTests
 {
     [Test]
-    [Timeout( 200 )]
-    public void SendingTimeUtc_and_ImmediateSending_are_exclusive()
+    [CancelAfter( 200 )]
+    public void SendingTimeUtc_and_ImmediateSending_are_exclusive( CancellationToken cancellation )
     {
         var d = DateTime.UtcNow;
 
@@ -204,8 +204,8 @@ public class SendingTimeUtcTests
 
     [TestCase( 30, 200, 20 )]
     [TestCase( 50, 150, 20 )]
-    [Timeout( 90000 )]
-    public async Task SendingTimeUtc_stress_test_Async( int nb, int sendingDeltaMS, int execTimeMS )
+    [CancelAfter( 90000 )]
+    public async Task SendingTimeUtc_stress_test_Async( int nb, int sendingDeltaMS, int execTimeMS, CancellationToken cancellation )
     {
         await new Safe( async testName =>
         {

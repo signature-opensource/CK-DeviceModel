@@ -7,6 +7,7 @@ using CK.Core;
 using System.Diagnostics;
 using FluentAssertions.Execution;
 using static CK.Testing.MonitorTestHelper;
+using System.Threading;
 
 namespace CK.DeviceModel.Tests;
 
@@ -115,8 +116,8 @@ public class DeviceHostTests
     }
 
     [Test]
-    [Timeout( 200 )]
-    public async Task testing_state_changed_PerfectEvent_Async()
+    [CancelAfter( 200 )]
+    public async Task testing_state_changed_PerfectEvent_Async( CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( testing_state_changed_PerfectEvent_Async ) );
 
@@ -228,7 +229,7 @@ public class DeviceHostTests
         lifetimeEvents.Clear();
         // AutoDestroying by sending the command to host.
         var cmd = new DestroyDeviceCommand<FlashBulbHost>() { DeviceName = "C" };
-        host.SendCommand( TestHelper.Monitor, cmd ).Should().Be( DeviceHostCommandResult.Success );
+        host.SendCommand( TestHelper.Monitor, cmd, token: cancellation ).Should().Be( DeviceHostCommandResult.Success );
         await cmd.Completion.Task;
 
         devicesCalled.Should().Be( 2, "Device removed!" );
@@ -250,8 +251,8 @@ public class DeviceHostTests
 
 
     [Test]
-    [Timeout( 200 )]
-    public async Task ensure_device_Async()
+    [CancelAfter( 200 )]
+    public async Task ensure_device_Async( CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( ensure_device_Async ) );
 
@@ -312,8 +313,8 @@ public class DeviceHostTests
     }
 
     [Test]
-    [Timeout( 200 )]
-    public async Task executing_commands_from_the_host_without_ControllerKey_Async()
+    [CancelAfter( 200 )]
+    public async Task executing_commands_from_the_host_without_ControllerKey_Async( CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( executing_commands_from_the_host_without_ControllerKey_Async ) );
 
@@ -336,34 +337,34 @@ public class DeviceHostTests
         d.TestFlash.Sync += ( m, c, color ) => flashLastColor = color;
 
         var cmdF = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
-        host.SendCommand( TestHelper.Monitor, cmdF ).Should().Be( DeviceHostCommandResult.Success );
+        host.SendCommand( TestHelper.Monitor, cmdF, token: cancellation ).Should().Be( DeviceHostCommandResult.Success );
         await cmdF.Completion.Task;
 
         flashLastColor.Should().Be( 78 );
 
         var cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 };
-        host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
+        host.SendCommand( TestHelper.Monitor, cmdS, token: cancellation ).Should().Be( DeviceHostCommandResult.Success );
         await cmdS.Completion.Task;
 
         flashLastColor.Should().Be( 78 );
         cmdF = new FlashCommand() { DeviceName = "n°1", ControllerKey = "Naouak" };
-        host.SendCommand( TestHelper.Monitor, cmdF ).Should().Be( DeviceHostCommandResult.Success );
+        host.SendCommand( TestHelper.Monitor, cmdF, token: cancellation ).Should().Be( DeviceHostCommandResult.Success );
         await cmdF.Completion.Task;
 
         flashLastColor.Should().Be( 3712 );
 
-        host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.CommandCheckValidityFailed );
+        host.SendCommand( TestHelper.Monitor, cmdS, token: cancellation ).Should().Be( DeviceHostCommandResult.CommandCheckValidityFailed );
 
         cmdS = new SetFlashColorCommand() { DeviceName = "Not the 1", ControllerKey = "Don't care since the device has no controller key.", Color = 3712 };
-        host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.DeviceNameNotFound );
+        host.SendCommand( TestHelper.Monitor, cmdS, token: cancellation ).Should().Be( DeviceHostCommandResult.DeviceNameNotFound );
 
         await d.SetControllerKeyAsync( TestHelper.Monitor, null, "The controlling key." );
         cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "Controller key will fail!", Color = 3712 };
-        host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
+        host.SendCommand( TestHelper.Monitor, cmdS, token: cancellation ).Should().Be( DeviceHostCommandResult.Success );
         await FluentActions.Awaiting( () => cmdS.Completion.Task ).Should().ThrowAsync<InvalidControllerKeyException>();
 
         cmdS = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "The controlling key.", Color = 3712 };
-        host.SendCommand( TestHelper.Monitor, cmdS ).Should().Be( DeviceHostCommandResult.Success );
+        host.SendCommand( TestHelper.Monitor, cmdS, token: cancellation ).Should().Be( DeviceHostCommandResult.Success );
 
         await cmdS.Completion.Task;
 
@@ -376,8 +377,8 @@ public class DeviceHostTests
 
     [TestCase( "UseSendCommand" )]
     [TestCase( "UseSendCommandImmediate" )]
-    [Timeout( 1000 )]
-    public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async( string mode )
+    [CancelAfter( 1000 )]
+    public async Task sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async( string mode, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_commands_checks_DeviceName_and_executing_checks_ControllerKey_Async )}(\"{mode}\")" );
 
@@ -400,7 +401,7 @@ public class DeviceHostTests
         bool SendCommand( BaseDeviceCommand c, bool checkDeviceName = true, bool checkControllerKey = true )
         {
             c.ImmediateSending = mode == "UseSendCommandImmediate";
-            return d.SendCommand( TestHelper.Monitor, c, checkDeviceName, checkControllerKey );
+            return d.SendCommand( TestHelper.Monitor, c, checkDeviceName, checkControllerKey, cancellation );
         }
 
         int flashLastColor = 0;
@@ -421,7 +422,7 @@ public class DeviceHostTests
         await cmdRaiseFlash.Completion.Task;
         flashLastColor.Should().Be( 6 );
         // Completion is signaled and then OnCommandComplededAsyc is called.
-        await Task.Delay( 50 );
+        await Task.Delay( 50, cancellation );
         FlashBulb.OnCommandComplededCount.Should().Be( 2 );
 
         // Use the basic command to set a ControllerKey.
@@ -438,7 +439,7 @@ public class DeviceHostTests
 
         do
         {
-            await Task.Delay( 100 );
+            await Task.Delay( 100, cancellation );
         }
         while( !cmdSet.Completion.IsCompleted );
 
@@ -450,7 +451,7 @@ public class DeviceHostTests
         await FluentActions.Awaiting( () => cmdRaiseFlash.Completion.Task ).Should().ThrowAsync<InvalidControllerKeyException>();
 
         flashLastColor.Should().Be( 6 );
-        await Task.Delay( 50 );
+        await Task.Delay( 50, cancellation );
         FlashBulb.OnCommandComplededCount.Should().Be( 5 );
 
         cmdRaiseFlash = new FlashCommand() { DeviceName = "n°1", ControllerKey = "I'm controlling." };
@@ -459,7 +460,7 @@ public class DeviceHostTests
         await cmdRaiseFlash.Completion.Task;
         flashLastColor.Should().Be( 18 );
 
-        await Task.Delay( 50 );
+        await Task.Delay( 50, cancellation );
         FlashBulb.OnCommandComplededCount.Should().Be( 6 );
 
         cmdSet = new SetFlashColorCommand() { DeviceName = "n°1", ControllerKey = "I'm NOT controlling, but checkControllerKey: false is used.", Color = 1 };
@@ -469,7 +470,7 @@ public class DeviceHostTests
         await cmdRaiseFlash.Completion.Task;
         flashLastColor.Should().Be( 1 );
 
-        await Task.Delay( 50 );
+        await Task.Delay( 50, cancellation );
         FlashBulb.OnCommandComplededCount.Should().Be( 8 );
 
         cmdSet = new SetFlashColorCommand() { DeviceName = "Not the right device name: this will throw an ArgumentException.", ControllerKey = "I'm controlling.", Color = 1 };
@@ -488,7 +489,7 @@ public class DeviceHostTests
         await cmdRaiseFlash.Completion.Task;
         flashLastColor.Should().Be( 3712 );
 
-        await Task.Delay( 50 );
+        await Task.Delay( 50, cancellation );
         FlashBulb.OnCommandComplededCount.Should().Be( 10 );
 
         await d.DestroyAsync( TestHelper.Monitor );

@@ -100,8 +100,8 @@ public class ImmediateCommandTests
     }
 
     [TestCase( 40, 7784 )]
-    [Timeout( 9000 )]
-    public async Task sending_immediate_commands_does_not_block_the_loop_Async( int nb, int seed )
+    [CancelAfter( 9000 )]
+    public async Task sending_immediate_commands_does_not_block_the_loop_Async( int nb, int seed, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_immediate_commands_does_not_block_the_loop_Async )}-{nb}-{seed}" );
         try
@@ -128,7 +128,7 @@ public class ImmediateCommandTests
                         ExecutionTime = random.Next( 30 )
                     };
                     commands.Add( c );
-                    d.SendCommand( TestHelper.Monitor, c ).Should().BeTrue();
+                    d.SendCommand( TestHelper.Monitor, c, token: cancellation ).Should().BeTrue();
                 }
                 int nbImmediate = random.Next( 2 );
                 while( --nbImmediate >= 0 )
@@ -141,9 +141,9 @@ public class ImmediateCommandTests
                         ImmediateSending = true
                     };
                     commands.Add( c );
-                    d.SendCommand( TestHelper.Monitor, c ).Should().BeTrue();
+                    d.SendCommand( TestHelper.Monitor, c, token: cancellation ).Should().BeTrue();
                 }
-                await Task.Delay( random.Next( 200 ) );
+                await Task.Delay( random.Next( 200 ), cancellation );
             }
 
             foreach( var c in commands )
@@ -163,14 +163,13 @@ public class ImmediateCommandTests
 
 
     [TestCase( 30 )]
-    [Timeout( 2000 )]
-    public async Task BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works_Async( int nb )
+    [CancelAfter( 2000 )]
+    public async Task BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works_Async( int nb, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works_Async )}-{nb}" );
         try
         {
-
-            static List<DCommand> SendCommands( IDevice d, int nb )
+            static List<DCommand> SendCommands( IDevice d, int nb, CancellationToken cancellation )
             {
                 using( TestHelper.Monitor.OpenInfo( $"Sending {nb * 3} commands." ) )
                 {
@@ -185,21 +184,21 @@ public class ImmediateCommandTests
                             ImmediateSending = true
                         };
                         commands.Add( cI );
-                        d.SendCommand( TestHelper.Monitor, cI ).Should().BeTrue();
+                        d.SendCommand( TestHelper.Monitor, cI, token: cancellation ).Should().BeTrue();
                         var cRegular1 = new DCommand()
                         {
                             DeviceName = "D",
                             Trace = $"N°{i}",
                         };
                         commands.Add( cRegular1 );
-                        d.SendCommand( TestHelper.Monitor, cRegular1 ).Should().BeTrue();
+                        d.SendCommand( TestHelper.Monitor, cRegular1, token: cancellation ).Should().BeTrue();
                         var cRegular2 = new DCommand()
                         {
                             DeviceName = "D",
                             Trace = $"N°{i}-2",
                         };
                         commands.Add( cRegular2 );
-                        d.SendCommand( TestHelper.Monitor, cRegular2 ).Should().BeTrue();
+                        d.SendCommand( TestHelper.Monitor, cRegular2, token: cancellation ).Should().BeTrue();
                     }
                     TestHelper.Monitor.CloseGroup( "Done." );
                     return commands;
@@ -245,7 +244,7 @@ public class ImmediateCommandTests
             D? d = h["D"];
             Debug.Assert( d != null && d.IsRunning );
 
-            foreach( var c in SendCommands( d, nb ) )
+            foreach( var c in SendCommands( d, nb, cancellation ) )
             {
                 await c.Completion;
             }
@@ -255,7 +254,7 @@ public class ImmediateCommandTests
             d.Traces.Clear();
             // This results in a 1 actual limit.
             d.ImmediateCommandLimitOffset = -13;
-            foreach( var c in SendCommands( d, nb ) )
+            foreach( var c in SendCommands( d, nb, cancellation ) )
             {
                 await c.Completion;
             }
@@ -265,11 +264,11 @@ public class ImmediateCommandTests
             d.Traces.Clear();
             // Limit is now 7 since configuration corrects it.
             config.BaseImmediateCommandLimit = 13 + 7;
-            (await d.ReconfigureAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+            (await d.ReconfigureAsync( TestHelper.Monitor, config, cancellation )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
             d.Traces.Should().BeEquivalentTo( "Reconfigure " );
             d.Traces.Clear();
 
-            foreach( var c in SendCommands( d, nb ) )
+            foreach( var c in SendCommands( d, nb, cancellation ) )
             {
                 await c.Completion;
             }
