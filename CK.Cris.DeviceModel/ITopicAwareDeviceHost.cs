@@ -14,13 +14,10 @@ public interface ITopicAwareDeviceHost
     string DeviceHostName { get; set; }
 
     /// <summary>
-    /// 
+    /// Handle the ICommandDeviceTopics for each device host that implements the interface.
     /// </summary>
     /// <param name="monitor"></param>
+    /// <param name="userMessageCollector"></param>
     /// <param name="cmd"></param>
-    /// <returns>
-    /// Returns true if the command has been handled, false if the command is not handled by this device.
-    /// This throws on error.
-    /// </returns>
-    ValueTask<bool> HandleAsync( IActivityMonitor monitor, ICommandDeviceTopics cmd );
+    ValueTask HandleAsync( IActivityMonitor monitor, UserMessageCollector userMessageCollector, ICommandDeviceTopics cmd );
 }
