@@ -8,5 +8,5 @@ namespace CK.IO.DeviceModel;
 /// </summary>
 public interface ICommandDeviceTopics : ICommandPart, ICommand<IStandardResultPart>
 {
-    List<string> Topics { get; }
+    IList<string> Topics { get; }
 }
