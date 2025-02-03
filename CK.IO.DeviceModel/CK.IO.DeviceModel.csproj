@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-    
-    <ItemGroup>
-        <PackageReference Include="CK.Cris" Version="0.35.1--0001-develop" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CK.Cris" Version="0.35.1--0009-develop" />
+  </ItemGroup>
 </Project>
