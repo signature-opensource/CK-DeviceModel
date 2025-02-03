@@ -10,6 +10,7 @@ using System.Linq;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
@@ -54,8 +55,8 @@ public class DeviceHostDaemonTests
     [TestCase( "UseDestroyCommandImmediate" )]
     [TestCase( "UseDestroyCommand" )]
     [TestCase( "UseDestroyMethod" )]
-    [Timeout( 1000 )]
-    public async Task simple_auto_restart_Async( string mode )
+    [CancelAfter( 1000 )]
+    public async Task simple_auto_restart_Async( string mode, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( simple_auto_restart_Async )}(\"{mode}\")" );
 
@@ -75,22 +76,22 @@ public class DeviceHostDaemonTests
         await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true );
         d.IsRunning.Should().BeFalse();
 
-        await Task.Delay( 100 );
+        await Task.Delay( 100, cancellation );
         d.IsRunning.Should().BeFalse( "Since MinRetryCount = 1." );
 
-        await Task.Delay( 200 );
+        await Task.Delay( 200, cancellation );
         d.IsRunning.Should().BeTrue( "Machine started again." );
 
         if( mode == "UseDestroyCommandImmediate" )
         {
             var destroy = new DestroyDeviceCommand<MachineHost>() { DeviceName = "M" };
-            d.SendCommand( TestHelper.Monitor, destroy );
+            d.SendCommand( TestHelper.Monitor, destroy, token: cancellation );
             await destroy.Completion.Task;
         }
         if( mode == "UseDestroyCommand" )
         {
             var destroy = new DestroyDeviceCommand<MachineHost>() { DeviceName = "M", ImmediateSending = false };
-            d.SendCommand( TestHelper.Monitor, destroy );
+            d.SendCommand( TestHelper.Monitor, destroy, token: cancellation );
             await destroy.Completion.Task;
         }
         else
@@ -100,7 +101,7 @@ public class DeviceHostDaemonTests
         d.IsRunning.Should().BeFalse();
         d.IsDestroyed.Should().BeTrue();
 
-        await Task.Delay( 120 );
+        await Task.Delay( 120, cancellation );
         d.IsRunning.Should().BeFalse();
         d.IsDestroyed.Should().BeTrue();
 
@@ -108,8 +109,8 @@ public class DeviceHostDaemonTests
     }
 
     [Test]
-    [Timeout( 500 )]
-    public async Task restart_can_be_fast_Async()
+    [CancelAfter( 500 )]
+    public async Task restart_can_be_fast_Async( CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( restart_can_be_fast_Async ) );
 
@@ -129,7 +130,7 @@ public class DeviceHostDaemonTests
         // It can be so fast (in release) that the device has already restarted here.
         if( !d.IsRunning )
         {
-            await Task.Delay( 20 );
+            await Task.Delay( 20, cancellation );
             d.IsRunning.Should().BeTrue();
         }
 
@@ -137,8 +138,8 @@ public class DeviceHostDaemonTests
     }
 
     [Test]
-    [Timeout( 6000 )]
-    public async Task multiple_devices_handling_Async()
+    [CancelAfter( 6000 )]
+    public async Task multiple_devices_handling_Async( CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( multiple_devices_handling_Async ) );
 
@@ -176,11 +177,11 @@ public class DeviceHostDaemonTests
         var stopD4NoName = new StopDeviceCommand<MachineHost> { IgnoreAlwaysRunning = true };
 
         d1.Invoking( _ => _.SendCommand( TestHelper.Monitor, stopD2NoName ) ).Should().Throw<ArgumentException>();
-        d1.SendCommand( TestHelper.Monitor, stopD1 ).Should().BeTrue();
+        d1.SendCommand( TestHelper.Monitor, stopD1, token: cancellation ).Should().BeTrue();
 
-        d2.UnsafeSendCommand( TestHelper.Monitor, stopD2NoName ).Should().BeTrue();
-        d3.SendCommand( TestHelper.Monitor, stopD3 ).Should().BeTrue();
-        d4.UnsafeSendCommand( TestHelper.Monitor, stopD4NoName ).Should().BeTrue();
+        d2.UnsafeSendCommand( TestHelper.Monitor, stopD2NoName, cancellation ).Should().BeTrue();
+        d3.SendCommand( TestHelper.Monitor, stopD3, token: cancellation ).Should().BeTrue();
+        d4.UnsafeSendCommand( TestHelper.Monitor, stopD4NoName, cancellation ).Should().BeTrue();
 
         await Task.WhenAll( stopD1.Completion.Task, stopD2NoName.Completion.Task, stopD3.Completion.Task, stopD4NoName.Completion.Task );
 
@@ -190,7 +191,7 @@ public class DeviceHostDaemonTests
         d4.IsRunning.Should().BeFalse();
 
         TestHelper.Monitor.Trace( "*** Wait ***" );
-        await Task.Delay( 1100 );
+        await Task.Delay( 1100, cancellation );
         TestHelper.Monitor.Trace( "*** EndWait ***" );
         d1.IsRunning.Should().BeTrue();
         d2.IsRunning.Should().BeFalse();
@@ -198,7 +199,7 @@ public class DeviceHostDaemonTests
         d4.IsRunning.Should().BeFalse();
 
         TestHelper.Monitor.Debug( "*** Wait ***" );
-        await Task.Delay( 1100 );
+        await Task.Delay( 1100, cancellation );
         TestHelper.Monitor.Debug( "*** EndWait ***" );
         d1.IsRunning.Should().BeTrue();
         d2.IsRunning.Should().BeTrue();
@@ -206,7 +207,7 @@ public class DeviceHostDaemonTests
         d4.IsRunning.Should().BeFalse();
 
         TestHelper.Monitor.Debug( "*** Wait ***" );
-        await Task.Delay( 1100 );
+        await Task.Delay( 1100, cancellation );
         TestHelper.Monitor.Debug( "*** EndWait ***" );
         d1.IsRunning.Should().BeTrue();
         d2.IsRunning.Should().BeTrue();
@@ -214,7 +215,7 @@ public class DeviceHostDaemonTests
         d4.IsRunning.Should().BeFalse();
 
         TestHelper.Monitor.Debug( "*** Wait ***" );
-        await Task.Delay( 1100 );
+        await Task.Delay( 1100, cancellation );
         TestHelper.Monitor.Debug( "*** EndWait ***" );
         d1.IsRunning.Should().BeTrue();
         d2.IsRunning.Should().BeTrue();
@@ -227,8 +228,8 @@ public class DeviceHostDaemonTests
 
     [TestCase( OnStoppedDaemonBehavior.ClearAllHosts )]
     [TestCase( OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed )]
-    [Timeout( 2000 )]
-    public async Task multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async( OnStoppedDaemonBehavior behavior )
+    [CancelAfter( 2000 )]
+    public async Task multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async( OnStoppedDaemonBehavior behavior, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async )}({behavior})" );
 
@@ -266,20 +267,20 @@ public class DeviceHostDaemonTests
             await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true );
         }
         TestHelper.Monitor.Trace( "*** Wait ***" );
-        await Task.Delay( 300 );
+        await Task.Delay( 300, cancellation );
         TestHelper.Monitor.Trace( "*** EndWait ***" );
         devices.Count( d => d.IsRunning ).Should().Be( 3 );
         devices.Where( d => d.IsRunning ).Select( d => d.Name ).Concatenate().Should().Be( "D1, D1, D1" );
 
         TestHelper.Monitor.Debug( "*** Wait ***" );
-        await Task.Delay( 300 );
+        await Task.Delay( 300, cancellation );
         devices.Count( d => d.IsRunning ).Should().Be( 6 );
 
         await ((IHostedService)daemon).StopAsync( default );
         if( behavior == OnStoppedDaemonBehavior.ClearAllHosts )
         {
             TestHelper.Monitor.Trace( "*** Wait ***" );
-            await Task.Delay( 300 );
+            await Task.Delay( 300, cancellation );
         }
         host1.Count.Should().Be( 0 );
         host2.Count.Should().Be( 0 );
@@ -287,8 +288,8 @@ public class DeviceHostDaemonTests
     }
 
     [Test]
-    [Timeout( 6000 )]
-    public async Task DefaultDeviceAlwaysRunningPolicy_always_retry_by_default_Async()
+    [CancelAfter( 6000 )]
+    public async Task DefaultDeviceAlwaysRunningPolicy_always_retry_by_default_Async( CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( DefaultDeviceAlwaysRunningPolicy_always_retry_by_default_Async ) );
 
@@ -316,14 +317,14 @@ public class DeviceHostDaemonTests
         foreach( var delay in policy.RetryTimeouts )
         {
             TestHelper.Monitor.Info( $"Waiting for {delay} ms" );
-            await Task.Delay( delay );
+            await Task.Delay( delay, cancellation );
             d.IsRunning.Should().BeFalse();
         }
         // Waiting for 2 more attempts.
         for( int i = 0; i < 2; ++i )
         {
             TestHelper.Monitor.Info( $"To be sure that we have honored the 'alwaysRetry' parameter. Waiting for last (repeated) timeout of the policy ({policy.RetryTimeouts[^1]} ms)." );
-            await Task.Delay( policy.RetryTimeouts[^1] );
+            await Task.Delay( policy.RetryTimeouts[^1], cancellation );
             d.IsRunning.Should().BeFalse();
         }
         TestHelper.Monitor.Info( $"Daemon has called Start {Machine.TotalRunning} times. This should be greater than {policy.RetryTimeouts.Count}." );
@@ -331,7 +332,7 @@ public class DeviceHostDaemonTests
 
         TestHelper.Monitor.Info( $"Let the device be started again and wait for the last timeout ({policy.RetryTimeouts[^1]} + 50 ms). The device must be started." );
         d.FailToStart = false;
-        await Task.Delay( policy.RetryTimeouts[^1] + 50 );
+        await Task.Delay( policy.RetryTimeouts[^1] + 50, cancellation );
         d.IsRunning.Should().BeTrue();
 
         TestHelper.Monitor.Info( $"Destroy the device and stop the daemon." );

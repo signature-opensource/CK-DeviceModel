@@ -153,8 +153,8 @@ public class CancellationAndTimeoutTests
 
     [TestCase( 11, 3713 )]
     [TestCase( 200, 42 )]
-    [Timeout( 1200 )]
-    public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed )
+    [CancelAfter( 1200 )]
+    public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed, CancellationToken cancellation )
     {
         using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_cancellation_reasons_Async )}({nb},{randomSeed})" );
         try
@@ -288,14 +288,14 @@ public class CancellationAndTimeoutTests
                         {
                             await Task.Delay( 100 );
                             c.Completion.SetCanceled();
-                        } );
+                        }, cancellation );
                         break;
                     default: Debug.Fail( "Never" ); break;
                 }
                 d.UnsafeSendCommand( TestHelper.Monitor, c, sendCommandTimeout?.Token ?? default );
             }
             // This is rather useless since in this test, completion is not the handling (long running commands).
-            await d.WaitForSynchronizationAsync( false );
+            await d.WaitForSynchronizationAsync( false, cancel: cancellation );
             foreach( var c in all )
             {
                 TestHelper.Monitor.Trace( $"Waiting for {c}." );
