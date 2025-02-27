@@ -19,7 +19,6 @@ public class LogFromCommandAndEventLoopTests
     [Test]
     public async Task check_final_logs_Async()
     {
-        using var gLog = TestHelper.Monitor.OpenInfo( nameof( check_final_logs_Async ) );
         // We don't have an easy way to inject a test GrandOuputSinkHandler: we build a new GrandOuput
         // with a text handler, make it the auto registering any new monitor and read the output file.
         var folder = TestHelper.LogFolder.AppendPart( "LogFromCommandAndEventLoop" );

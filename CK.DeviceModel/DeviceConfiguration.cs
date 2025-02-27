@@ -2,6 +2,7 @@ using CK.Core;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Reflection;
+using System.Threading;
 
 namespace CK.DeviceModel;
 
@@ -40,6 +41,86 @@ public abstract class DeviceConfiguration : ICKSimpleBinarySerializable
         Status = (DeviceConfigurationStatus)r.ReadInt32();
         ControllerKey = r.ReadNullableString();
         BaseImmediateCommandLimit = r.ReadInt32();
+    }
+
+    /// <summary>
+    /// Uses the configuration section to initialize <see cref="Name"/> (this is the
+    /// <see cref="IConfigurationSection.Key"/>), <see cref="Status"/>, <see cref="ControllerKey"/>
+    /// and <see cref="BaseImmediateCommandLimit"/>.
+    /// <para>
+    /// This never throws, on error the default values are used.
+    /// </para>
+    /// </summary>
+    /// <param name="configuration">The configuration section.</param>
+    protected void ApplyBaseConfiguration( IConfigurationSection configuration )
+    {
+        Throw.CheckNotNullArgument( configuration );
+        Name = configuration.Key;
+        var s = configuration["ControllerKey"];
+        if( String.IsNullOrWhiteSpace( s ) ) s = null;
+        ControllerKey = s;
+        Enum.TryParse<DeviceConfigurationStatus>( configuration["Status"], out var status );
+        Status = status;
+        if( int.TryParse( configuration["BaseImmediateCommandLimit"], out var result ) )
+        {
+            BaseImmediateCommandLimit = result;
+        }
+        else
+        {
+            BaseImmediateCommandLimit = 10;
+        }
+    }
+
+    /// <summary>
+    /// Uses the configuration section to initialize <see cref="Name"/> (this is the
+    /// <see cref="IConfigurationSection.Key"/>), <see cref="Status"/>, <see cref="ControllerKey"/>
+    /// and <see cref="BaseImmediateCommandLimit"/>.
+    /// <para>
+    /// This never throws, invalid configuration values are logged and false is returned.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The required monitor.</param>
+    /// <param name="configuration">The configuration section.</param>
+    /// <returns>True on success, false otherwise.</returns>
+    protected bool ApplyBaseConfiguration( IActivityMonitor monitor, IConfigurationSection configuration )
+    {
+        Throw.CheckNotNullArgument( configuration );
+        Name = configuration.Key;
+
+        bool success = true;
+        var s = configuration["ControllerKey"];
+        if( String.IsNullOrWhiteSpace( s ) ) s = null;
+        ControllerKey = s;
+
+        Status = DeviceConfigurationStatus.Disabled;
+        s = configuration["Status"];
+        if( s != null )
+        {
+            if( Enum.TryParse<DeviceConfigurationStatus>( s, out var status ) )
+            {
+                Status = status;
+            }
+            else
+            {
+                monitor.Error( $"Invalid Status '{s}'. Expected: Disabled, Runnable, RunnableStarted or AlwaysRunning." );
+                success = false;
+            }
+        }
+        BaseImmediateCommandLimit = 10;
+        s = configuration["BaseImmediateCommandLimit"];
+        if( s != null )
+        {
+            if( int.TryParse( configuration["BaseImmediateCommandLimit"], out var result ) )
+            {
+                BaseImmediateCommandLimit = result;
+            }
+            else
+            {
+                monitor.Error( $"Invalid BaseImmediateCommandLimit '{s}'." );
+                success = false;
+            }
+        }
+        return success;
     }
 
     /// <summary>

@@ -12,9 +12,24 @@ public class ConveyorDeviceConfiguration : DeviceConfiguration
     {
     }
 
+    public static bool UseBinding = true;
+
     public ConveyorDeviceConfiguration( IActivityMonitor monitor, IConfigurationSection configuration )
     {
-        configuration.CreateSectionWithout( nameof( Hubs ) ).Bind( this );
+        if( UseBinding )
+        {
+            configuration.CreateSectionWithout( nameof( Hubs ) ).Bind( this );
+        }
+        else
+        {
+            ApplyBaseConfiguration( monitor, configuration );
+            OneProp = configuration["OneProp"];
+            var s = configuration["AnotherProp"];
+            if( s != null )
+            {
+                AnotherProp = int.Parse( s );
+            }
+        }
         foreach( var hC in configuration.GetSection( nameof( Hubs ) ).GetChildren() )
         {
             if( !hC.Exists() )

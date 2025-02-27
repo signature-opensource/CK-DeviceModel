@@ -14,10 +14,11 @@ namespace CK.DeviceModel.Configuration.Tests;
 [TestFixture]
 public class ExplicitConfigurationConstructorTests
 {
-    [Test]
-    public async Task with_root_properties_only_Async()
+    [TestCase( "UseBinding" )]
+    [TestCase( "" )]
+    public async Task with_root_properties_only_Async( string mode )
     {
-        using var gLog = TestHelper.Monitor.OpenInfo( nameof( with_root_properties_only_Async ) );
+        ConveyorDeviceConfiguration.UseBinding = mode == "UseBinding";
 
         var config = DynamicConfiguration.Create();
         config.Provider.Set( "CK-DeviceModel:ConveyorDeviceHost:Items:TheBeast:Status", "Runnable" );
@@ -33,10 +34,11 @@ public class ExplicitConfigurationConstructorTests
         await host.ClearAsync( TestHelper.Monitor, true );
     }
 
-    [Test]
-    public async Task from_json_with_hubs_Async()
+    [TestCase( "UseBinding" )]
+    [TestCase( "" )]
+    public async Task from_json_with_hubs_Async( string mode )
     {
-        using var gLog = TestHelper.Monitor.OpenInfo( nameof( with_root_properties_only_Async ) );
+        ConveyorDeviceConfiguration.UseBinding = mode == "UseBinding";
 
         var builder = new ConfigurationBuilder();
         builder.AddJsonStream( new MemoryStream( Encoding.UTF8.GetBytes( @"
