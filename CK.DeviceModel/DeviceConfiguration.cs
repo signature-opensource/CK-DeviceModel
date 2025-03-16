@@ -2,7 +2,6 @@ using CK.Core;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Reflection;
-using System.Threading;
 
 namespace CK.DeviceModel;
 

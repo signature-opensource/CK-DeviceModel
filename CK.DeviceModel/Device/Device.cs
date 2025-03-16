@@ -1,15 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
 using CK.PerfectEvent;
 using System.Threading.Channels;
-using System.ComponentModel;
-using System.IO;
 
 namespace CK.DeviceModel;
 

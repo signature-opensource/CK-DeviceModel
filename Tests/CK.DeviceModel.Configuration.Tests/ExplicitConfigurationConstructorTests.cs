@@ -1,4 +1,3 @@
-using CK.Core;
 using Shouldly;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;

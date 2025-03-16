@@ -1,8 +1,6 @@
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
-using CK.PerfectEvent;
 
 namespace CK.DeviceModel.Tests;
 

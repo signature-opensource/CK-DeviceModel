@@ -1,7 +1,6 @@
 using NUnit.Framework;
 using Shouldly;
 using System;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using CK.Core;
 using System.Diagnostics;
