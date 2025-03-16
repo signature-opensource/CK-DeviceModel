@@ -1,5 +1,5 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -59,7 +59,6 @@ public class WaitForSynchronizationTests
         }
     }
 
-
     public class DCommand : DeviceCommand<DHost>
     {
         public int ExecutionTime { get; set; }
@@ -70,33 +69,31 @@ public class WaitForSynchronizationTests
     [Test]
     public async Task cancellation_and_timeout_are_handled_Async()
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( cancellation_and_timeout_are_handled_Async )}" );
-
         var h = new DHost();
         var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.RunnableStarted };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
         D? d = h["D"];
         Debug.Assert( d != null );
 
         var start = DateTime.UtcNow;
         d.SendCommand( TestHelper.Monitor, NewCommand() );
         var result = await d.WaitForSynchronizationAsync( considerDeferredCommands: false );
-        (DateTime.UtcNow - start).Should().BeGreaterThan( TimeSpan.FromMilliseconds( 100 - 20 ) );
-        result.Should().Be( WaitForSynchronizationResult.Success );
+        (DateTime.UtcNow - start).ShouldBeGreaterThan( TimeSpan.FromMilliseconds( 100 - 20 ) );
+        result.ShouldBe( WaitForSynchronizationResult.Success );
 
         d.SendCommand( TestHelper.Monitor, NewCommand() );
         result = await d.WaitForSynchronizationAsync( considerDeferredCommands: false, timeout: 20 );
-        result.Should().Be( WaitForSynchronizationResult.Timeout );
+        result.ShouldBe( WaitForSynchronizationResult.Timeout );
 
         CancellationTokenSource cts = new CancellationTokenSource();
         d.SendCommand( TestHelper.Monitor, NewCommand() );
         await cts.CancelAsync();
         result = await d.WaitForSynchronizationAsync( considerDeferredCommands: false, cancel: cts.Token );
-        result.Should().Be( WaitForSynchronizationResult.Canceled );
+        result.ShouldBe( WaitForSynchronizationResult.Canceled );
 
         CancellationTokenSource ctsTimed = new CancellationTokenSource( 20 );
         result = await d.WaitForSynchronizationAsync( considerDeferredCommands: false, cancel: ctsTimed.Token );
-        result.Should().Be( WaitForSynchronizationResult.Canceled );
+        result.ShouldBe( WaitForSynchronizationResult.Canceled );
 
         static DCommand NewCommand()
         {
@@ -111,11 +108,9 @@ public class WaitForSynchronizationTests
     [Test]
     public async Task deferred_commands_can_be_awaited_Async()
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( deferred_commands_can_be_awaited_Async )}" );
-
         var h = new DHost();
         var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.Runnable };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateSucceeded );
         D? d = h["D"];
         Debug.Assert( d != null );
 
@@ -127,18 +122,18 @@ public class WaitForSynchronizationTests
         await Task.Delay( 100 );
 
         // No completion yet.
-        taskResult.IsCompleted.Should().BeFalse();
+        taskResult.IsCompleted.ShouldBeFalse();
 
         // Starts the device. The deferred command will be handled.
         await d.StartAsync( TestHelper.Monitor );
 
         // Still no completion: the command is executing.
         await Task.Delay( 50 );
-        taskResult.IsCompleted.Should().BeFalse();
+        taskResult.IsCompleted.ShouldBeFalse();
 
         // After 100 ms (+20 ms for security), the command must have been handled: the WaitForSynchronizationAsync should be resolved.
         await Task.Delay( 50 + 20 );
-        taskResult.IsCompleted.Should().BeTrue();
+        taskResult.IsCompleted.ShouldBeTrue();
 
         static DCommand NewCommand()
         {

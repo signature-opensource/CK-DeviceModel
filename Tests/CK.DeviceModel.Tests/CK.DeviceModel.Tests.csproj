@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
-    <LangVersion>11</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CK.Testing.Nunit" Version="11.1.1--0022-develop" />

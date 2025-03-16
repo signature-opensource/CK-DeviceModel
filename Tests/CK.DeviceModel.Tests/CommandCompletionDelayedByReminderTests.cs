@@ -1,5 +1,5 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -119,10 +119,9 @@ public class CommandCompletionDelayedByReminderTests
     [CancelAfter( 3000 )]
     public async Task completion_with_reminder_Async( int nb, int randomSeed, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( completion_with_reminder_Async )}({nb},{randomSeed})" );
         var h = new DHost();
         var config = new DConfiguration() { Name = "Single", Status = DeviceConfigurationStatus.RunnableStarted, RandomSeed = randomSeed };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
         D? d = h["Single"];
         Debug.Assert( d != null );
 
@@ -149,10 +148,10 @@ public class CommandCompletionDelayedByReminderTests
         // We have to wait.
         // Instead of waiting for a delay, use the new WaitForSynchronizationAsync method.
         //   await Task.Delay( nb * 2 );
-        (await d.WaitForSynchronizationAsync( true, cancel: cancellation )).Should().Be( WaitForSynchronizationResult.Success );
+        (await d.WaitForSynchronizationAsync( true, cancel: cancellation )).ShouldBe( WaitForSynchronizationResult.Success );
 
-        d.OnCommandCompletionErrorCount.Should().Be( nbError );
-        d.OnCommandCompletionCancelCount.Should().Be( nbCancel );
-        d.OnCommandCompletionSuccessCount.Should().Be( nbSuccess );
+        d.OnCommandCompletionErrorCount.ShouldBe( nbError );
+        d.OnCommandCompletionCancelCount.ShouldBe( nbCancel );
+        d.OnCommandCompletionSuccessCount.ShouldBe( nbSuccess );
     }
 }

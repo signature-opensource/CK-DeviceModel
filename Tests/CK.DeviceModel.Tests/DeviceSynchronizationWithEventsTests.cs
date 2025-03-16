@@ -1,5 +1,5 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -250,6 +250,6 @@ public class DeviceSynchronizationWithEventsTests
             }
         }
         await host.ClearAsync( monitor, true );
-        success.Should().BeTrue();
+        success.ShouldBeTrue();
     }
 }
