@@ -1,13 +1,10 @@
 using CK.Core;
-using FluentAssertions;
-using Microsoft.Extensions.Hosting;
+using Shouldly;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -68,7 +65,6 @@ public class ActiveDeviceTests
     [CancelAfter( 3000 )]
     public async Task collecting_lifetime_reset_and_measure_events_Async( string type, string mode, string useAllEvent, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( collecting_lifetime_reset_and_measure_events_Async )}(\"{type}\",\"{mode}\",\"{useAllEvent}\")" );
         IDeviceHost host = type == "SimpleScale"
                            ? new SimpleScaleHost()
                            : new ScaleHost();
@@ -79,51 +75,62 @@ public class ActiveDeviceTests
             MeasurePattern = "Measure!",
             Status = DeviceConfigurationStatus.Runnable
         };
-        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
+        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateSucceeded );
 
         var scale = (IActiveDevice?)host.Find( "M" );
         Debug.Assert( scale != null );
-        scale.IsRunning.Should().BeFalse();
+        scale.IsRunning.ShouldBeFalse();
 
         var events = new EventCollector( scale, useAllEvent == "UseAllEvent" );
 
         // Starts the device.
-        (await scale.StartAsync( TestHelper.Monitor )).Should().BeTrue();
-        scale.IsRunning.Should().BeTrue();
+        (await scale.StartAsync( TestHelper.Monitor )).ShouldBeTrue();
+        scale.IsRunning.ShouldBeTrue();
 
         // Let it run to have at least 2 measures.
         await Task.Delay( 3 * config.PhysicalRate * config.MeasureStep, cancellation );
 
-        if( mode == "StoppedReset" ) (await scale.StopAsync( TestHelper.Monitor )).Should().BeTrue();
+        if( mode == "StoppedReset" )
+        {
+            (await scale.StopAsync( TestHelper.Monitor )).ShouldBeTrue();
+        }
 
         // Sends a reset command.
-        scale.UnsafeSendCommand( TestHelper.Monitor, type == "SimpleScale" ? new SimpleScaleResetCommand() : new ScaleResetCommand(), cancellation );
+        // This command is StoppedBehavior => DeviceCommandStoppedBehavior.RunAnyway;
+        scale.UnsafeSendCommand( TestHelper.Monitor, type == "SimpleScale"
+                                                        ? new SimpleScaleResetCommand()
+                                                        : new ScaleResetCommand(), cancellation );
 
-        if( mode == "StoppedReset" ) (await scale.StartAsync( TestHelper.Monitor )).Should().BeTrue();
+        if( mode == "StoppedReset" )
+        {
+            // Let the the time to the event to be raised before restarting.
+            await Task.Delay( 50, cancellation );
+            (await scale.StartAsync( TestHelper.Monitor )).ShouldBeTrue();
+        }
 
         // Let it run to have at least one measure.
         await Task.Delay( 2 * config.PhysicalRate * config.MeasureStep, cancellation );
 
         // Stops it.
-        (await scale.StopAsync( TestHelper.Monitor )).Should().BeTrue();
-        scale.IsRunning.Should().BeFalse();
+        (await scale.StopAsync( TestHelper.Monitor )).ShouldBeTrue();
+        scale.IsRunning.ShouldBeFalse();
 
         if( mode == "StoppedReset" )
         {
             events.GetScaleEvents()
-                         .Should().BeEquivalentTo( new[] { "Device 'ScaleHost/M' status changed: Running (StartCall).",
-                                                           "Measure!",
-                                                           "Measure!",
-                                                           "Device 'ScaleHost/M' status changed: Stopped (StoppedCall).",
-                                                           "Reset",
-                                                           "Device 'ScaleHost/M' status changed: Running (StartCall).",
-                                                           "Measure!",
-                                                           "Device 'ScaleHost/M' status changed: Stopped (StoppedCall)." } );
+                         .ShouldBe( [ "Device 'ScaleHost/M' status changed: Running (StartCall).",
+                                      "Measure!",
+                                      "Measure!",
+                                      "Device 'ScaleHost/M' status changed: Stopped (StoppedCall).",
+                                      "Reset",
+                                      "Device 'ScaleHost/M' status changed: Running (StartCall).",
+                                      "Measure!",
+                                      "Device 'ScaleHost/M' status changed: Stopped (StoppedCall)." ] );
         }
         else
         {
             events.GetScaleEvents()
-                         .Should().BeEquivalentTo( new[] { "Device 'ScaleHost/M' status changed: Running (StartCall).",
+                         .ShouldBe( new[] { "Device 'ScaleHost/M' status changed: Running (StartCall).",
                                                            "Measure!",
                                                            "Measure!",
                                                            "Reset",
@@ -132,8 +139,8 @@ public class ActiveDeviceTests
         }
 
         var measures = events.Events.OfType<ICommonScaleMeasureEvent>().Select( e => e.Measure ).ToArray();
-        measures[1].Should().BeGreaterThan( measures[0] );
-        measures[1].Should().BeGreaterThan( measures[2] );
+        measures[1].ShouldBeGreaterThan( measures[0] );
+        measures[1].ShouldBeGreaterThan( measures[2] );
 
         await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
     }
@@ -143,7 +150,6 @@ public class ActiveDeviceTests
     [CancelAfter( 3000 )]
     public async Task event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself_Async( string type, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( event_loop_can_call_async_device_methods_so_that_a_device_CAN_auto_start_itself_Async )}(\"{type}\")" );
         IDeviceHost host = type == "SimpleScale"
                            ? new SimpleScaleHost()
                            : new ScaleHost();
@@ -154,33 +160,33 @@ public class ActiveDeviceTests
             Status = DeviceConfigurationStatus.RunnableStarted
         };
 
-        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
         var scale = host.Find( "M" );
         Debug.Assert( scale != null );
 
-        scale.IsRunning.Should().BeTrue();
+        scale.IsRunning.ShouldBeTrue();
 
         // A negative value has 10% probability to occur, The random seed is fixed.
         // It appears below 8 measures.
         await Task.Delay( 8 * config.PhysicalRate, cancellation );
 
-        scale.IsRunning.Should().BeFalse( "We obtained a negative value." );
+        scale.IsRunning.ShouldBeFalse( "We obtained a negative value." );
 
         config.AllowUnattendedRestartAfterStopOnNegativeValue = true;
-        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
+        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.UpdateSucceeded );
 
         // Restarts the device.
-        (await scale.StartAsync( TestHelper.Monitor )).Should().BeTrue();
-        scale.IsRunning.Should().BeTrue();
+        (await scale.StartAsync( TestHelper.Monitor )).ShouldBeTrue();
+        scale.IsRunning.ShouldBeTrue();
 
         // Wait again for a negative value.
         await Task.Delay( 8 * config.PhysicalRate, cancellation );
 
-        scale.IsRunning.Should().BeFalse( "We obtained a negative value again." );
+        scale.IsRunning.ShouldBeFalse( "We obtained a negative value again." );
 
         // Wait for the internals to restart.
         await Task.Delay( 50 * config.PhysicalRate, cancellation );
-        scale.IsRunning.Should().BeTrue( "The device has been started from the event loop!" );
+        scale.IsRunning.ShouldBeTrue( "The device has been started from the event loop!" );
 
         await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
     }
@@ -209,7 +215,7 @@ public class ActiveDeviceTests
             BaseImmediateCommandLimit = 1000
         };
 
-        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
+        (await host.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateSucceeded );
         var device = (IActiveDevice?)host.Find( "M" );
         Debug.Assert( device != null );
 
@@ -283,7 +289,7 @@ public class ActiveDeviceTests
 
         #region Test1: Running device: receiving all DebugPostEvent and some MeasureEvent.
         await device.StartAsync( TestHelper.Monitor );
-        device.IsRunning.Should().BeTrue();
+        device.IsRunning.ShouldBeTrue();
 
         for( int i = 0; i < 100; ++i )
         {
@@ -300,8 +306,8 @@ public class ActiveDeviceTests
         await SendStopAndWaitForSynchronizationAsync( scaleType, device, cancellation );
 
         TestHelper.Monitor.Info( $"Results '{scaleType}': DebugPostEventCount = {debugPostEventCount}, MeasureEventCount = {measureEventCount}." );
-        debugPostEventCount.Should().Be( 100 );
-        measureEventCount.Should().BeGreaterThanOrEqualTo( 50 );
+        debugPostEventCount.ShouldBe( 100 );
+        measureEventCount.ShouldBeGreaterThanOrEqualTo( 50 );
 
         #endregion
 
@@ -316,8 +322,8 @@ public class ActiveDeviceTests
             device.DebugPostEvent( ev );
         }
         await SendStopAndWaitForSynchronizationAsync( scaleType, device, cancellation );
-        debugPostEventCount.Should().Be( 100 );
-        measureEventCount.Should().Be( 0 );
+        debugPostEventCount.ShouldBe( 100 );
+        measureEventCount.ShouldBe( 0 );
         #endregion
 
         await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
@@ -330,10 +336,10 @@ public class ActiveDeviceTests
                                    ? new StopDeviceCommand<SimpleScaleHost>()
                                    : new StopDeviceCommand<ScaleHost>();
         stop.ImmediateSending = false;
-        device.UnsafeSendCommand( TestHelper.Monitor, stop, cancellation ).Should().BeTrue();
+        device.UnsafeSendCommand( TestHelper.Monitor, stop, cancellation ).ShouldBeTrue();
 
-        (await device.WaitForSynchronizationAsync( true, cancel: cancellation )).Should().Be( WaitForSynchronizationResult.Success );
+        (await device.WaitForSynchronizationAsync( true, cancel: cancellation )).ShouldBe( WaitForSynchronizationResult.Success );
 
-        device.IsRunning.Should().BeFalse();
+        device.IsRunning.ShouldBeFalse();
     }
 }

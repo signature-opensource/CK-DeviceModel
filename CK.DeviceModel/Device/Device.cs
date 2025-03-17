@@ -1,15 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using CK.Core;
 using CK.PerfectEvent;
 using System.Threading.Channels;
-using System.ComponentModel;
-using System.IO;
 
 namespace CK.DeviceModel;
 
@@ -615,11 +611,6 @@ public abstract partial class Device<TConfiguration> : BaseDevice, IDevice, IInt
             await HandleStartAsync( null, DeviceStartedReason.SelfStart ).ConfigureAwait( false );
             return _isRunning;
         }
-        var preCheck = SyncStateStartCheck( monitor );
-        if( preCheck.HasValue )
-        {
-            return preCheck.Value;
-        }
         var cmd = _host.CreateStartCommand( Name );
         if( !UnsafeSendCommand( monitor, cmd ) )
         {
@@ -629,33 +620,23 @@ public abstract partial class Device<TConfiguration> : BaseDevice, IDevice, IInt
         return await cmd.Completion.Task.ConfigureAwait( false );
     }
 
-    bool? SyncStateStartCheck( IActivityMonitor monitor )
-    {
-        if( _configStatus == DeviceConfigurationStatus.Disabled )
-        {
-            monitor.Error( $"Device {FullName} is Disabled by configuration." );
-            return false;
-        }
-        if( _isRunning )
-        {
-            monitor.Debug( "Already running." );
-            return true;
-        }
-        return null;
-    }
-
     async Task HandleStartAsync( BaseStartDeviceCommand? cmd, DeviceStartedReason reason )
     {
         using( _commandMonitor.OpenInfo( $"Starting {FullName} ({reason})" ).ConcludeWith( () => _isRunning ? "Success." : "Failed." ) )
         {
-            var check = SyncStateStartCheck( _commandMonitor );
-            if( check.HasValue )
+            if( _configStatus == DeviceConfigurationStatus.Disabled )
             {
-                cmd?.Completion.SetResult( check.Value );
+                _commandMonitor.Error( $"Device {FullName} is Disabled by configuration." );
+                cmd?.Completion.SetResult( false );
+                return;
+            }
+            if( _isRunning )
+            {
+                _commandMonitor.Debug( "Already running." );
+                cmd?.Completion.SetResult( true );
                 return;
             }
             Exception? error = null;
-            Debug.Assert( _isRunning == false );
             try
             {
                 if( await DoStartAsync( _commandMonitor, reason ).ConfigureAwait( false ) )
@@ -679,7 +660,9 @@ public abstract partial class Device<TConfiguration> : BaseDevice, IDevice, IInt
             // Sets the completion last.
             if( cmd != null )
             {
-                bool complete = error != null ? cmd.Completion.TrySetException( error ) : cmd.Completion.TrySetResult( _isRunning );
+                bool complete = error != null
+                                    ? cmd.Completion.TrySetException( error )
+                                    : cmd.Completion.TrySetResult( _isRunning );
                 if( !complete )
                 {
                     _commandMonitor.Warn( $"Command has been completed outside of the normal process." );

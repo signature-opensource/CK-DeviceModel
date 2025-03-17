@@ -3,8 +3,6 @@
 using CK.Core;
 using System.Threading.Tasks;
 using System;
-using System.Linq;
-using Newtonsoft.Json;
 
 namespace CK.DeviceModel.Configuration.Tests;
 

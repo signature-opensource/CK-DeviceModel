@@ -1,9 +1,6 @@
 using CK.Core;
 using CK.PerfectEvent;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 

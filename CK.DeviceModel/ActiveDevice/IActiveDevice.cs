@@ -1,7 +1,5 @@
 using CK.PerfectEvent;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CK.DeviceModel;
 

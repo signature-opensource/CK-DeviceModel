@@ -1,12 +1,9 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -117,11 +114,9 @@ public class AutoStartCommandAndDestroyTests
     [CancelAfter( 500 )]
     public async Task auto_starting_device_and_keep_running_eventually_execute_deferred_commands_Async( CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( auto_starting_device_and_keep_running_eventually_execute_deferred_commands_Async ) );
-
         var h = new DHost();
         var config = new DConfiguration() { Name = "First", Status = DeviceConfigurationStatus.Runnable };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateSucceeded );
         D? d = h["First"];
         Debug.Assert( d != null );
 
@@ -142,21 +137,21 @@ public class AutoStartCommandAndDestroyTests
         h.SendCommand( TestHelper.Monitor, destroy, token: cancellation );
 
         await commands[0].Completion.Task;
-        statusChanged.Should().BeTrue( "Since the first deferred command is executed, the device has started." );
+        statusChanged.ShouldBeTrue( "Since the first deferred command is executed, the device has started." );
 
         await destroy.Completion;
 
         foreach( var c in commands )
         {
-            c.Completion.IsCompleted.Should().BeTrue();
-            c.Completion.Task.IsCompletedSuccessfully.Should().BeTrue();
+            c.Completion.IsCompleted.ShouldBeTrue();
+            c.Completion.Task.IsCompletedSuccessfully.ShouldBeTrue();
         }
 
-        d.Traces.Should().BeEquivalentTo( "Start StartAndKeepRunningStoppedBehavior",
-                                          "Command STARTER!",
-                                          "Command n°0", "Command n°1", "Command n°2",
-                                          "Stop Destroyed",
-                                          "Destroy" );
+        d.Traces.ShouldBe( [ "Start StartAndKeepRunningStoppedBehavior",
+                             "Command STARTER!",
+                             "Command n°0", "Command n°1", "Command n°2",
+                             "Stop Destroyed",
+                             "Destroy"] );
     }
 
     [TestCase( "ExecuteDeferred" )]
@@ -164,16 +159,14 @@ public class AutoStartCommandAndDestroyTests
     [CancelAfter( 500 )]
     public async Task auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async( string mode, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( nameof( auto_starting_device_and_stop_skip_deferred_and_no_event_is_raised_Async ) );
-
         var h = new DHost();
         var config = new DConfiguration() { Name = "First", Status = DeviceConfigurationStatus.Runnable };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateSucceeded );
         D? d = h["First"];
         Debug.Assert( d != null );
 
         var initialStatus = d.Status.ToString();
-        initialStatus.Should().Be( "Stopped (None)" );
+        initialStatus.ShouldBe( "Stopped (None)" );
 
         bool statusChanged = false;
         void OnLifetimeChange( IActivityMonitor monitor, DeviceLifetimeEvent e ) => statusChanged |= e.StatusChanged;
@@ -196,9 +189,9 @@ public class AutoStartCommandAndDestroyTests
         // DoHandleCommandAsync of the real command), we use the WaitForSynchronizationAsync.
         // Since the device is Stopped and there are deferred commands we must ignore them otherwise
         // we'll be waiting for the device to restart.
-        (await d.WaitForSynchronizationAsync( considerDeferredCommands: false, cancel: cancellation )).Should().Be( WaitForSynchronizationResult.Success );
-        statusChanged.Should().BeFalse( "No visible status change despite the fact that the device has start/stop." );
-        d.Status.ToString().Should().Be( initialStatus );
+        (await d.WaitForSynchronizationAsync( considerDeferredCommands: false, cancel: cancellation )).ShouldBe( WaitForSynchronizationResult.Success );
+        statusChanged.ShouldBeFalse( "No visible status change despite the fact that the device has start/stop." );
+        d.Status.ToString().ShouldBe( initialStatus );
 
         bool executeDeferred = mode == "ExecuteDeferred";
         if( executeDeferred )
@@ -206,57 +199,57 @@ public class AutoStartCommandAndDestroyTests
             // We want to monitor the end of the currently deferred commands.
             var afterDeferred = d.WaitForSynchronizationAsync( considerDeferredCommands: true, cancel: cancellation );
             await d.StartAsync( TestHelper.Monitor );
-            (await afterDeferred).Should().Be( WaitForSynchronizationResult.Success );
+            (await afterDeferred).ShouldBe( WaitForSynchronizationResult.Success );
             foreach( var c in commands )
             {
-                c.Completion.Task.IsCompletedSuccessfully.Should().BeTrue();
-                c.Completion.HasSucceed.Should().BeTrue();
+                c.Completion.Task.IsCompletedSuccessfully.ShouldBeTrue();
+                c.Completion.HasSucceed.ShouldBeTrue();
             }
         }
         else
         {
             foreach( var c in commands )
             {
-                c.Completion.Task.IsCompleted.Should().BeFalse();
-                c.Completion.IsCompleted.Should().BeFalse();
+                c.Completion.Task.IsCompleted.ShouldBeFalse();
+                c.Completion.IsCompleted.ShouldBeFalse();
             }
         }
         // Destroying the device.
         h.SendCommand( TestHelper.Monitor, destroy, token: cancellation );
         // Using WaitForSynchronizationAsync here may lead to Success or IsDetroyed.
         (await d.WaitForSynchronizationAsync( considerDeferredCommands: false, cancel: cancellation ))
-            .Should().Match( r => r == WaitForSynchronizationResult.Success
-                                  || r == WaitForSynchronizationResult.DeviceDestroyed );
-        destroy.Completion.Task.IsCompleted.Should().BeTrue();
+            .ShouldMatch( r => r == WaitForSynchronizationResult.Success
+                                    || r == WaitForSynchronizationResult.DeviceDestroyed );
+        destroy.Completion.Task.IsCompleted.ShouldBeTrue();
 
         if( executeDeferred )
         {
             foreach( var c in commands )
             {
-                c.Completion.Task.IsCompletedSuccessfully.Should().BeTrue();
-                c.Completion.HasSucceed.Should().BeTrue();
+                c.Completion.Task.IsCompletedSuccessfully.ShouldBeTrue();
+                c.Completion.HasSucceed.ShouldBeTrue();
             }
-            d.Traces.Should().BeEquivalentTo( "Start SilentAutoStartAndStopStoppedBehavior",
-                                              "Command DO IT",
-                                              "Stop SilentAutoStartAndStopStoppedBehavior",
-                                              "Start StartCall",
-                                              "Command n°0",
-                                              "Command n°1",
-                                              "Command n°2",
-                                              "Stop Destroyed",
-                                              "Destroy" );
+            d.Traces.ShouldBe( ["Start SilentAutoStartAndStopStoppedBehavior",
+                                "Command DO IT",
+                                "Stop SilentAutoStartAndStopStoppedBehavior",
+                                "Start StartCall",
+                                "Command n°0",
+                                "Command n°1",
+                                "Command n°2",
+                                "Stop Destroyed",
+                                "Destroy"] );
         }
         else
         {
             foreach( var c in commands )
             {
-                c.Completion.Task.IsFaulted.Should().BeTrue();
-                c.Completion.HasFailed.Should().BeTrue();
+                c.Completion.Task.IsFaulted.ShouldBeTrue();
+                c.Completion.HasFailed.ShouldBeTrue();
             }
-            d.Traces.Should().BeEquivalentTo( "Start SilentAutoStartAndStopStoppedBehavior",
-                                              "Command DO IT",
-                                              "Stop SilentAutoStartAndStopStoppedBehavior",
-                                              "Destroy" );
+            d.Traces.ShouldBe( [ "Start SilentAutoStartAndStopStoppedBehavior",
+                                 "Command DO IT",
+                                 "Stop SilentAutoStartAndStopStoppedBehavior",
+                                 "Destroy" ] );
         }
 
     }
@@ -266,21 +259,19 @@ public class AutoStartCommandAndDestroyTests
     [CancelAfter( 500 )]
     public async Task destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async( string mode, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( destroying_the_device_eventually_set_the_UnavailableDeviceException_on_all_pending_commands_Async )}(\"{mode}\")" );
-
         var h = new DHost();
         var config = new DConfiguration() { Name = "First", Status = DeviceConfigurationStatus.Runnable };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateSucceeded );
         D? d = h["First"];
         Debug.Assert( d != null );
 
         var commands = Enumerable.Range( 0, 10 ).Select( i => new DCommand() { DeviceName = "First", Trace = $"n°{i}" } ).ToArray();
-        if( mode == "StartFirst" ) (await d.StartAsync( TestHelper.Monitor )).Should().BeTrue();
+        if( mode == "StartFirst" ) (await d.StartAsync( TestHelper.Monitor )).ShouldBeTrue();
         foreach( var c in commands )
         {
             h.SendCommand( TestHelper.Monitor, c, token: cancellation );
         }
-        if( mode != "StartFirst" ) (await d.StartAsync( TestHelper.Monitor )).Should().BeTrue();
+        if( mode != "StartFirst" ) (await d.StartAsync( TestHelper.Monitor )).ShouldBeTrue();
 
         // Immediately destroys the device.
         await d.DestroyAsync( TestHelper.Monitor );
@@ -297,10 +288,10 @@ public class AutoStartCommandAndDestroyTests
             {
                 // This is expected.
             }
-            c.Completion.IsCompleted.Should().BeTrue();
+            c.Completion.IsCompleted.ShouldBeTrue();
         }
 
-        commands.Any( c => c.Completion.HasFailed ).Should().BeTrue( "At least one command should be true." );
+        commands.Any( c => c.Completion.HasFailed ).ShouldBeTrue( "At least one command should be true." );
     }
 
 

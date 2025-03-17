@@ -1,5 +1,4 @@
-using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using NUnit.Framework;
@@ -14,10 +13,11 @@ namespace CK.DeviceModel.Configuration.Tests;
 [TestFixture]
 public class ExplicitConfigurationConstructorTests
 {
-    [Test]
-    public async Task with_root_properties_only_Async()
+    [TestCase( "UseBinding" )]
+    [TestCase( "" )]
+    public async Task with_root_properties_only_Async( string mode )
     {
-        using var gLog = TestHelper.Monitor.OpenInfo( nameof( with_root_properties_only_Async ) );
+        ConveyorDeviceConfiguration.UseBinding = mode == "UseBinding";
 
         var config = DynamicConfiguration.Create();
         config.Provider.Set( "CK-DeviceModel:ConveyorDeviceHost:Items:TheBeast:Status", "Runnable" );
@@ -26,17 +26,18 @@ public class ExplicitConfigurationConstructorTests
 
         var host = new ConveyorDeviceHost();
         ConveyorDevice? device = await CreateTheBeastDeviceAsync( config, host );
-        device.ExternalConfiguration.OneProp.Should().Be( "I'm a property." );
-        device.ExternalConfiguration.AnotherProp.Should().Be( 3712 );
-        device.ExternalConfiguration.Hubs.Should().BeEmpty();
+        device.ExternalConfiguration.OneProp.ShouldBe( "I'm a property." );
+        device.ExternalConfiguration.AnotherProp.ShouldBe( 3712 );
+        device.ExternalConfiguration.Hubs.ShouldBeEmpty();
 
         await host.ClearAsync( TestHelper.Monitor, true );
     }
 
-    [Test]
-    public async Task from_json_with_hubs_Async()
+    [TestCase( "UseBinding" )]
+    [TestCase( "" )]
+    public async Task from_json_with_hubs_Async( string mode )
     {
-        using var gLog = TestHelper.Monitor.OpenInfo( nameof( with_root_properties_only_Async ) );
+        ConveyorDeviceConfiguration.UseBinding = mode == "UseBinding";
 
         var builder = new ConfigurationBuilder();
         builder.AddJsonStream( new MemoryStream( Encoding.UTF8.GetBytes( @"
@@ -100,43 +101,43 @@ public class ExplicitConfigurationConstructorTests
         var device = host.Find( "TheBeast" );
         Debug.Assert( device != null );
         var c = device.ExternalConfiguration;
-        c.OneProp.Should().Be( "I have Hubs!" );
-        c.Hubs.Should().HaveCount( 1 );
-        c.Status.Should().Be( DeviceConfigurationStatus.Runnable );
+        c.OneProp.ShouldBe( "I have Hubs!" );
+        c.Hubs.Count.ShouldBe( 1 );
+        c.Status.ShouldBe( DeviceConfigurationStatus.Runnable );
         var h = c.Hubs["Starter"];
-        h.IPAddress.Should().Be( "192.168.5.4:3712" );
-        h.TimeoutMilliseconds.Should().Be( 100 );
-        h.Components.Should().HaveCount( 5 );
+        h.IPAddress.ShouldBe( "192.168.5.4:3712" );
+        h.TimeoutMilliseconds.ShouldBe( 100 );
+        h.Components.Count.ShouldBe( 5 );
         var entry = (SpanConfiguration)h.Components["EntrySlide"];
         var primaryController = (ControllerConfiguration)h.Components["PrimaryController"];
         var sensor1 = (BooleanSensorConfiguration)h.Components["S1"];
         var motor1 = (MotorConfiguration)h.Components["Motor1"];
         var sensor2 = (BooleanSensorConfiguration)h.Components["S2"];
 
-        entry.Name.Should().Be( "EntrySlide" );
-        entry.Length.Should().Be( 30 );
-        entry.Position.Should().Be( 0 );
+        entry.Name.ShouldBe( "EntrySlide" );
+        entry.Length.ShouldBe( 30 );
+        entry.Position.ShouldBe( 0 );
 
-        primaryController.Name.Should().Be( "PrimaryController" );
-        primaryController.Position.Should().Be( 30 );
-        primaryController.Address.Should().Be( 124 );
-        primaryController.ManufacturerDeviceName.Should().Be( "BWU8745" );
+        primaryController.Name.ShouldBe( "PrimaryController" );
+        primaryController.Position.ShouldBe( 30 );
+        primaryController.Address.ShouldBe( 124 );
+        primaryController.ManufacturerDeviceName.ShouldBe( "BWU8745" );
 
-        sensor1.Name.Should().Be( "S1" );
-        sensor1.Position.Should().Be( 40 );
-        sensor1.ControllerName.Should().Be( "PrimaryController" );
-        sensor1.FieldName.Should().Be( "I1" );
+        sensor1.Name.ShouldBe( "S1" );
+        sensor1.Position.ShouldBe( 40 );
+        sensor1.ControllerName.ShouldBe( "PrimaryController" );
+        sensor1.FieldName.ShouldBe( "I1" );
 
-        motor1.Name.Should().Be( "Motor1" );
-        motor1.Position.Should().Be( 30 );
-        motor1.ControllerName.Should().Be( "PrimaryController" );
-        motor1.Length.Should().Be( 250 );
-        motor1.ForwardFieldName.Should().Be( "SpeedM1" );
+        motor1.Name.ShouldBe( "Motor1" );
+        motor1.Position.ShouldBe( 30 );
+        motor1.ControllerName.ShouldBe( "PrimaryController" );
+        motor1.Length.ShouldBe( 250 );
+        motor1.ForwardFieldName.ShouldBe( "SpeedM1" );
 
-        sensor2.Name.Should().Be( "S2" );
-        sensor2.Position.Should().Be( 270 );
-        sensor2.ControllerName.Should().Be( "PrimaryController" );
-        sensor2.FieldName.Should().Be( "I2" );
+        sensor2.Name.ShouldBe( "S2" );
+        sensor2.Position.ShouldBe( 270 );
+        sensor2.ControllerName.ShouldBe( "PrimaryController" );
+        sensor2.FieldName.ShouldBe( "I2" );
 
         await host.ClearAsync( TestHelper.Monitor, true );
     }

@@ -1,11 +1,6 @@
 using CK.Core;
 using CK.PerfectEvent;
-using Microsoft.Extensions.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel;

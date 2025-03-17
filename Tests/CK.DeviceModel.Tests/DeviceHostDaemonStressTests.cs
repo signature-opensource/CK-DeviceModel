@@ -1,15 +1,10 @@
 using CK.Core;
-using CK.Testing;
-using FluentAssertions;
+using Shouldly;
 using Microsoft.Extensions.Hosting;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -168,8 +163,6 @@ public class DeviceHostDaemonStressTests
     [CancelAfter( 3500 )]
     public async Task stress_test_Async( int nbDevice, int randomSeed, bool useDirectReconfiguration, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( stress_test_Async )}({nbDevice},{randomSeed},{useDirectReconfiguration})" );
-
         var rnd = randomSeed != 0 ? new Random( randomSeed ) : new Random();
         var policy = new AlwaysRetryPolicy( rnd.Next( 5 ) + 1 );
         var host = new DHost();
@@ -194,11 +187,11 @@ public class DeviceHostDaemonStressTests
         }
         TestHelper.Monitor.Info( $"{nbDevice} devices: StartFailure = {nbStartFailure}, CommandFailure = {nbCommandFailure}." );
         var applyResult = await host.ApplyConfigurationAsync( TestHelper.Monitor, config );
-        applyResult.Success.Should().BeFalse();
+        applyResult.Success.ShouldBeFalse();
         foreach( var r in applyResult.Results )
         {
-            r.Should().Match( r => r == DeviceApplyConfigurationResult.CreateAndStartSucceeded
-                                   || r == DeviceApplyConfigurationResult.CreateSucceededButStartFailed );
+            r.ShouldMatch( r => r == DeviceApplyConfigurationResult.CreateAndStartSucceeded
+                                     || r == DeviceApplyConfigurationResult.CreateSucceededButStartFailed );
         }
         TestHelper.Monitor.Info( "Sending one command to each devices." );
         var devices = host.GetDevices().Values.ToArray();
@@ -219,15 +212,15 @@ public class DeviceHostDaemonStressTests
                 switch( d.Fail )
                 {
                     case FailureType.None:
-                        (await c.Completion).Should().Be( CommandResult.Success, $"{c.Trace} should have succeeded." );
+                        (await c.Completion).ShouldBe( CommandResult.Success, $"{c.Trace} should have succeeded." );
                         break;
                     case FailureType.CommandSync:
                     case FailureType.CommandAsync:
-                        (await c.Completion).Should().Be( CommandResult.Failure, $"{c.Trace} should have failed." );
+                        (await c.Completion).ShouldBe( CommandResult.Failure, $"{c.Trace} should have failed." );
                         break;
                     case FailureType.StartSync:
                     case FailureType.StartAsync:
-                        c.Completion.IsCompleted.Should().BeFalse( $"Command {c} ({c.Trace}) should be in the deferred queue and not completed yet." );
+                        c.Completion.IsCompleted.ShouldBeFalse( $"Command {c} ({c.Trace}) should be in the deferred queue and not completed yet." );
                         deferred.Add( c );
                         break;
                     default: throw new NotSupportedException();
@@ -260,13 +253,13 @@ public class DeviceHostDaemonStressTests
                     else if( c.Fail == FailureType.StartAsync ) c.Fail = FailureType.CommandAsync;
                 }
                 applyResult = await host.ApplyConfigurationAsync( TestHelper.Monitor, config );
-                applyResult.Success.Should().BeTrue();
+                applyResult.Success.ShouldBeTrue();
             }
         }
         TestHelper.Monitor.Info( $"{deferred.Count} deferred commands have now failed miserably (and stopped their device)..." );
         foreach( var c in deferred )
         {
-            (await c.Completion).Should().Be( CommandResult.Failure );
+            (await c.Completion).ShouldBe( CommandResult.Failure );
         }
         TestHelper.Monitor.Info( $"Let the daemon try to restart the stopped devices during 200 ms." );
         await Task.Delay( 200, cancellation );
@@ -290,7 +283,7 @@ public class DeviceHostDaemonStressTests
                     c.Fail = FailureType.None;
                 }
                 applyResult = await host.ApplyConfigurationAsync( TestHelper.Monitor, config );
-                applyResult.Success.Should().BeTrue();
+                applyResult.Success.ShouldBeTrue();
             }
         }
 
@@ -299,7 +292,7 @@ public class DeviceHostDaemonStressTests
         {
             TestHelper.Monitor.Fatal( $"Still stopped devices are: {stopped.Concatenate()}." );
         }
-        stopped.Should().BeEmpty();
+        stopped.ShouldBeEmpty();
 
         using( TestHelper.Monitor.OpenInfo( "Resending a bunch of commands." ) )
         {
@@ -316,7 +309,7 @@ public class DeviceHostDaemonStressTests
         {
             for( int i = 0; i < nbDevice; i++ )
             {
-                (await commands[i].Completion).Should().Be( CommandResult.Success );
+                (await commands[i].Completion).ShouldBe( CommandResult.Success );
             }
         }
         TestHelper.Monitor.Info( $"Destroying host and daemon." );

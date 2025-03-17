@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.IO.DeviceModel;
-using System.Text.RegularExpressions;
 
 namespace CK.Cris.DeviceModel;
 

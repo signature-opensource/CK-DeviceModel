@@ -1,11 +1,10 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -250,6 +249,6 @@ public class DeviceSynchronizationWithEventsTests
             }
         }
         await host.ClearAsync( monitor, true );
-        success.Should().BeTrue();
+        success.ShouldBeTrue();
     }
 }

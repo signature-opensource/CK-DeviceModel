@@ -1,14 +1,11 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
+using Microsoft.Extensions.Hosting;
 
 namespace CK.DeviceModel.Tests;
 
@@ -96,6 +93,8 @@ public class ReminderTests
     public class AddReminderIn50DaysCommand : DeviceCommand<DHost>
     {
         public bool In49Days;
+
+        protected override DeviceCommandStoppedBehavior StoppedBehavior => DeviceCommandStoppedBehavior.AlwaysWaitForNextStart;
     }
 
     public class AddRemindersInPast : DeviceCommand<DHost>
@@ -105,11 +104,9 @@ public class ReminderTests
     [Test]
     public async Task pooled_reminders_are_released_when_the_device_is_destroyed_Async()
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( pooled_reminders_are_released_when_the_device_is_destroyed_Async )}" );
-
         var h = new DHost();
         var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.RunnableStarted };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
         D? d = h["D"];
         Debug.Assert( d != null );
 
@@ -117,33 +114,55 @@ public class ReminderTests
         d.SendCommand( TestHelper.Monitor, c, checkDeviceName: false );
         await c.Completion.Task;
 
-        D.ReminderPoolTotalCount.Should().Be( D.ReminderMaxPooledPerDevice );
-        D.ReminderPoolInUseCount.Should().Be( D.ReminderMaxPooledPerDevice );
+        D.ReminderPoolTotalCount.ShouldBe( D.ReminderMaxPooledPerDevice );
+        D.ReminderPoolInUseCount.ShouldBe( D.ReminderMaxPooledPerDevice );
 
         await d.DestroyAsync( TestHelper.Monitor, true );
         TestHelper.Monitor.Info( "await d.DestroyAsync done." );
 
-        D.ReminderPoolTotalCount.Should().Be( D.ReminderMaxPooledPerDevice );
-        D.ReminderPoolInUseCount.Should().Be( 0 );
+        D.ReminderPoolTotalCount.ShouldBe( D.ReminderMaxPooledPerDevice );
+        D.ReminderPoolInUseCount.ShouldBe( 0 );
     }
 
     [Test]
-    public async Task reminders_cannot_exceed_49_days_Async()
+    public async Task reminders_cannot_exceed_49_days_with_AlwaysRunning_Async()
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( reminders_cannot_exceed_49_days_Async )}" );
-
         var h = new DHost();
-        var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.RunnableStarted };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        var daemon = new DeviceHostDaemon( [h], new DefaultDeviceAlwaysRunningPolicy() );
+        await ((IHostedService)daemon).StartAsync( default );
+
+        var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.AlwaysRunning };
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
         D? d = h["D"];
         Debug.Assert( d != null );
 
         var cTooMuch = new AddReminderIn50DaysCommand();
         d.SendCommand( TestHelper.Monitor, cTooMuch, checkDeviceName: false );
-        await FluentActions.Awaiting( () => cTooMuch.Completion.Task ).Should().ThrowAsync<NotSupportedException>();
+        await Util.Awaitable( () => cTooMuch.Completion.Task ).ShouldThrowAsync<NotSupportedException>();
 
-        // Restarts the device (the error stopped it).
-        await d.StartAsync( TestHelper.Monitor );
+        var cPass = new AddReminderIn50DaysCommand() { In49Days = true };
+        d.SendCommand( TestHelper.Monitor, cPass, checkDeviceName: false );
+        await cPass.Completion.Task;
+
+        await h.ClearAsync( TestHelper.Monitor, true );
+    }
+
+    [Test]
+    public async Task reminders_cannot_exceed_49_days_Async()
+    {
+        var h = new DHost();
+        var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.RunnableStarted };
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        D? d = h["D"];
+        Debug.Assert( d != null );
+
+        var cTooMuch = new AddReminderIn50DaysCommand();
+        d.SendCommand( TestHelper.Monitor, cTooMuch, checkDeviceName: false );
+        await Util.Awaitable( () => cTooMuch.Completion.Task ).ShouldThrowAsync<NotSupportedException>();
+
+        // Restarts the device (the error stopped it and there is no daemon in this test).
+        TestHelper.Monitor.Info( "Restarting device." );
+        (await d.StartAsync( TestHelper.Monitor )).ShouldBeTrue();
 
         var cPass = new AddReminderIn50DaysCommand() { In49Days = true };
         d.SendCommand( TestHelper.Monitor, cPass, checkDeviceName: false );
@@ -155,15 +174,13 @@ public class ReminderTests
     [Test]
     public async Task reminders_now_or_in_past_are_sent_as_immediate_Async()
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( reminders_now_or_in_past_are_sent_as_immediate_Async )}" );
-
         var h = new DHost();
         var config = new DConfiguration() { Name = "D", Status = DeviceConfigurationStatus.RunnableStarted };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
         D? d = h["D"];
         Debug.Assert( d != null );
 
-        d.NumberOfRemindersInPast.Should().Be( 0 );
+        d.NumberOfRemindersInPast.ShouldBe( 0 );
 
         var inPast = new AddRemindersInPast();
         d.SendCommand( TestHelper.Monitor, inPast, checkDeviceName: false );
@@ -174,9 +191,9 @@ public class ReminderTests
         await d.WaitForSynchronizationAsync( false );
 
         // And the device is still alive.
-        d.Status.IsRunning.Should().BeTrue();
+        d.Status.IsRunning.ShouldBeTrue();
         // And we have seen the 2 reminders handled as immediate.
-        d.NumberOfRemindersInPast.Should().Be( 2 );
+        d.NumberOfRemindersInPast.ShouldBe( 2 );
 
         await h.ClearAsync( TestHelper.Monitor, true );
     }

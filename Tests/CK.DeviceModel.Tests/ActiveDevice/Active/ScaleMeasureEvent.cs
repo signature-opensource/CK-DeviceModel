@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace CK.DeviceModel.Tests;
 
 public sealed class ScaleMeasureEvent : ScaleEvent, ICommonScaleMeasureEvent

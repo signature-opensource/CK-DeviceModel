@@ -1,11 +1,8 @@
 using CK.Core;
-using FluentAssertions;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -156,13 +153,12 @@ public class CancellationAndTimeoutTests
     [CancelAfter( 1200 )]
     public async Task multiple_cancellation_reasons_Async( int nb, int randomSeed, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( multiple_cancellation_reasons_Async )}({nb},{randomSeed})" );
         try
         {
             var rnd = new Random( randomSeed );
             var h = new DHost();
             var config = new DConfiguration() { Name = "Single", Status = DeviceConfigurationStatus.RunnableStarted, RandomSeed = rnd.Next() };
-            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
             D? d = h["Single"];
             Debug.Assert( d != null );
 
@@ -301,7 +297,7 @@ public class CancellationAndTimeoutTests
                 TestHelper.Monitor.Trace( $"Waiting for {c}." );
                 await c.Completion;
                 TestHelper.Monitor.Trace( $"Got {c}." );
-                c.CancellationReason.Should().Be( c.ExpectedCancellationReason, c.ToString() );
+                c.CancellationReason.ShouldBe( c.ExpectedCancellationReason, c.ToString() );
             }
 
             await h.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );

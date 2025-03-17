@@ -1,5 +1,5 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -103,12 +103,11 @@ public class ImmediateCommandTests
     [CancelAfter( 9000 )]
     public async Task sending_immediate_commands_does_not_block_the_loop_Async( int nb, int seed, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sending_immediate_commands_does_not_block_the_loop_Async )}-{nb}-{seed}" );
         try
         {
             var h = new DHost();
             var config = new DConfiguration() { Name = "First", Status = DeviceConfigurationStatus.RunnableStarted };
-            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
             D? d = h["First"];
             Debug.Assert( d != null && d.IsRunning );
             Random random = new Random( seed );
@@ -128,7 +127,7 @@ public class ImmediateCommandTests
                         ExecutionTime = random.Next( 30 )
                     };
                     commands.Add( c );
-                    d.SendCommand( TestHelper.Monitor, c, token: cancellation ).Should().BeTrue();
+                    d.SendCommand( TestHelper.Monitor, c, token: cancellation ).ShouldBeTrue();
                 }
                 int nbImmediate = random.Next( 2 );
                 while( --nbImmediate >= 0 )
@@ -141,7 +140,7 @@ public class ImmediateCommandTests
                         ImmediateSending = true
                     };
                     commands.Add( c );
-                    d.SendCommand( TestHelper.Monitor, c, token: cancellation ).Should().BeTrue();
+                    d.SendCommand( TestHelper.Monitor, c, token: cancellation ).ShouldBeTrue();
                 }
                 await Task.Delay( random.Next( 200 ), cancellation );
             }
@@ -149,8 +148,8 @@ public class ImmediateCommandTests
             foreach( var c in commands )
             {
                 await c.Completion;
-                c.Completion.IsCompleted.Should().BeTrue( c.Trace );
-                c.Completion.Task.IsCompletedSuccessfully.Should().BeTrue( c.Trace );
+                c.Completion.IsCompleted.ShouldBeTrue( c.Trace );
+                c.Completion.Task.IsCompletedSuccessfully.ShouldBeTrue( c.Trace );
             }
             await h.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
         }
@@ -166,7 +165,6 @@ public class ImmediateCommandTests
     [CancelAfter( 2000 )]
     public async Task BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works_Async( int nb, CancellationToken cancellation )
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( BaseImmediateCommandLimit_and_ImmediateCommandLimitOffset_works_Async )}-{nb}" );
         try
         {
             static List<DCommand> SendCommands( IDevice d, int nb, CancellationToken cancellation )
@@ -184,21 +182,21 @@ public class ImmediateCommandTests
                             ImmediateSending = true
                         };
                         commands.Add( cI );
-                        d.SendCommand( TestHelper.Monitor, cI, token: cancellation ).Should().BeTrue();
+                        d.SendCommand( TestHelper.Monitor, cI, token: cancellation ).ShouldBeTrue();
                         var cRegular1 = new DCommand()
                         {
                             DeviceName = "D",
                             Trace = $"N°{i}",
                         };
                         commands.Add( cRegular1 );
-                        d.SendCommand( TestHelper.Monitor, cRegular1, token: cancellation ).Should().BeTrue();
+                        d.SendCommand( TestHelper.Monitor, cRegular1, token: cancellation ).ShouldBeTrue();
                         var cRegular2 = new DCommand()
                         {
                             DeviceName = "D",
                             Trace = $"N°{i}-2",
                         };
                         commands.Add( cRegular2 );
-                        d.SendCommand( TestHelper.Monitor, cRegular2, token: cancellation ).Should().BeTrue();
+                        d.SendCommand( TestHelper.Monitor, cRegular2, token: cancellation ).ShouldBeTrue();
                     }
                     TestHelper.Monitor.CloseGroup( "Done." );
                     return commands;
@@ -210,9 +208,9 @@ public class ImmediateCommandTests
                 using var g = TestHelper.Monitor.OpenInfo( $"Checking traces. Expected consecutive {limit} immediate commands for {nb} immediate and {2 * nb} regular commands." );
                 var profile = traces.Where( t => t.StartsWith( "Command " ) ).Select( t => t[8] ).ToArray();
                 TestHelper.Monitor.Info( $"Commands order: {profile.Select( x => x.ToString() ).Concatenate()}." );
-                profile.Length.Should().Be( 3 * nb, "We have nb 'I' and 2*nb 'N'." );
-                profile.All( c => c == 'I' || c == 'N' ).Should().BeTrue();
-                profile.Count( c => c == 'I' ).Should().Be( nb );
+                profile.Length.ShouldBe( 3 * nb, "We have nb 'I' and 2*nb 'N'." );
+                profile.All( c => c == 'I' || c == 'N' ).ShouldBeTrue();
+                profile.Count( c => c == 'I' ).ShouldBe( nb );
                 // 'I' should occur limit times, with one N between them and the remaining must be N only.
                 var oneBlock = Enumerable.Repeat( 'I', limit ).Append( 'N' ).ToArray();
                 var inspector = profile.AsSpan();
@@ -223,14 +221,14 @@ public class ImmediateCommandTests
                     if( !matchBlock )
                     {
                         blockLen = (nb % limit) + 1;
-                        blockLen.Should().BeGreaterThan( 1, "The last block must not match because of nb is not a factor of limit." );
+                        blockLen.ShouldBeGreaterThan( 1, "The last block must not match because of nb is not a factor of limit." );
                         matchBlock = inspector.Slice( 0, blockLen ).SequenceEqual( Enumerable.Repeat( 'I', blockLen - 1 ).Append( 'N' ).ToArray() );
                     }
-                    matchBlock.Should().BeTrue();
+                    matchBlock.ShouldBeTrue();
                     inspector = inspector.Slice( blockLen );
                 }
                 while( inspector[0] == 'I' );
-                inspector.ToArray().All( c => c == 'N' ).Should().BeTrue();
+                inspector.ToArray().All( c => c == 'N' ).ShouldBeTrue();
             }
 
             var h = new DHost();
@@ -240,7 +238,7 @@ public class ImmediateCommandTests
                 Status = DeviceConfigurationStatus.RunnableStarted,
                 BaseImmediateCommandLimit = 5
             };
-            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
             D? d = h["D"];
             Debug.Assert( d != null && d.IsRunning );
 
@@ -264,8 +262,8 @@ public class ImmediateCommandTests
             d.Traces.Clear();
             // Limit is now 7 since configuration corrects it.
             config.BaseImmediateCommandLimit = 13 + 7;
-            (await d.ReconfigureAsync( TestHelper.Monitor, config, cancellation )).Should().Be( DeviceApplyConfigurationResult.UpdateSucceeded );
-            d.Traces.Should().BeEquivalentTo( "Reconfigure " );
+            (await d.ReconfigureAsync( TestHelper.Monitor, config, cancellation )).ShouldBe( DeviceApplyConfigurationResult.UpdateSucceeded );
+            d.Traces.ShouldBe( ["Reconfigure "] );
             d.Traces.Clear();
 
             foreach( var c in SendCommands( d, nb, cancellation ) )

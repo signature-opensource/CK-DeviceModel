@@ -1,12 +1,11 @@
 using CK.Core;
-using FluentAssertions;
+using Shouldly;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
@@ -24,31 +23,31 @@ public class SendingTimeUtcTests
         var d = DateTime.UtcNow;
 
         var cmd = new FlashCommand();
-        cmd.ImmediateSending.Should().BeFalse();
-        cmd.SendingTimeUtc.Should().BeNull();
+        cmd.ImmediateSending.ShouldBeFalse();
+        cmd.SendingTimeUtc.ShouldBeNull();
 
         cmd.SendingTimeUtc = d;
-        cmd.ImmediateSending.Should().BeFalse();
-        cmd.SendingTimeUtc.Should().Be( d );
+        cmd.ImmediateSending.ShouldBeFalse();
+        cmd.SendingTimeUtc.ShouldBe( d );
 
         cmd.ImmediateSending = true;
-        cmd.ImmediateSending.Should().BeTrue();
-        cmd.SendingTimeUtc.Should().BeNull();
+        cmd.ImmediateSending.ShouldBeTrue();
+        cmd.SendingTimeUtc.ShouldBeNull();
 
         cmd.SendingTimeUtc = d;
-        cmd.ImmediateSending.Should().BeFalse();
-        cmd.SendingTimeUtc.Should().Be( d );
+        cmd.ImmediateSending.ShouldBeFalse();
+        cmd.SendingTimeUtc.ShouldBe( d );
 
         cmd.SendingTimeUtc = null;
-        cmd.ImmediateSending.Should().BeFalse();
-        cmd.SendingTimeUtc.Should().BeNull();
+        cmd.ImmediateSending.ShouldBeFalse();
+        cmd.SendingTimeUtc.ShouldBeNull();
 
         cmd.ImmediateSending = true;
         cmd.SendingTimeUtc = CK.Core.Util.UtcMinValue;
-        cmd.ImmediateSending.Should().BeFalse();
-        cmd.SendingTimeUtc.Should().BeNull();
+        cmd.ImmediateSending.ShouldBeFalse();
+        cmd.SendingTimeUtc.ShouldBeNull();
 
-        FluentActions.Invoking( () => cmd.SendingTimeUtc = DateTime.Now ).Should().Throw<ArgumentException>();
+        Util.Invokable( () => cmd.SendingTimeUtc = DateTime.Now ).ShouldThrow<ArgumentException>();
     }
 
     public class DHost : DeviceHost<D, DeviceHostConfiguration<DConfiguration>, DConfiguration>
@@ -238,7 +237,7 @@ public class SendingTimeUtcTests
                 c.AddRangeArray( commands );
                 foreach( var cmd in commands )
                 {
-                    device.UnsafeSendCommand( TestHelper.Monitor, cmd ).Should().BeTrue();
+                    device.UnsafeSendCommand( TestHelper.Monitor, cmd ).ShouldBeTrue();
                 }
             }
 
@@ -249,7 +248,7 @@ public class SendingTimeUtcTests
                 Status = DeviceConfigurationStatus.RunnableStarted,
                 ExecTimeMS = execTimeMS
             };
-            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+            (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
             D? d = h["Single"];
             Debug.Assert( d != null );
 
@@ -281,8 +280,8 @@ public class SendingTimeUtcTests
 
             await h.ClearAsync( TestHelper.Monitor, true );
 
-            rc.Should().Be( nb * 3, "ReminderCount is fine." );
-            fc.Should().Be( nb * 3, "ReminderFiredCount is fine." );
+            rc.ShouldBe( nb * 3, "ReminderCount is fine." );
+            fc.ShouldBe( nb * 3, "ReminderFiredCount is fine." );
 
         } ).RunAsync( nb, sendingDeltaMS, execTimeMS );
     }
@@ -290,10 +289,9 @@ public class SendingTimeUtcTests
     [Test]
     public async Task sendig_time_in_more_than_49_days_simply_warns_Async()
     {
-        using var ensureMonitoring = TestHelper.Monitor.OpenInfo( $"{nameof( sendig_time_in_more_than_49_days_simply_warns_Async )}" );
         var h = new DHost();
         var config = new DConfiguration() { Name = "D", ExecTimeMS = 0, Status = DeviceConfigurationStatus.RunnableStarted };
-        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).Should().Be( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        (await h.EnsureDeviceAsync( TestHelper.Monitor, config )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
         D? d = h["D"];
         Debug.Assert( d != null );
 
@@ -302,14 +300,14 @@ public class SendingTimeUtcTests
         var cToolate = new DCommand() { SendingTimeUtc = tooLate };
 
         // The adjustment is done when the command enters the delayed queue.
-        cToolate.SendingTimeUtc.Should().Be( tooLate );
+        cToolate.SendingTimeUtc.ShouldBe( tooLate );
 
         d.SendCommand( TestHelper.Monitor, cToolate, checkDeviceName: false );
         await d.WaitForSynchronizationAsync( false );
 
         // When the command is delayed and its time overflows, we update the SendingTimeUtc.
         // We can use this to check the adjustment.
-        cToolate.SendingTimeUtc.Should().BeBefore( tooLate );
+        cToolate.SendingTimeUtc.ShouldNotBeNull().ShouldBeLessThan( tooLate );
 
         await h.ClearAsync( TestHelper.Monitor, true );
 

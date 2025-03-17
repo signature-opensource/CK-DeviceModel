@@ -1,6 +1,5 @@
 using CK.Core;
 using System;
-using System.Diagnostics;
 
 namespace CK.DeviceModel;
 
