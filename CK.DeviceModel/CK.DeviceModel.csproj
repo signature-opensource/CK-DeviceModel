@@ -4,8 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CK.Abstractions" Version="27.0.0" />
-    <PackageReference Include="CK.Configuration" Version="0.7.0" />
-    <PackageReference Include="CK.PerfectEvent" Version="24.0.0" />
+    <PackageReference Include="CK.Configuration" Version="0.7.1" />
+    <PackageReference Include="CK.PerfectEvent" Version="24.0.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
   </ItemGroup>
