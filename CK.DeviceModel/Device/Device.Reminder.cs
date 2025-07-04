@@ -97,6 +97,9 @@ public abstract partial class Device<TConfiguration>
     /// <summary>
     /// Reminder callback triggered by <see cref="AddReminder(DateTime, object?)"/>.
     /// This does nothing at this level.
+    /// <para>
+    /// This is called on the command loop.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="reminderTimeUtc">The exact time configured on the reminder.</param>
