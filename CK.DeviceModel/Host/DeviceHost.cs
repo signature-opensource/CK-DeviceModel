@@ -36,7 +36,6 @@ public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> 
     readonly PerfectEventSender<IDeviceHost, DeviceLifetimeEvent> _allDevicesLifetimeEvent;
     readonly PerfectEventSender<IDeviceHost, BaseDeviceEvent> _allDevicesEvent;
 
-
     /// <summary>
     /// This lock uses the NoRecursion policy.
     /// It protects the whole ApplyConfigurationAsync: only one global reconfiguration is
@@ -216,6 +215,16 @@ public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> 
 
     /// <inheritdoc />
     public PerfectEvent<IDeviceHost, BaseDeviceEvent> AllDevicesEvent => _allDevicesEvent.PerfectEvent;
+
+    /// <inheritdoc />
+    public virtual string? ObservableDeviceHostTypeName
+    {
+        get
+        {
+            var t = GetType();
+            return $"{t.Namespace?.Replace( "Device", "Observable" )}.O{t.Name}, {t.Assembly.GetName().Name?.Replace( "Device", "Observable" )}";
+        }
+    }
 
     Task IInternalDeviceHost.RaiseAllDevicesLifetimeEventAsync( IActivityMonitor monitor, DeviceLifetimeEvent e )
     {

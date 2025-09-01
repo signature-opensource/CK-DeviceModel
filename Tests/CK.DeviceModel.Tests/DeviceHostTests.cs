@@ -546,4 +546,17 @@ public class DeviceHostTests
         TestHelper.Monitor.Info( "/Disabling_sends_a_stop_status_change_Async" );
     }
 
+
+    [Test]
+    public void default_ObservableDeviceHostTypeName_tests()
+    {
+        new FlashBulbHost()
+            .ObservableDeviceHostTypeName.ShouldBe( "CK.ObservableModel.Tests.OFlashBulbHost, CK.ObservableModel.Tests" );
+        new MachineHost()
+            .ObservableDeviceHostTypeName.ShouldBe( "CK.ObservableModel.Tests.OMachineHost, CK.ObservableModel.Tests" );
+        new OtherMachineHost()
+            .ObservableDeviceHostTypeName.ShouldBe( "CK.ObservableModel.Tests.OOtherMachineHost, CK.ObservableModel.Tests" );
+        new ScaleHost()
+            .ObservableDeviceHostTypeName.ShouldBe( "CK.ObservableModel.Tests.OScaleHost, CK.ObservableModel.Tests" );
+    }
 }
