@@ -146,4 +146,16 @@ public interface IDeviceHost : ISingletonAutoService
     /// </summary>
     /// <returns>The type of the device configuration.</returns>
     Type GetDeviceConfigurationType();
+
+    /// <summary>
+    /// Gets the optional fully qualified name of the Observable type for this device host.
+    /// <para>
+    /// When let to null, the observable type name is derived from this device host type by replacing
+    /// "Device" by "Observable" in the assembly name and namespace and prefixing the type name with "O".
+    /// </para>
+    /// <para>
+    /// "Corp.Device.FlashBulbHost, Corp.Devices" =&gt; "Corp.Observable.OFlashBulbHost, Corp.Observables" 
+    /// </para>
+    /// </summary>
+    string? ObservableDeviceHostTypeName { get; }
 }
