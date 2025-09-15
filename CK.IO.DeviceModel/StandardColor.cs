@@ -1,4 +1,5 @@
-namespace CK.DeviceModel;
+namespace CK.IO.DeviceModel;
+
 public enum StandardColor
 {
     Off,

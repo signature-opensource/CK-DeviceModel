@@ -15,6 +15,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
+using CK.IO.DeviceModel;
 
 #pragma warning disable CA2211 // Non-constant fields should not be visible
 

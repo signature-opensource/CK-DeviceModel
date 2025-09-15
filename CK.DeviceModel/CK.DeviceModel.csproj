@@ -9,4 +9,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.9" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CK.IO.DeviceModel\CK.IO.DeviceModel.csproj" />
+  </ItemGroup>
 </Project>

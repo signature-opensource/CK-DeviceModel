@@ -7,6 +7,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
+using CK.IO.DeviceModel;
 
 namespace CK.DeviceModel.Configuration.Tests;
 

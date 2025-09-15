@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.IO.DeviceModel;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Reflection;
