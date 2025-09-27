@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CK.DeviceModel\CK.DeviceModel.csproj" />
-    <ProjectReference Include="..\CK.IO.DeviceModel\CK.IO.DeviceModel.csproj" />
   </ItemGroup>
 
 </Project>

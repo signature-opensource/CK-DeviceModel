@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.IO.DeviceModel;
 using System.Threading.Tasks;
 
 namespace CK.DeviceModel;

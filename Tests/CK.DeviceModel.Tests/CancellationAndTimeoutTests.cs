@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.IO.DeviceModel;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;

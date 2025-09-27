@@ -6,6 +6,7 @@ using CK.Core;
 using System.Diagnostics;
 using static CK.Testing.MonitorTestHelper;
 using System.Threading;
+using CK.IO.DeviceModel;
 
 namespace CK.DeviceModel.Tests;
 

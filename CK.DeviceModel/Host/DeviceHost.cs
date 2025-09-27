@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.IO.DeviceModel;
 using CK.PerfectEvent;
 using System;
 using System.Collections.Generic;

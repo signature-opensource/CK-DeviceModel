@@ -1,4 +1,4 @@
-namespace CK.DeviceModel;
+namespace CK.IO.DeviceModel;
 
 /// <summary>
 /// Models the 4 states of a device's running status from its configuration.
