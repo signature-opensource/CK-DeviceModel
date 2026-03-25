@@ -141,7 +141,7 @@ public abstract partial class Device<TConfiguration>
                     }
                 }
             }
-            cmd.Completion.SetResult( (cRemoved, tRemoved, dRemoved) );
+            cmd.Completion.TrySetResult( (cRemoved, tRemoved, dRemoved) );
         }
     }
 

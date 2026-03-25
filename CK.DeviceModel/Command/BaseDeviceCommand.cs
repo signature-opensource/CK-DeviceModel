@@ -16,8 +16,7 @@ namespace CK.DeviceModel;
 public abstract class BaseDeviceCommand
 {
     /// <summary>
-    /// Cancellation reason used when <see cref="ICompletionSource.SetCanceled()"/> or <see cref="ICompletionSource.TrySetCanceled()"/>
-    /// have been used.
+    /// Cancellation reason used when <see cref="ICompletionSource.TrySetCanceled()"/> have been used.
     /// </summary>
     public const string CommandCompletionCanceledReason = "CommandCompletionCanceled";
 

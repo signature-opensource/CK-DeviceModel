@@ -43,7 +43,7 @@ public enum DeviceCommandStoppedBehavior
     SetUnavailableDeviceException,
 
     /// <summary>
-    /// <see cref="ICompletionSource.SetCanceled()"/> is called on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
+    /// <see cref="ICompletionSource.TrySetCanceled()"/> is called on the <see cref="DeviceCommandNoResult.Completion"/> or <see cref="DeviceCommandWithResult{TResult}.Completion"/>.
     /// </summary>
     Cancel,
 

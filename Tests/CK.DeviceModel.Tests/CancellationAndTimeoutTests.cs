@@ -263,7 +263,7 @@ public class CancellationAndTimeoutTests
                         c.ExpectedCancellationReason = BaseDeviceCommand.CommandCompletionCanceledReason;
                         c.AddCancellationSource( cancel200Timeout.Token, nameof( cancel200Timeout ) );
                         c.AddCancellationSource( neverCanceled.Token, nameof( neverCanceled ) );
-                        c.Completion.SetCanceled();
+                        c.Completion.TrySetCanceled();
                         break;
                     case 8:
                         c.ExpectedCancellationReason = "ExplicitCancel";
@@ -284,7 +284,7 @@ public class CancellationAndTimeoutTests
                         _ = Task.Run( async () =>
                         {
                             await Task.Delay( 100 );
-                            c.Completion.SetCanceled();
+                            c.Completion.TrySetCanceled();
                         }, cancellation );
                         break;
                     default: Debug.Fail( "Never" ); break;

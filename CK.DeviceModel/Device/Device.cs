@@ -10,8 +10,6 @@ using CK.IO.DeviceModel;
 
 namespace CK.DeviceModel;
 
-
-
 /// <summary>
 /// Abstract base class for a device.
 /// </summary>
@@ -587,7 +585,7 @@ public abstract partial class Device<TConfiguration> : BaseDevice, IDevice, IInt
             if( _controllerKeyFromConfiguration )
             {
                 _commandMonitor.Warn( $"Unable to take control of device '{FullName}' with key '{key}': key from configuration is '{_controllerKey}'." );
-                cmd.Completion.SetResult( false );
+                cmd.Completion.TrySetResult( false );
                 return;
             }
             _commandMonitor.Trace( $"Device {FullName}: controller key changed from '{_controllerKey}' to '{key}'." );
@@ -628,13 +626,13 @@ public abstract partial class Device<TConfiguration> : BaseDevice, IDevice, IInt
             if( _configStatus == DeviceConfigurationStatus.Disabled )
             {
                 _commandMonitor.Error( $"Device {FullName} is Disabled by configuration." );
-                cmd?.Completion.SetResult( false );
+                cmd?.Completion.TrySetResult( false );
                 return;
             }
             if( _isRunning )
             {
                 _commandMonitor.Debug( "Already running." );
-                cmd?.Completion.SetResult( true );
+                cmd?.Completion.TrySetResult( true );
                 return;
             }
             Exception? error = null;
