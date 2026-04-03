@@ -5,8 +5,8 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using static CK.Testing.MonitorTestHelper;
 using CK.IO.DeviceModel;
+using static CK.Testing.MonitorTestHelper;
 
 namespace CK.DeviceModel.Tests;
 
@@ -50,7 +50,7 @@ public class WaitForSynchronizationTests
             if( command is DCommand cmd )
             {
                 await Task.Delay( cmd.ExecutionTime, cmd.CancellationToken ).ConfigureAwait( false );
-                cmd.Completion.SetResult();
+                cmd.Completion.TrySetResult();
                 return;
             }
             await base.DoHandleCommandAsync( monitor, command );

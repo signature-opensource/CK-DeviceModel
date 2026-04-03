@@ -83,7 +83,7 @@ public class AutoStartCommandAndDestroyTests
                 await Task.Delay( 10, cmd.CancellationToken ).ConfigureAwait( false );
                 Traces.Add( $"Command {cmd.Trace}" );
                 monitor.Info( $"Handling {cmd.Trace}" );
-                cmd.Completion.SetResult();
+                cmd.Completion.TrySetResult();
                 return;
             }
             await base.DoHandleCommandAsync( monitor, command );

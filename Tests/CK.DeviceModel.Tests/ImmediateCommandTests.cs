@@ -83,7 +83,7 @@ public class ImmediateCommandTests
             {
                 Traces.Add( $"Command {cmd.Trace}" );
                 await Task.Delay( cmd.ExecutionTime, cmd.CancellationToken ).ConfigureAwait( false );
-                cmd.Completion.SetResult();
+                cmd.Completion.TrySetResult();
                 return;
             }
             await base.DoHandleCommandAsync( monitor, command );

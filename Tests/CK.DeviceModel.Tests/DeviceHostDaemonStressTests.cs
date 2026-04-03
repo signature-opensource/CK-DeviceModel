@@ -127,7 +127,7 @@ public class DeviceHostDaemonStressTests
                 Traces.Add( $"Command {cmd.Trace}" );
                 if( Fail == FailureType.CommandSync ) throw new CKException( "Sync." );
                 else if( Fail == FailureType.CommandAsync ) return FailAsync();
-                cmd.Completion.SetResult( CommandResult.Success );
+                cmd.Completion.TrySetResult( CommandResult.Success );
                 return Task.CompletedTask;
             }
             return base.DoHandleCommandAsync( monitor, command );

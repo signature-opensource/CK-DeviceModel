@@ -85,9 +85,9 @@ public class CommandCompletionDelayedByReminderTests
         {
             switch( _rnd.Next( 3 ) )
             {
-                case 0: ((DCommand)state!).Completion.SetCanceled(); break;
-                case 1: ((DCommand)state!).Completion.SetResult(); break;
-                case 2: ((DCommand)state!).Completion.SetException( new Exception() ); break;
+                case 0: ((DCommand)state!).Completion.TrySetCanceled(); break;
+                case 1: ((DCommand)state!).Completion.TrySetResult(); break;
+                case 2: ((DCommand)state!).Completion.TrySetException( new Exception() ); break;
             }
             return Task.CompletedTask;
         }

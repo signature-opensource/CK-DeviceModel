@@ -53,7 +53,7 @@ public class ReminderTests
                 {
                     AddReminder( TimeSpan.FromMilliseconds( 60 + Random.Shared.Next( 1000 ) ), null );
                 }
-                c1.Completion.SetResult();
+                c1.Completion.TrySetResult();
                 return;
             }
             else if( command is AddReminderIn50DaysCommand c2 )
@@ -61,14 +61,14 @@ public class ReminderTests
                 // This will pass!
                 if( c2.In49Days ) AddReminder( TimeSpan.FromDays( 49 ), null );
                 else AddReminder( TimeSpan.FromDays( 50 ), null ); // This will throw!
-                c2.Completion.SetResult();
+                c2.Completion.TrySetResult();
                 return;
             }
             else if( command is AddRemindersInPast c3 )
             {
                 AddReminder( DateTime.UtcNow, "was now..." );
                 AddReminder( DateTime.UtcNow.AddDays( -1 ), "was yesterday..." );
-                c3.Completion.SetResult();
+                c3.Completion.TrySetResult();
                 return;
             }
             await base.DoHandleCommandAsync( monitor, command );

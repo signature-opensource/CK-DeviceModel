@@ -115,7 +115,7 @@ public class SimpleScale : SimpleActiveDevice<CommonScaleConfiguration, SimpleSc
                     } );
                 }
             }
-            cmd.Completion.SetResult( null );
+            cmd.Completion.TrySetResult( null );
             return;
         }
         _currentSum += cmd.Value;
@@ -126,14 +126,14 @@ public class SimpleScale : SimpleActiveDevice<CommonScaleConfiguration, SimpleSc
             var text = CurrentConfiguration.MeasurePattern ?? "{0}";
             var m = (double)_currentSum / _stepCount;
             var ev = new SimpleScaleMeasureEvent( this, m, string.Format( text, m ) );
-            cmd.Completion.SetResult( ev );
+            cmd.Completion.TrySetResult( ev );
             monitor.Debug( $"Raised SimpleScaleMeasureEvent: {ev.Measure}." );
             await RaiseEventAsync( monitor, ev );
             _stepCount = 0;
         }
         else
         {
-            cmd.Completion.SetResult( null );
+            cmd.Completion.TrySetResult( null );
         }
     }
 

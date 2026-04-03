@@ -113,7 +113,7 @@ public class Scale : ActiveDevice<CommonScaleConfiguration, ScaleEvent>
         {
             case ScaleResetCommand r:
                 Reset();
-                r.Completion.SetResult();
+                r.Completion.TrySetResult();
                 return Task.CompletedTask;
             case ScaleTestSendLogsFromCommandAndEventLoopCommand l:
                 var fromC = Task.Run( () =>
@@ -132,7 +132,7 @@ public class Scale : ActiveDevice<CommonScaleConfiguration, ScaleEvent>
                         EventLoop.Logger.Info( $"Log from EventLoop n°{i}." );
                     }
                 } );
-                _ = Task.WhenAll( fromE, fromC ).ContinueWith( _ => l.Completion.SetResult(), TaskScheduler.Default );
+                _ = Task.WhenAll( fromE, fromC ).ContinueWith( _ => l.Completion.TrySetResult(), TaskScheduler.Default );
                 return Task.CompletedTask;
             default:
                 return base.DoHandleCommandAsync( monitor, command );

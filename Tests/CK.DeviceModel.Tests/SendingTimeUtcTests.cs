@@ -123,12 +123,12 @@ public class SendingTimeUtcTests
                 monitor.Trace( $"Handling command '{cmd}': Waiting {CurrentConfiguration.ExecTimeMS} ms before completing it." );
                 await Task.Delay( CurrentConfiguration.ExecTimeMS, cmd.CancellationToken ).ConfigureAwait( false );
                 monitor.Trace( $"Completing command '{cmd}'. (ReminderCount so far {ReminderCount})" );
-                cmd.Completion.SetResult();
+                cmd.Completion.TrySetResult();
                 return;
             }
             if( command is GetReminderCountCommand get )
             {
-                get.Completion.SetResult( (ReminderCount, ReminderFiredCount) );
+                get.Completion.TrySetResult( (ReminderCount, ReminderFiredCount) );
                 monitor.Trace( $"ReminderCount is '({ReminderCount},{ReminderFiredCount})'." );
                 return;
             }

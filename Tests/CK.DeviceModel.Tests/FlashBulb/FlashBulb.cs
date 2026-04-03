@@ -84,7 +84,7 @@ public class FlashBulb : Device<FlashBulbConfiguration>
                 // ...Do whatever is needed here to make the FlashBulb flash using
                 // the current _color and CurrentConfiguration.FlashRate...
                 await _testFlash.SafeRaiseAsync( monitor, this, _color );
-                f.Completion.SetResult();
+                f.Completion.TrySetResult();
                 return;
             case SetFlashColorCommand c:
             {
@@ -99,7 +99,7 @@ public class FlashBulb : Device<FlashBulbConfiguration>
                     _color = CurrentConfiguration.FlashColor;
                     _colorFromConfig = true;
                 }
-                c.Completion.SetResult( prevColor );
+                c.Completion.TrySetResult( prevColor );
                 return;
             }
         }
