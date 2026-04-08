@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path=".gitlab-ci.yml" />
+    <File Path="appveyor.yml" />
+    <File Path="Directory.Build.props" />
+    <File Path="NuGet.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Solution Items/Doc/">
+    <File Path="Common/Doc/BasicCommands.png" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <File Path="Tests/TestHelper.config" />
+    <Project Path="Tests/CK.DeviceModel.Configuration.Tests/CK.DeviceModel.Configuration.Tests.csproj" />
+    <Project Path="Tests/CK.DeviceModel.Tests/CK.DeviceModel.Tests.csproj" />
+  </Folder>
+  <Project Path="CK.Cris.DeviceModel/CK.Cris.DeviceModel.csproj" />
+  <Project Path="CK.DeviceModel.Configuration/CK.DeviceModel.Configuration.csproj" />
+  <Project Path="CK.DeviceModel/CK.DeviceModel.csproj" />
+  <Project Path="CK.IO.DeviceModel/CK.IO.DeviceModel.csproj" />
+</Solution>
