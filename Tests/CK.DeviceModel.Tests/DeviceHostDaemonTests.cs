@@ -49,6 +49,101 @@ public class DeviceHostDaemonTests
         }
     }
 
+    /// <summary>
+    /// Test policy that suspends the daemon loop on every iteration via the "Gate" device (a two-way handshake:
+    /// <see cref="GateReachedAsync"/> then <see cref="Proceed"/>), and records/starts any other device.
+    /// </summary>
+    public sealed class GatedShutdownPolicy : IDeviceAlwaysRunningPolicy
+    {
+        readonly SemaphoreSlim _reached = new( 0 );
+        readonly SemaphoreSlim _proceed = new( 0 );
+
+        /// <summary>Completes once the daemon has entered the "Gate" device restart and is suspended.</summary>
+        public Task GateReachedAsync( CancellationToken cancellation ) => _reached.WaitAsync( cancellation );
+
+        /// <summary>Lets the currently gated attempt return.</summary>
+        public void Proceed() => _proceed.Release();
+
+        /// <summary>Set to true as soon as the daemon asks this policy to restart the victim device.</summary>
+        public volatile bool RestartAttemptedForVictim;
+
+        public async Task<int> RetryStartAsync( IActivityMonitor monitor, IDeviceHost host, IDevice device, int retryCount )
+        {
+            if( device.Name == "Gate" )
+            {
+                _reached.Release();
+                await _proceed.WaitAsync().ConfigureAwait( false );
+                // Negative: stay stopped and keep the (past) NextCall so the device gates again next iteration.
+                return -1;
+            }
+            RestartAttemptedForVictim = true;
+            await device.StartAsync( monitor ).ConfigureAwait( false );
+            return 0;
+        }
+    }
+
+    [Test]
+    [CancelAfter( 5000 )]
+    public async Task daemon_does_not_restart_an_AlwaysRunning_device_that_signals_during_shutdown_Async( CancellationToken cancellation )
+    {
+        // The AlwaysRunning restart path ignores DeviceHostDaemon.StoppedToken, so a device that stops as the host
+        // shuts down can be restarted mid-shutdown. We force the victim to be DUE inside a gated iteration, then
+        // cancel the token before it is examined. The Gate device gates every iteration (it never starts, keeping
+        // its already-due NextCall) and is processed first (insertion order):
+        //   Iteration 1 (copy = [Gate]): gate, stop the victim (now queued for next iteration), proceed.
+        //   Iteration 2 (copy = [Gate, Victim]): gate, start daemon shutdown (cancels token), proceed -> victim is
+        //                                         then examined with the token already cancelled and must NOT restart.
+        var policy = new GatedShutdownPolicy();
+        var host = new MachineHost();
+        var daemon = new DeviceHostDaemon( new IDeviceHost[] { host }, policy );
+
+        await ((IHostedService)daemon).StartAsync( default );
+
+        // The Gate device is created/stopped first so it sits first in the stopped list and is processed first.
+        var gateConfig = new MachineConfiguration() { Name = "Gate", Status = DeviceConfigurationStatus.AlwaysRunning };
+        (await host.EnsureDeviceAsync( TestHelper.Monitor, gateConfig )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+        var victimConfig = new MachineConfiguration() { Name = "Victim", Status = DeviceConfigurationStatus.AlwaysRunning };
+        (await host.EnsureDeviceAsync( TestHelper.Monitor, victimConfig )).ShouldBe( DeviceApplyConfigurationResult.CreateAndStartSucceeded );
+
+        var gate = host["Gate"];
+        var victim = host["Victim"];
+        Debug.Assert( gate != null && victim != null );
+        gate.IsRunning.ShouldBeTrue();
+        victim.IsRunning.ShouldBeTrue();
+
+        try
+        {
+            // Iteration 1: gate on Gate, then stop the victim (queued for iteration 2).
+            (await gate.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true )).ShouldBeTrue();
+            await policy.GateReachedAsync( cancellation );
+            (await victim.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true )).ShouldBeTrue();
+            victim.IsRunning.ShouldBeFalse();
+
+            // Iteration 2: gate again (victim now due).
+            policy.Proceed();
+            await policy.GateReachedAsync( cancellation );
+
+            // Begin shutdown and wait for the token to actually flip before letting the loop examine the victim.
+            var stopTask = ((IHostedService)daemon).StopAsync( default );
+            while( !daemon.StoppedToken.IsCancellationRequested )
+            {
+                await Task.Delay( 1, cancellation );
+            }
+            policy.Proceed();
+            await stopTask;
+
+            policy.RestartAttemptedForVictim.ShouldBeFalse( "The daemon restarted an AlwaysRunning device during shutdown: the restart path ignores StoppedToken." );
+            victim.IsRunning.ShouldBeFalse( "A device that stops during the shutdown window must stay stopped." );
+        }
+        finally
+        {
+            // Release any attempt still gated by a failed assertion.
+            policy.Proceed();
+            policy.Proceed();
+            await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
+        }
+    }
+
     [TestCase( "UseDestroyCommandImmediate" )]
     [TestCase( "UseDestroyCommand" )]
     [TestCase( "UseDestroyMethod" )]

@@ -132,27 +132,36 @@ public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> 
                     delta = (e.NextCall - now).Ticks;
                     if( delta <= 0 )
                     {
-                        using( monitor.OpenInfo( $"Attempt n°{e.Count} to restart the device '{d.FullName}'." ) )
+                        // Don't (re)start a device once the daemon is stopping (mirrors the SafeCreateDevice guard).
+                        if( DaemonStoppedToken.IsCancellationRequested )
                         {
-                            _currentRestarting = d;
-                            delta = await TryAlwaysRunningRestartAsync( monitor, global, d, e.Count ).ConfigureAwait( false );
-                            _currentRestarting = null;
-                            if( d.IsRunning )
+                            monitor.Trace( "System is shutting down. Skipping AlwaysRunning restart." );
+                            delta = 0;
+                        }
+                        else
+                        {
+                            using( monitor.OpenInfo( $"Attempt n°{e.Count} to restart the device '{d.FullName}'." ) )
                             {
-                                monitor.CloseGroup( $"Successfully restarted." );
-                                delta = 0;
-                            }
-                            else
-                            {
-                                if( delta <= 0 )
+                                _currentRestarting = d;
+                                delta = await TryAlwaysRunningRestartAsync( monitor, global, d, e.Count ).ConfigureAwait( false );
+                                _currentRestarting = null;
+                                if( d.IsRunning )
                                 {
-                                    monitor.CloseGroup( $"Restart failed. No more retries will be done." );
+                                    monitor.CloseGroup( $"Successfully restarted." );
+                                    delta = 0;
                                 }
                                 else
                                 {
-                                    monitor.CloseGroup( $"Restart failed. Retrying in {delta} ms." );
-                                    delta *= TimeSpan.TicksPerMillisecond;
-                                    // Delta is positive: means that the NextCallDate in the _alwayRunningStopped list must be updated.
+                                    if( delta <= 0 )
+                                    {
+                                        monitor.CloseGroup( $"Restart failed. No more retries will be done." );
+                                    }
+                                    else
+                                    {
+                                        monitor.CloseGroup( $"Restart failed. Retrying in {delta} ms." );
+                                        delta *= TimeSpan.TicksPerMillisecond;
+                                        // Delta is positive: means that the NextCallDate in the _alwayRunningStopped list must be updated.
+                                    }
                                 }
                             }
                         }
