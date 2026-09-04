@@ -5,6 +5,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Cris" Version="0.43.2" />
+    <PackageReference Include="CK.Cris" Version="0.43.3" />
   </ItemGroup>
 </Project>
