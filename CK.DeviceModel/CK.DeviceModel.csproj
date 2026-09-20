@@ -3,9 +3,9 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CK.Abstractions" Version="29.0.5--ci.3" />
-    <PackageReference Include="CK.Configuration" Version="0.11.5--ci.4" />
-    <PackageReference Include="CK.PerfectEvent" Version="27.0.5--ci.4" />
+    <PackageReference Include="CK.Abstractions" Version="29.0.5--ci.4" />
+    <PackageReference Include="CK.Configuration" Version="0.11.5--ci.5" />
+    <PackageReference Include="CK.PerfectEvent" Version="27.0.5--ci.5" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
   </ItemGroup>
