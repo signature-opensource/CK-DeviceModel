@@ -161,6 +161,12 @@ public class ReminderTests
         d.SendCommand( TestHelper.Monitor, cTooMuch, checkDeviceName: false );
         await Util.Awaitable( () => cTooMuch.Completion.Task ).ShouldThrowAsync<NotSupportedException>();
 
+        // The command is completed with the error before the device sends itself the stop command:
+        // waits for the stop to be handled, otherwise our StartAsync may be handled before it (the device
+        // is "Already running") and the stop that follows defers cPass forever.
+        await d.WaitForSynchronizationAsync( considerDeferredCommands: false );
+        d.IsRunning.ShouldBeFalse();
+
         // Restarts the device (the error stopped it and there is no daemon in this test).
         TestHelper.Monitor.Info( "Restarting device." );
         (await d.StartAsync( TestHelper.Monitor )).ShouldBeTrue();
