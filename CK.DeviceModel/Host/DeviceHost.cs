@@ -444,7 +444,18 @@ public abstract partial class DeviceHost<T, THostConfiguration, TConfiguration> 
                     {
                         foreach( var (idx, d) in toReconfigure )
                         {
-                            DeviceApplyConfigurationResult r = await d.InternalReconfigureAsync( monitor, configuration.Items[idx], safeConfig.Items[idx], default ).ConfigureAwait( false );
+                            DeviceApplyConfigurationResult r;
+                            var externalConfig = configuration.Items[idx];
+                            if( !externalConfig.CheckValid( monitor ) )
+                            {
+                                monitor.Error( $"Device '{externalConfig.Name}' is not reconfigured: {typeof( TConfiguration ).Name}.CheckValid rejects the configuration (see errors above) but accepts its DeepClone. " +
+                                               $"Both must agree: DeepClone must copy every property CheckValid reads, and CheckValid must depend only on the configuration content." );
+                                r = DeviceApplyConfigurationResult.InvalidConfiguration;
+                            }
+                            else
+                            {
+                                r = await d.InternalReconfigureAsync( monitor, externalConfig, safeConfig.Items[idx], default ).ConfigureAwait( false );
+                            }
                             results[idx] = r;
                             success &= (r == DeviceApplyConfigurationResult.UpdateSucceeded || r == DeviceApplyConfigurationResult.None);
                         }
