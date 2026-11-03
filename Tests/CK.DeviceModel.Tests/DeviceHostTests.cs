@@ -107,6 +107,14 @@ public class DeviceHostTests
         c2.ExternalConfiguration.ShouldNotBeSameAs( config2 ).ShouldBeSameAs( newConfig2 );
         ((IFlashBulbConfiguration)newConfig2).ComputedValid.ShouldNotBeNull( "CheckValid has been called." );
 
+        var hostConfig2 = new FlashBulbConfiguration() { Name = c2.Name, Status = DeviceConfigurationStatus.Disabled, FlashColor = 1 };
+        hostConfig.Items.Clear();
+        hostConfig.Items.Add( hostConfig2 );
+        (await host.ApplyConfigurationAsync( TestHelper.Monitor, hostConfig )).Success.ShouldBeTrue();
+        host.Find( "Another" ).ShouldBeSameAs( c2 );
+        c2.ExternalConfiguration.ShouldBeSameAs( hostConfig2 );
+        ((IFlashBulbConfiguration)hostConfig2).ComputedValid.ShouldNotBeNull( "A host reconfiguration validates the external configuration." );
+
         await host.ClearAsync( TestHelper.Monitor, waitForDeviceDestroyed: true );
         FlashBulb.TotalCount.ShouldBe( 0 );
         FlashBulb.TotalRunning.ShouldBe( 0 );
