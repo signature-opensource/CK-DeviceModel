@@ -3,6 +3,8 @@ using Shouldly;
 using Microsoft.Extensions.Hosting;
 using NUnit.Framework;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -28,6 +30,27 @@ public class DeviceHostDaemonTests
 
         public int MinRetryCount { get; set; } = 1;
 
+        // The devices started by this policy, in order, and one release per start: a test waits for the
+        // starts (WaitForStartsAsync) instead of guessing when the daemon calls the policy.
+        readonly ConcurrentQueue<IDevice> _started = new();
+        readonly SemaphoreSlim _startedSignal = new( 0 );
+
+        /// <summary>
+        /// Gets the devices started by this policy, in the order of their start.
+        /// </summary>
+        public IReadOnlyCollection<IDevice> StartedDevices => _started;
+
+        /// <summary>
+        /// Waits for <paramref name="count"/> more starts by this policy.
+        /// </summary>
+        public async Task WaitForStartsAsync( int count, CancellationToken cancellation )
+        {
+            for( int i = 0; i < count; ++i )
+            {
+                await _startedSignal.WaitAsync( cancellation );
+            }
+        }
+
         public async Task<int> RetryStartAsync( IActivityMonitor monitor, IDeviceHost host, IDevice device, int retryCount )
         {
             using( monitor.OpenTrace( $"AlwaysRetryPolicy called. retryCount: {retryCount}." ) )
@@ -37,6 +60,8 @@ public class DeviceHostDaemonTests
                     monitor.Trace( $"AlwaysRetryPolicy: calling StartAsync." );
                     if( await device.StartAsync( monitor ) )
                     {
+                        _started.Enqueue( device );
+                        _startedSignal.Release();
                         return 0;
                     }
                 }
@@ -314,7 +339,7 @@ public class DeviceHostDaemonTests
 
     [TestCase( OnStoppedDaemonBehavior.ClearAllHosts )]
     [TestCase( OnStoppedDaemonBehavior.ClearAllHostsAndWaitForDevicesDestroyed )]
-    [CancelAfter( 2000 )]
+    [CancelAfter( 10000 )]
     public async Task multiple_hosts_handling_and_OnStoppedDaemonBehavior_Async( OnStoppedDaemonBehavior behavior, CancellationToken cancellation )
     {
         var policy = new AlwaysRetryPolicy() { MinRetryCount = 1 };
@@ -350,21 +375,27 @@ public class DeviceHostDaemonTests
         {
             await d.StopAsync( TestHelper.Monitor, ignoreAlwaysRunning: true );
         }
-        TestHelper.Monitor.Trace( "*** Wait ***" );
-        await Task.Delay( 300, cancellation );
-        TestHelper.Monitor.Trace( "*** EndWait ***" );
-        devices.Count( d => d.IsRunning ).ShouldBe( 3 );
-        devices.Where( d => d.IsRunning ).Select( d => d.Name ).Concatenate().ShouldBe( "D1, D1, D1" );
-
-        TestHelper.Monitor.Debug( "*** Wait ***" );
-        await Task.Delay( 300, cancellation );
+        // The daemon restarts them through the policy: the "D1" are due 200 ms after their first retry,
+        // the "D*2" 400 ms after (the policy multiplies the delay by 2): the "D1" start first.
+        await policy.WaitForStartsAsync( 3, cancellation );
+        policy.StartedDevices.Take( 3 ).Select( d => d.Name ).Concatenate().ShouldBe( "D1, D1, D1" );
+        await policy.WaitForStartsAsync( 3, cancellation );
         devices.Count( d => d.IsRunning ).ShouldBe( 6 );
 
+        // A destroyed device leaves its host, then raises its Destroyed status.
+        var destroyed = new SemaphoreSlim( 0 );
+        foreach( var d in devices )
+        {
+            d.LifetimeEvent.Sync += ( m, e ) => { if( e.StatusChanged && e.DeviceStatus.IsDestroyed ) destroyed.Release(); };
+        }
         await ((IHostedService)daemon).StopAsync( default );
         if( behavior == OnStoppedDaemonBehavior.ClearAllHosts )
         {
-            TestHelper.Monitor.Trace( "*** Wait ***" );
-            await Task.Delay( 300, cancellation );
+            // The hosts are cleared without waiting for the devices to be destroyed.
+            for( int i = 0; i < devices.Length; ++i )
+            {
+                await destroyed.WaitAsync( cancellation );
+            }
         }
         host1.Count.ShouldBe( 0 );
         host2.Count.ShouldBe( 0 );
