@@ -3,7 +3,6 @@
     <File Path=".editorconfig" />
     <File Path=".gitignore" />
     <File Path=".gitlab-ci.yml" />
-    <File Path="appveyor.yml" />
     <File Path="Directory.Build.props" />
     <File Path="NuGet.config" />
     <File Path="README.md" />
